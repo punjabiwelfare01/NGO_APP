@@ -1,0 +1,169 @@
+import 'package:flutter/material.dart';
+
+import 'app_state.dart';
+import 'core/colors.dart';
+import 'core/config.dart';
+import 'models/auth_models.dart';
+import 'repositories/auth0_strategy.dart';
+import 'repositories/auth_repository.dart';
+import 'screens/auth/login_view.dart';
+import 'screens/events/events_view.dart';
+import 'screens/events/student/event_detail_screen.dart';
+import 'screens/home/home_view.dart';
+import 'screens/learn/learn_view.dart';
+import 'screens/profile/profile_view.dart';
+import 'screens/quiz/quiz_play_screen.dart';
+import 'screens/helping_support/helping_support_view.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initializes the Auth0 JS client on web (no-op on Android/iOS).
+  await initAuth0(AppConfig.auth0Domain, AppConfig.auth0ClientId);
+  AppState.restore();
+
+  // Web only: if Auth0 just redirected back with a code, exchange it now.
+  // On Android/iOS this always returns null (login completes in loginWithAuth0).
+  try {
+    final result = await AuthRepository.handleAuth0RedirectCallback();
+    if (result != null) {
+      AppState.setFromLogin(
+        result.userId,
+        result.accessToken,
+        UserRole.fromString(result.role),
+      );
+    }
+  } catch (_) {
+    // Ignore — user will see the login screen and can retry.
+  }
+
+  runApp(const CareSkillApp());
+}
+
+class CareSkillApp extends StatelessWidget {
+  const CareSkillApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: AppConfig.appName,
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: AppColors.background,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primary,
+          primary: AppColors.primary,
+          secondary: AppColors.secondary,
+          surface: Colors.white,
+        ),
+        fontFamily: AppConfig.fontFamily,
+        textTheme: const TextTheme(
+          headlineLarge: TextStyle(fontWeight: FontWeight.w800),
+          headlineMedium: TextStyle(fontWeight: FontWeight.w800),
+          titleLarge: TextStyle(fontWeight: FontWeight.w800),
+          titleMedium: TextStyle(fontWeight: FontWeight.w700),
+          bodyLarge: TextStyle(fontWeight: FontWeight.w500),
+        ),
+      ),
+      // After sign-in we push /home via pushReplacementNamed.
+      initialRoute: AppState.isAuthenticated ? '/home' : '/login',
+      routes: {
+        '/login': (_) => const LoginView(),
+        '/home': (_) => const AppShell(),
+      },
+      onGenerateRoute: (settings) {
+        final name = settings.name ?? '';
+        final uri = Uri.parse(name);
+        if (uri.pathSegments.length == 2) {
+          final id = int.tryParse(uri.pathSegments[1]);
+          if (id != null && uri.pathSegments[0] == 'quiz') {
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => QuizPlayScreen(quizId: id),
+            );
+          }
+          const eventPrefixes = {
+            'event',
+            'quiz-event',
+            'daily-challenge',
+            'workshop',
+            'competition',
+            'scholarship',
+            'counselling-drive',
+            'talent-hunt',
+            'awareness-campaign',
+            'cyber-security',
+          };
+          if (id != null && eventPrefixes.contains(uri.pathSegments[0])) {
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => EventDetailScreen(eventId: id),
+            );
+          }
+        }
+        return null;
+      },
+    );
+  }
+}
+
+class AppShell extends StatefulWidget {
+  const AppShell({super.key});
+
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  int _selectedIndex = 0;
+
+  // Role-specific UI lives inside each view.
+  final _pages = const [
+    HomeView(),
+    LearnView(),
+    EventsView(),
+    HelpingSupportView(),
+    ProfileView(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(child: _pages[_selectedIndex]),
+      bottomNavigationBar: NavigationBar(
+        height: 72,
+        selectedIndex: _selectedIndex,
+        indicatorColor: AppColors.primary.withValues(alpha: 0.16),
+        onDestinationSelected: (index) =>
+            setState(() => _selectedIndex = index),
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.school_outlined),
+            selectedIcon: Icon(Icons.school_rounded),
+            label: 'Learn',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.event_outlined),
+            selectedIcon: Icon(Icons.event_rounded),
+            label: 'Events',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.support_agent_outlined),
+            selectedIcon: Icon(Icons.support_agent_rounded),
+            label: 'Helping Support',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+}

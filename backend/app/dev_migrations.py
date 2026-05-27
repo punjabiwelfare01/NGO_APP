@@ -1,0 +1,218 @@
+from sqlalchemy import inspect, text
+from sqlalchemy.engine import Engine
+
+
+def ensure_sqlite_schema(engine: Engine) -> None:
+    if not engine.url.drivername.startswith("sqlite"):
+        return
+
+    inspector = inspect(engine)
+    if "events" not in inspector.get_table_names():
+        return
+
+    event_columns = {column["name"] for column in inspector.get_columns("events")}
+    event_additions = {
+        "quiz_id": "INTEGER",
+        "is_daily_challenge": "BOOLEAN NOT NULL DEFAULT 0",
+        "start_date": "DATETIME",
+        "end_date": "DATETIME",
+    }
+
+    with engine.begin() as connection:
+        for column, ddl_type in event_additions.items():
+            if column not in event_columns:
+                connection.execute(
+                    text(f"ALTER TABLE events ADD COLUMN {column} {ddl_type}")
+                )
+
+        if "event_participants" in inspector.get_table_names():
+            participant_columns = {
+                column["name"]
+                for column in inspector.get_columns("event_participants")
+            }
+            if "slot_id" not in participant_columns:
+                connection.execute(
+                    text("ALTER TABLE event_participants ADD COLUMN slot_id INTEGER")
+                )
+
+        if "event_slots" not in inspector.get_table_names():
+            connection.execute(text("""
+                CREATE TABLE event_slots (
+                    id INTEGER NOT NULL,
+                    event_id INTEGER NOT NULL,
+                    title VARCHAR NOT NULL,
+                    starts_at DATETIME NOT NULL,
+                    ends_at DATETIME,
+                    capacity INTEGER NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(event_id) REFERENCES events (id)
+                )
+            """))
+            connection.execute(
+                text("CREATE INDEX ix_event_slots_id ON event_slots (id)")
+            )
+
+        if "lessons" not in inspector.get_table_names():
+            connection.execute(text("""
+                CREATE TABLE lessons (
+                    id INTEGER NOT NULL,
+                    course_id INTEGER NOT NULL,
+                    title VARCHAR NOT NULL,
+                    description VARCHAR,
+                    content_type VARCHAR NOT NULL DEFAULT 'text',
+                    content_url VARCHAR,
+                    content_text TEXT,
+                    "order" INTEGER NOT NULL DEFAULT 0,
+                    duration_minutes INTEGER,
+                    is_published BOOLEAN NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(course_id) REFERENCES courses (id)
+                )
+            """))
+            connection.execute(text("CREATE INDEX ix_lessons_id ON lessons (id)"))
+            connection.execute(text("CREATE INDEX ix_lessons_course_id ON lessons (course_id)"))
+
+        if "user_lesson_progress" not in inspector.get_table_names():
+            connection.execute(text("""
+                CREATE TABLE user_lesson_progress (
+                    id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    lesson_id INTEGER NOT NULL,
+                    completed BOOLEAN NOT NULL DEFAULT 0,
+                    completed_at DATETIME,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(user_id) REFERENCES users (id),
+                    FOREIGN KEY(lesson_id) REFERENCES lessons (id)
+                )
+            """))
+            connection.execute(text("CREATE INDEX ix_user_lesson_progress_id ON user_lesson_progress (id)"))
+
+        if "safety_awareness_questions" not in inspector.get_table_names():
+            connection.execute(text("""
+                CREATE TABLE safety_awareness_questions (
+                    id INTEGER NOT NULL,
+                    question_text VARCHAR NOT NULL,
+                    option_a VARCHAR NOT NULL,
+                    option_b VARCHAR NOT NULL,
+                    option_c VARCHAR NOT NULL,
+                    correct_option VARCHAR NOT NULL,
+                    explanation VARCHAR NOT NULL,
+                    category VARCHAR NOT NULL DEFAULT 'general',
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id)
+                )
+            """))
+            connection.execute(text("CREATE INDEX ix_safety_awareness_questions_id ON safety_awareness_questions (id)"))
+
+        if "user_safety_answers" not in inspector.get_table_names():
+            connection.execute(text("""
+                CREATE TABLE user_safety_answers (
+                    id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    question_id INTEGER NOT NULL,
+                    chosen_option VARCHAR NOT NULL,
+                    is_correct BOOLEAN NOT NULL,
+                    answered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(user_id) REFERENCES users (id),
+                    FOREIGN KEY(question_id) REFERENCES safety_awareness_questions (id)
+                )
+            """))
+            connection.execute(text("CREATE INDEX ix_user_safety_answers_id ON user_safety_answers (id)"))
+
+        if "counselling_sessions" in inspector.get_table_names():
+            counselling_columns = {
+                column["name"]
+                for column in inspector.get_columns("counselling_sessions")
+            }
+            counselling_additions = {
+                "slot_id": "INTEGER",
+                "mentor_id": "INTEGER",
+                "ends_at": "DATETIME",
+                "meeting_url": "VARCHAR",
+            }
+            for column, ddl_type in counselling_additions.items():
+                if column not in counselling_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE counselling_sessions ADD COLUMN {column} {ddl_type}")
+                    )
+
+        if "counselling_availability" not in inspector.get_table_names():
+            connection.execute(text("""
+                CREATE TABLE counselling_availability (
+                    id INTEGER NOT NULL,
+                    mentor_id INTEGER NOT NULL,
+                    mentor_name VARCHAR NOT NULL,
+                    starts_at DATETIME NOT NULL,
+                    ends_at DATETIME NOT NULL,
+                    topic VARCHAR,
+                    capacity INTEGER NOT NULL DEFAULT 1,
+                    booked_count INTEGER NOT NULL DEFAULT 0,
+                    meeting_url VARCHAR,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    slot_duration_minutes INTEGER NOT NULL DEFAULT 45,
+                    recurrence_type VARCHAR NOT NULL DEFAULT 'none',
+                    recurrence_end_date DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(mentor_id) REFERENCES users (id)
+                )
+            """))
+            connection.execute(text("CREATE INDEX ix_counselling_availability_id ON counselling_availability (id)"))
+        else:
+            # Add new columns to existing counselling_availability table
+            avail_columns = {col["name"] for col in inspector.get_columns("counselling_availability")}
+            avail_additions = {
+                "slot_duration_minutes": "INTEGER NOT NULL DEFAULT 45",
+                "recurrence_type": "VARCHAR NOT NULL DEFAULT 'none'",
+                "recurrence_end_date": "DATETIME",
+            }
+            for column, ddl_type in avail_additions.items():
+                if column not in avail_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE counselling_availability ADD COLUMN {column} {ddl_type}")
+                    )
+
+        # mentor_profiles table
+        if "mentor_profiles" not in inspector.get_table_names():
+            connection.execute(text("""
+                CREATE TABLE mentor_profiles (
+                    id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL UNIQUE,
+                    display_name VARCHAR NOT NULL,
+                    bio TEXT,
+                    expertise VARCHAR,
+                    category VARCHAR,
+                    profile_image_url VARCHAR,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    rating REAL NOT NULL DEFAULT 0.0,
+                    session_count INTEGER NOT NULL DEFAULT 0,
+                    google_calendar_id VARCHAR,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(user_id) REFERENCES users (id)
+                )
+            """))
+            connection.execute(text("CREATE INDEX ix_mentor_profiles_id ON mentor_profiles (id)"))
+            connection.execute(text("CREATE UNIQUE INDEX ix_mentor_profiles_user_id ON mentor_profiles (user_id)"))
+
+        # counselling_notifications table
+        if "counselling_notifications" not in inspector.get_table_names():
+            connection.execute(text("""
+                CREATE TABLE counselling_notifications (
+                    id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    type VARCHAR NOT NULL,
+                    message TEXT NOT NULL,
+                    booking_ref VARCHAR,
+                    is_read BOOLEAN NOT NULL DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(user_id) REFERENCES users (id)
+                )
+            """))
+            connection.execute(text("CREATE INDEX ix_counselling_notifications_id ON counselling_notifications (id)"))

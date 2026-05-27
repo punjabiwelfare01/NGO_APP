@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"/home/sonia/Documents/MY_PROJECTS/Android_devlopment/MY_APP1/flutter_application_1 \\(Copy\\)/lib/core\" \\\\ *)",
+      "Bash(pip install *)",
+      "Bash(python3 -m pip install -r requirements.txt -q)",
+      "Bash(python3 -c \"import sys; print\\(sys.path\\)\")",
+      "Read(//usr/bin/**)",
+      "Read(//home/sonia/.local/bin/**)",
+      "Bash(command -v uv pipx conda)",
+      "Bash(uv venv *)",
+      "Bash(uv pip *)",
+      "Read(//usr/local/bin/**)",
+      "Read(//home/sonia/.local/share/uv/**)",
+      "Bash(.venv/bin/python -c \"import fastapi, sqlalchemy, pydantic; print\\('All packages OK'\\)\")",
+      "Bash(.venv/bin/python -c \"from app.main import app; print\\('App loaded, routes:', [r.path for r in app.routes]\\)\")",
+      "Bash(.venv/bin/python seed.py)",
+      "Bash(flutter pub *)",
+      "Bash(flutter analyze *)",
+      "Bash(.venv/bin/python -c \"import docx\")",
+      "Bash(backend/.venv/bin/python generate_checklist.py)",
+      "Bash(.venv/bin/pip show *)",
+      "Bash(lsof -ti:8000)",
+      "Bash(xargs kill -9)",
+      "Bash(.venv/bin/uvicorn app.main:app --reload --port 8000)",
+      "Bash(curl -s http://localhost:8000/)",
+      "Bash(python3 -c \"import sys,json; print\\(json.load\\(sys.stdin\\)\\)\")",
+      "Bash(curl -s -X POST http://localhost:8000/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@careskill.demo\",\"password\":\"admin123\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('role:', d.get\\('role'\\), '| user_id:', d.get\\('user_id'\\), '| name:', d.get\\('name'\\)\\)\")"
+    ],
+    "additionalDirectories": [
+      "/home/sonia/Documents/MY_PROJECTS/Android_devlopment/MY_APP1/flutter_application_1 (Copy)/lib"
+    ]
+  }
+}
