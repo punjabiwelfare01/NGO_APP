@@ -205,7 +205,7 @@ def seed_quizzes(admin: User) -> list[Quiz]:
     return quizzes
 
 
-def seed_users() -> tuple[User, User]:
+def seed_users() -> tuple[User, User, User, User, User]:
     # Demo student: Aarav Sharma
     student = User(
         name="Aarav Sharma",
@@ -216,6 +216,16 @@ def seed_users() -> tuple[User, User]:
         xp=2480,
         role=UserRole.student,
         parent_email="parent@example.com",
+    )
+    # NGO super-admin (platform owner)
+    super_admin = User(
+        name="Super Admin",
+        email="superadmin@careskill.demo",
+        hashed_password=_hash("superadmin123"),
+        age=40,
+        level=1,
+        xp=0,
+        role=UserRole.super_admin,
     )
     # NGO admin account
     admin = User(
@@ -237,12 +247,21 @@ def seed_users() -> tuple[User, User]:
         xp=0,
         role=UserRole.mentor,
     )
-    db.add_all([student, admin, mentor])
+    # Demo content creator
+    content_creator = User(
+        name="Content Creator",
+        email="creator@careskill.demo",
+        hashed_password=_hash("creator123"),
+        age=28,
+        level=1,
+        xp=0,
+        role=UserRole.content_creator,
+    )
+    db.add_all([student, super_admin, admin, mentor, content_creator])
     db.commit()
-    db.refresh(student)
-    db.refresh(admin)
-    db.refresh(mentor)
-    return student, admin, mentor
+    for u in [student, super_admin, admin, mentor, content_creator]:
+        db.refresh(u)
+    return student, super_admin, admin, mentor, content_creator
 
 
 def seed_demo_activity(
@@ -267,7 +286,7 @@ def seed_demo_activity(
         starts_at=datetime.now() + timedelta(hours=2),
         ends_at=datetime.now() + timedelta(hours=3),
         booked_count=1,
-        meeting_url="https://meet.example.org/careskill-demo",
+        meeting_url="https://meet.jit.si/CareSkill-Demo-Session",
     )
     db.add(slot)
     db.flush()
@@ -297,16 +316,17 @@ if __name__ == "__main__":
     cats    = seed_categories();  print(f"  {len(cats)} skill categories")
     crs     = seed_courses(cats); print(f"  {len(crs)} courses")
     bdgs    = seed_badges();      print(f"  {len(bdgs)} badges")
-    student, admin, mentor = seed_users()
-    print(f"  Users: {student.name} (student, id={student.id}), "
-          f"{admin.name} (admin, id={admin.id}), "
-          f"{mentor.name} (mentor, id={mentor.id})")
+    student, super_admin, admin, mentor, content_creator = seed_users()
+    print(f"  Users: {student.name} (student), {super_admin.name} (super_admin), "
+          f"{admin.name} (admin), {mentor.name} (mentor), {content_creator.name} (content_creator)")
     qzs     = seed_quizzes(admin); print(f"  {len(qzs)} quizzes + daily challenge")
     seed_demo_activity(student, mentor, crs, bdgs)
     print("  Demo activity seeded")
     db.close()
     print("\nDone. Database ready.")
     print("\nDemo credentials:")
-    print(f"  Student  →  aarav@careskill.demo  /  careskill123")
-    print(f"  Admin    →  admin@careskill.demo  /  admin123")
-    print(f"  Mentor   →  meera@careskill.demo  /  mentor123")
+    print(f"  Super Admin      →  superadmin@careskill.demo  /  superadmin123")
+    print(f"  Admin            →  admin@careskill.demo       /  admin123")
+    print(f"  Mentor           →  meera@careskill.demo       /  mentor123")
+    print(f"  Content Creator  →  creator@careskill.demo     /  creator123")
+    print(f"  Student          →  aarav@careskill.demo       /  careskill123")

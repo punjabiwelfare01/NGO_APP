@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/colors.dart';
 import '../../../models/api_models.dart';
@@ -46,10 +47,15 @@ class LiveSessionBanner extends StatelessWidget {
             ),
           ),
           FilledButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Join: ${session.meetingUrl}')),
-              );
+            onPressed: () async {
+              final url = Uri.parse(session.meetingUrl!);
+              if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not open meeting link.')),
+                  );
+                }
+              }
             },
             icon: const Icon(Icons.open_in_new_rounded, size: 16),
             label: const Text('Join'),

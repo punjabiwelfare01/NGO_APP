@@ -1,3 +1,10 @@
+# Secrets — never commit these
+backend/.env
+backend/google_token.json
+backend/client_secret_*.json
+backend/careskill.db
+backend/.venv/
+
 # Miscellaneous
 *.class
 *.log
