@@ -1,55 +1,76 @@
-# Secrets — never commit these
-backend/.env
-backend/google_token.json
-backend/client_secret_*.json
-backend/careskill.db
-backend/.venv/
-
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
+# ─── Secrets — never commit ───────────────────────────────────────────────────
 .env
 .env.*
 !.env.example
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+backend/.env
+backend/.env.*
+backend/google_token.json
+backend/client_secret_*.json
+backend/service_account*.json
+backend/*_credentials.json
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+# ─── Backend ──────────────────────────────────────────────────────────────────
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/careskill.db
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+backend/logs/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/htmlcov/
+backend/.coverage
+backend/dist/
+backend/*.egg-info/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# ─── Flutter platform folders (regenerate with `flutter create --platforms`) ──
+android/
+ios/
+linux/
+windows/
+macos/
+web/
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# ─── Flutter / Dart ───────────────────────────────────────────────────────────
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 /build/
 /coverage/
+**/doc/api/
+*.g.dart
+*.freezed.dart
+*.mocks.dart
 
-# Symbolication related
+# ─── IDE & OS ─────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.history/
+.atom/
+.buildlog/
+.svn/
+migrate_working_dir/
+
+# ─── Misc build artefacts ─────────────────────────────────────────────────────
+*.class
+*.log
+*.pyc
+*.pyo
+.build/
+.swiftpm/
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
