@@ -11,3 +11,4 @@ from .safety import SafetyAwarenessQuestion, UserSafetyAnswer
 from .emergency import EmergencyContact
 from .chat import ChatMessage
 from .notification import AdminNotification
+from .calendar import StudentReminder

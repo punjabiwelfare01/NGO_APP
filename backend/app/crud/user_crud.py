@@ -1,6 +1,9 @@
+from datetime import date, timedelta
+
 from sqlalchemy.orm import Session
 
 from ..config import settings
+from ..models.course import UserCourseProgress, UserLessonProgress
 from ..models.user import User
 from ..schemas.user import UserCreate, UserUpdate
 
@@ -56,10 +59,51 @@ def get_user_stats(db: Session, user_id: int) -> dict:
     skill_growth = (
         round((user.xp / total_possible_xp.xp) * 100) if total_possible_xp and total_possible_xp.xp > 0 else 0
     )
+    courses_enrolled = (
+        db.query(UserCourseProgress)
+        .filter(UserCourseProgress.user_id == user_id)
+        .count()
+    )
+    lessons_completed = (
+        db.query(UserLessonProgress)
+        .filter(
+            UserLessonProgress.user_id == user_id,
+            UserLessonProgress.completed == True,
+        )
+        .count()
+    )
 
     return {
         "user_id": user_id,
         "weekly_learning_hours": 6.5,   # placeholder — wire to real tracking later
         "skill_growth_percent": skill_growth,
         "quiz_rank": rank,
+        "courses_enrolled": courses_enrolled,
+        "lessons_completed": lessons_completed,
+        "study_streak_days": _study_streak_days(db, user_id),
     }
+
+
+def _study_streak_days(db: Session, user_id: int) -> int:
+    rows = (
+        db.query(UserLessonProgress.completed_at)
+        .filter(
+            UserLessonProgress.user_id == user_id,
+            UserLessonProgress.completed == True,
+            UserLessonProgress.completed_at.isnot(None),
+        )
+        .all()
+    )
+    completed_dates = {row[0].date() for row in rows if row[0] is not None}
+    if not completed_dates:
+        return 0
+
+    cursor = date.today()
+    if cursor not in completed_dates:
+        cursor -= timedelta(days=1)
+
+    streak = 0
+    while cursor in completed_dates:
+        streak += 1
+        cursor -= timedelta(days=1)
+    return streak

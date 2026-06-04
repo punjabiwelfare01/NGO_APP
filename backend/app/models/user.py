@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Boolean, Column, DateTime, Enum as SAEnum, Integer, String, func
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum as SAEnum, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -23,6 +23,7 @@ class User(Base):
     email           = Column(String, unique=True, nullable=True, index=True)
     hashed_password = Column(String, nullable=True)
     age             = Column(Integer, nullable=True)
+    date_of_birth   = Column(Date, nullable=True)
     level           = Column(Integer, default=1)
     xp              = Column(Integer, default=0)
     role            = Column(SAEnum(UserRole), default=UserRole.student, nullable=False)

@@ -51,6 +51,19 @@ def create_user(
     return user_crud.create_user(db, payload)
 
 
+@router.patch("/me/profile", response_model=UserResponse,
+              summary="Update the current user's student profile fields")
+def update_my_profile(
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user = user_crud.update_user(db, current_user.id, payload)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
 @router.get("/{user_id}", response_model=UserResponse,
             summary="Get a user profile [self or admin]")
 def get_user(

@@ -21,6 +21,7 @@ from .models import (  # noqa: F401 — registers all ORM models before create_a
     EmergencyContact,
     ChatMessage,
     AdminNotification,
+    StudentReminder,
 )
 from .database import Base
 from .dev_migrations import ensure_sqlite_schema
@@ -32,7 +33,9 @@ from .routers import quiz
 from .routers import safety
 from .routers import emergency
 from .routers import chat
+from .routers import creator
 from .routers import upload
+from .routers import calendar
 
 Base.metadata.create_all(bind=engine)
 ensure_sqlite_schema(engine)
@@ -77,7 +80,9 @@ app.include_router(quiz.router)
 app.include_router(safety.router)
 app.include_router(emergency.router)
 app.include_router(chat.router)
+app.include_router(creator.router)
 app.include_router(upload.router)
+app.include_router(calendar.router)
 
 
 @app.get("/health", tags=["Health"])

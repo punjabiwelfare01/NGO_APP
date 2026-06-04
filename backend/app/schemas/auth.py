@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 
 from pydantic import BaseModel
@@ -10,6 +11,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     age: Optional[int] = None
+    date_of_birth: Optional[date] = None
     role: UserRole = UserRole.student
     parent_email: Optional[str] = None
     class_name: Optional[str] = None

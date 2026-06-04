@@ -16,8 +16,9 @@ class UserRepository {
   }
 
   static Future<AppUser> addXp(int userId, int amount) async {
-    final json = await ApiClient.post('/users/$userId/xp', {'amount': amount})
-        as Map<String, dynamic>;
+    final json =
+        await ApiClient.post('/users/$userId/xp', {'amount': amount})
+            as Map<String, dynamic>;
     return AppUser.fromJson(json);
   }
 
@@ -28,20 +29,29 @@ class UserRepository {
     String? schoolName,
     String? location,
     int? age,
+    DateTime? dateOfBirth,
     String? parentEmail,
     String? phone,
   }) async {
-    final body = <String, dynamic>{
-      if (name != null) 'name': name,
-      if (className != null) 'class_name': className,
-      if (schoolName != null) 'school_name': schoolName,
-      if (location != null) 'location': location,
-      if (age != null) 'age': age,
-      if (parentEmail != null) 'parent_email': parentEmail,
-      if (phone != null) 'phone': phone,
-    };
-    final json = await ApiClient.patch('/users/me/profile', body)
-        as Map<String, dynamic>;
+    final body = <String, dynamic>{};
+    void addIfPresent(String key, Object? value) {
+      if (value != null) body[key] = value;
+    }
+
+    addIfPresent('name', name);
+    addIfPresent('class_name', className);
+    addIfPresent('school_name', schoolName);
+    addIfPresent('location', location);
+    addIfPresent('age', age);
+    addIfPresent(
+      'date_of_birth',
+      dateOfBirth?.toIso8601String().split('T').first,
+    );
+    addIfPresent('parent_email', parentEmail);
+    addIfPresent('phone', phone);
+    final json =
+        await ApiClient.patch('/users/me/profile', body)
+            as Map<String, dynamic>;
     return AppUser.fromJson(json);
   }
 }

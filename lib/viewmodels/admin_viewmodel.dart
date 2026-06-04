@@ -10,19 +10,19 @@ class AdminViewModel extends ChangeNotifier {
   String? _errorMessage;
   bool _disposed = false;
 
-  List<PendingUserItem>   _pendingUsers  = [];
+  List<PendingUserItem> _pendingUsers = [];
   List<AdminNotification> _notifications = [];
-  List<AdminUserItem>     _allUsers      = [];
-  AdminStats              _stats         = AdminStats.empty();
+  List<AdminUserItem> _allUsers = [];
+  AdminStats _stats = AdminStats.empty();
 
-  ViewState               get state         => _state;
-  String?                 get errorMessage  => _errorMessage;
-  List<PendingUserItem>   get pendingUsers  => _pendingUsers;
+  ViewState get state => _state;
+  String? get errorMessage => _errorMessage;
+  List<PendingUserItem> get pendingUsers => _pendingUsers;
   List<AdminNotification> get notifications => _notifications;
-  List<AdminUserItem>     get allUsers      => _allUsers;
-  AdminStats              get stats         => _stats;
+  List<AdminUserItem> get allUsers => _allUsers;
+  AdminStats get stats => _stats;
 
-  int get unreadCount  => _notifications.where((n) => !n.isRead).length;
+  int get unreadCount => _notifications.where((n) => !n.isRead).length;
   int get pendingCount => _pendingUsers.length;
 
   @override
@@ -40,10 +40,12 @@ class AdminViewModel extends ChangeNotifier {
         AdminRepository.getPendingUsers(),
         AdminRepository.getNotifications(),
         AdminRepository.getStats(),
+        AdminRepository.getAllUsers(),
       ]);
-      _pendingUsers  = results[0] as List<PendingUserItem>;
+      _pendingUsers = results[0] as List<PendingUserItem>;
       _notifications = results[1] as List<AdminNotification>;
-      _stats         = results[2] as AdminStats;
+      _stats = results[2] as AdminStats;
+      _allUsers = results[3] as List<AdminUserItem>;
       _state = ViewState.idle;
     } on ApiException catch (e) {
       _state = ViewState.error;
@@ -209,8 +211,9 @@ class AdminViewModel extends ChangeNotifier {
   Future<void> markAllRead() async {
     try {
       await AdminRepository.markAllNotificationsRead();
-      _notifications =
-          _notifications.map((n) => n.copyWith(isRead: true)).toList();
+      _notifications = _notifications
+          .map((n) => n.copyWith(isRead: true))
+          .toList();
       if (!_disposed) notifyListeners();
     } on ApiException {
       // ignore
@@ -222,8 +225,10 @@ class AdminViewModel extends ChangeNotifier {
   void _updateAllUser(int userId, {String? role, String? accessStatus}) {
     final idx = _allUsers.indexWhere((u) => u.id == userId);
     if (idx != -1) {
-      _allUsers[idx] =
-          _allUsers[idx].copyWith(role: role, accessStatus: accessStatus);
+      _allUsers[idx] = _allUsers[idx].copyWith(
+        role: role,
+        accessStatus: accessStatus,
+      );
     }
   }
 }

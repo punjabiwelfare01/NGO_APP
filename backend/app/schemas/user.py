@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel
@@ -9,14 +9,24 @@ from ..models.user import UserRole
 class UserCreate(BaseModel):
     name: str
     age: Optional[int] = None
+    date_of_birth: Optional[date] = None
     role: UserRole = UserRole.student
     parent_email: Optional[str] = None
+    class_name: Optional[str] = None
+    school_name: Optional[str] = None
+    location: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     age: Optional[int] = None
+    date_of_birth: Optional[date] = None
     parent_email: Optional[str] = None
+    class_name: Optional[str] = None
+    school_name: Optional[str] = None
+    location: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class UserRoleUpdate(BaseModel):
@@ -36,6 +46,7 @@ class UserResponse(BaseModel):
     name: str
     email: Optional[str] = None
     age: Optional[int] = None
+    date_of_birth: Optional[date] = None
     level: int
     xp: int
     role: str = "student"
@@ -58,6 +69,9 @@ class UserStats(BaseModel):
     weekly_learning_hours: float
     skill_growth_percent: int
     quiz_rank: int
+    courses_enrolled: int = 0
+    lessons_completed: int = 0
+    study_streak_days: int = 0
 
 
 class LeaderboardEntry(BaseModel):

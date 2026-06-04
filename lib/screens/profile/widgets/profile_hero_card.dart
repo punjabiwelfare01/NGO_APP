@@ -17,11 +17,11 @@ class ProfileHeroCard extends StatelessWidget {
     final school = user?.schoolName;
     final location = user?.location;
 
-    final schoolLine = [
-      if (className != null) 'Class $className',
-      if (school != null) school,
-      if (location != null) location,
-    ].join(' • ');
+    final schoolParts = <String>[];
+    if (className != null) schoolParts.add('Class $className');
+    if (school != null) schoolParts.add(school);
+    if (location != null) schoolParts.add(location);
+    final schoolLine = schoolParts.join(' • ');
 
     return AppCard(
       child: Row(
@@ -60,7 +60,10 @@ class ProfileHeroCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     'Age $age',
-                    style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ],

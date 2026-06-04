@@ -111,6 +111,7 @@ def register_user(db: Session, data: RegisterRequest) -> User:
         email=data.email,
         hashed_password=hash_password(data.password),
         age=data.age,
+        date_of_birth=data.date_of_birth,
         role=UserRole.student,
         access_status="pending_verification",
         parent_email=data.parent_email,

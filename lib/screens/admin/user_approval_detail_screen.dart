@@ -23,14 +23,14 @@ class UserApprovalDetailScreen extends StatefulWidget {
       _UserApprovalDetailScreenState();
 }
 
-class _UserApprovalDetailScreenState
-    extends State<UserApprovalDetailScreen> {
+class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
   final _noteCtrl = TextEditingController();
   String? _selectedRole;
   bool _loading = false;
   bool _changed = false;
   AppUser? _user;
   String? _loadError;
+  bool _closing = false;
 
   @override
   void initState() {
@@ -68,19 +68,16 @@ class _UserApprovalDetailScreenState
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: true,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) Navigator.of(context).pop(_changed);
+        if (!didPop) _close();
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
           backgroundColor: AppColors.background,
           elevation: 0,
-          leading: BackButton(
-            color: AppColors.ink,
-            onPressed: () => Navigator.of(context).pop(_changed),
-          ),
+          leading: BackButton(color: AppColors.ink, onPressed: _close),
           title: const Text(
             'Review Profile',
             style: TextStyle(
@@ -93,10 +90,21 @@ class _UserApprovalDetailScreenState
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _loadError != null
-                ? _ErrorBody(error: _loadError!, onRetry: _loadUser)
-                : _buildBody(),
+            ? _ErrorBody(error: _loadError!, onRetry: _loadUser)
+            : _buildBody(),
       ),
     );
+  }
+
+  void _close([bool? result]) {
+    if (_closing || !mounted) return;
+    _closing = true;
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop(result ?? _changed);
+    } else {
+      navigator.pushReplacementNamed('/home');
+    }
   }
 
   Widget _buildBody() {
@@ -143,8 +151,10 @@ class _UserApprovalDetailScreenState
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide:
-                    const BorderSide(color: AppColors.primary, width: 2),
+                borderSide: const BorderSide(
+                  color: AppColors.primary,
+                  width: 2,
+                ),
               ),
             ),
           ),
@@ -179,7 +189,9 @@ class _UserApprovalDetailScreenState
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: _loading || _selectedRole == null ? null : _approve,
+                  onPressed: _loading || _selectedRole == null
+                      ? null
+                      : _approve,
                   icon: _loading
                       ? const SizedBox(
                           width: 16,
@@ -189,7 +201,10 @@ class _UserApprovalDetailScreenState
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(Icons.check_circle_outline_rounded, size: 18),
+                      : const Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 18,
+                        ),
                   label: const Text('Approve & Assign'),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.accent,
@@ -222,8 +237,9 @@ class _UserApprovalDetailScreenState
     final ok = await widget.vm.assignRole(
       userId: widget.userId,
       role: _selectedRole!,
-      verificationNote:
-          _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+      verificationNote: _noteCtrl.text.trim().isEmpty
+          ? null
+          : _noteCtrl.text.trim(),
     );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -237,7 +253,7 @@ class _UserApprovalDetailScreenState
           backgroundColor: AppColors.accent,
         ),
       );
-      Navigator.of(context).pop(true);
+      _close(true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -263,10 +279,10 @@ class _UserApprovalDetailScreenState
     setState(() => _loading = false);
     if (ok) {
       _changed = true;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request rejected.')),
-      );
-      Navigator.of(context).pop(true);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Request rejected.')));
+      _close(true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -308,11 +324,11 @@ class _UserApprovalDetailScreenState
   }
 
   static String _roleLabel(String role) => switch (role) {
-        'mentor'           => 'Mentor',
-        'content_creator'  => 'Content Creator',
-        'admin'            => 'Admin',
-        _                  => 'Student',
-      };
+    'mentor' => 'Mentor',
+    'content_creator' => 'Content Creator',
+    'admin' => 'Admin',
+    _ => 'Student',
+  };
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
@@ -404,24 +420,24 @@ class _DetailGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <(IconData, String, String?)>[
-      (Icons.class_outlined,      'Class',   user.className),
-      (Icons.apartment_outlined,  'School',  user.schoolName),
-      (Icons.location_on_outlined,'Location',user.location),
-      (Icons.phone_outlined,      'Phone',   user.phone),
-      (Icons.cake_outlined,       'Age',     user.age?.toString()),
+      (Icons.class_outlined, 'Class', user.className),
+      (Icons.apartment_outlined, 'School', user.schoolName),
+      (Icons.location_on_outlined, 'Location', user.location),
+      (Icons.phone_outlined, 'Phone', user.phone),
+      (Icons.cake_outlined, 'Age', user.age?.toString()),
       (Icons.family_restroom_outlined, 'Parent Email', user.parentEmail),
     ];
 
-    final filled = items.where((e) => e.$3 != null && e.$3!.isNotEmpty).toList();
+    final filled = items
+        .where((e) => e.$3 != null && e.$3!.isNotEmpty)
+        .toList();
     if (filled.isEmpty) return const SizedBox.shrink();
 
     return Wrap(
       spacing: 12,
       runSpacing: 10,
       children: filled
-          .map(
-            (e) => _InfoRow(icon: e.$1, label: '${e.$2}: ${e.$3}'),
-          )
+          .map((e) => _InfoRow(icon: e.$1, label: '${e.$2}: ${e.$3}'))
           .toList(),
     );
   }
@@ -455,14 +471,14 @@ class _RequestedRoleBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (role) {
-      'mentor'           => AppColors.secondary,
-      'content_creator'  => AppColors.accent,
-      _                  => AppColors.primary,
+      'mentor' => AppColors.secondary,
+      'content_creator' => AppColors.accent,
+      _ => AppColors.primary,
     };
     final label = switch (role) {
-      'mentor'           => 'Mentor',
-      'content_creator'  => 'Content Creator',
-      _                  => 'Student',
+      'mentor' => 'Mentor',
+      'content_creator' => 'Content Creator',
+      _ => 'Student',
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -497,11 +513,26 @@ class _RoleSelector extends StatelessWidget {
   final ValueChanged<String?> onChanged;
 
   static const _roles = [
-    ('student',          'Student',          Icons.school_outlined,              AppColors.primary),
-    ('mentor',           'Counsellor',       Icons.psychology_outlined,          AppColors.secondary),
-    ('content_creator',  'Content Creator',  Icons.edit_note_outlined,           AppColors.accent),
-    ('event_manager',    'Event Manager',    Icons.event_available_rounded,      Color(0xFF6B48FF)),
-    ('support_staff',    'Support Staff',    Icons.support_agent_rounded,        Color(0xFF009688)),
+    ('student', 'Student', Icons.school_outlined, AppColors.primary),
+    ('mentor', 'Counsellor', Icons.psychology_outlined, AppColors.secondary),
+    (
+      'content_creator',
+      'Content Creator',
+      Icons.edit_note_outlined,
+      AppColors.accent,
+    ),
+    (
+      'event_manager',
+      'Event Manager',
+      Icons.event_available_rounded,
+      Color(0xFF6B48FF),
+    ),
+    (
+      'support_staff',
+      'Support Staff',
+      Icons.support_agent_rounded,
+      Color(0xFF009688),
+    ),
   ];
 
   @override
@@ -517,10 +548,7 @@ class _RoleSelector extends StatelessWidget {
             onTap: () => onChanged(value),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: isSelected
                     ? color.withValues(alpha: 0.08)
@@ -535,7 +563,11 @@ class _RoleSelector extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(icon, size: 20, color: isSelected ? color : AppColors.muted),
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: isSelected ? color : AppColors.muted,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -548,11 +580,7 @@ class _RoleSelector extends StatelessWidget {
                     ),
                   ),
                   if (isSelected)
-                    Icon(
-                      Icons.check_circle_rounded,
-                      size: 18,
-                      color: color,
-                    ),
+                    Icon(Icons.check_circle_rounded, size: 18, color: color),
                 ],
               ),
             ),
@@ -576,10 +604,17 @@ class _ErrorBody extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.muted),
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 48,
+              color: AppColors.muted,
+            ),
             const SizedBox(height: 12),
-            Text(error, textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.muted)),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.muted),
+            ),
             const SizedBox(height: 16),
             FilledButton(onPressed: onRetry, child: const Text('Retry')),
           ],

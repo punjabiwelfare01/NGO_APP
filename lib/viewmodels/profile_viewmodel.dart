@@ -54,6 +54,7 @@ class ProfileViewModel extends ChangeNotifier {
     String? schoolName,
     String? location,
     int? age,
+    DateTime? dateOfBirth,
     String? parentEmail,
     String? phone,
   }) async {
@@ -66,6 +67,7 @@ class ProfileViewModel extends ChangeNotifier {
         schoolName: schoolName,
         location: location,
         age: age,
+        dateOfBirth: dateOfBirth,
         parentEmail: parentEmail,
         phone: phone,
       );

@@ -3,19 +3,10 @@ import 'package:flutter/material.dart';
 import '../../app_state.dart';
 import '../../core/colors.dart';
 import '../../models/api_models.dart';
-import '../../models/auth_models.dart';
-import '../../utils/icon_mapper.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/profile_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
-import '../../widgets/app_card.dart';
 import '../../widgets/app_scroll_view.dart';
-import '../../widgets/role_guard.dart';
-import '../../widgets/section_header.dart';
-import '../../widgets/top_header.dart';
-import 'widgets/badge_pill.dart';
-import 'widgets/counselling_history_card.dart';
-import 'widgets/profile_hero_card.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -31,9 +22,8 @@ class _ProfileViewState extends State<ProfileView> {
   @override
   void initState() {
     super.initState();
-    _vm = ProfileViewModel();
+    _vm = ProfileViewModel()..load();
     _authVm = AuthViewModel();
-    _vm.load();
   }
 
   @override
@@ -49,6 +39,12 @@ class _ProfileViewState extends State<ProfileView> {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
+  void _showComingSoon(String label) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$label will be available soon.')));
+  }
+
   Future<void> _openEditProfile() async {
     final user = _vm.user;
     if (user == null) return;
@@ -58,31 +54,46 @@ class _ProfileViewState extends State<ProfileView> {
       backgroundColor: Colors.transparent,
       builder: (_) => _EditProfileSheet(
         user: user,
-        onSave: (name, className, schoolName, location, age, parentEmail, phone) async {
-          final ok = await _vm.updateProfile(
-            name: name,
-            className: className,
-            schoolName: schoolName,
-            location: location,
-            age: age,
-            parentEmail: parentEmail,
-            phone: phone,
-          );
-          if (!mounted) return;
-          if (ok) {
-            Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Profile updated successfully.')),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(_vm.updateError ?? 'Failed to update profile.'),
-                backgroundColor: Colors.red.shade600,
-              ),
-            );
-          }
-        },
+        onSave:
+            (
+              name,
+              className,
+              schoolName,
+              location,
+              age,
+              dateOfBirth,
+              parentEmail,
+              phone,
+            ) async {
+              final ok = await _vm.updateProfile(
+                name: name,
+                className: className,
+                schoolName: schoolName,
+                location: location,
+                age: age,
+                dateOfBirth: dateOfBirth,
+                parentEmail: parentEmail,
+                phone: phone,
+              );
+              if (!mounted) return;
+              if (ok) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Profile updated successfully.'),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      _vm.updateError ?? 'Failed to update profile.',
+                    ),
+                    backgroundColor: AppColors.softRed,
+                  ),
+                );
+              }
+            },
       ),
     );
   }
@@ -96,167 +107,116 @@ class _ProfileViewState extends State<ProfileView> {
           return const Center(child: CircularProgressIndicator());
         }
         if (_vm.state == ViewState.error) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _vm.errorMessage ?? 'Error',
-                  style: const TextStyle(color: Colors.grey),
-                ),
-                TextButton(onPressed: _vm.load, child: const Text('Retry')),
-              ],
-            ),
-          );
+          return _ProfileError(message: _vm.errorMessage, onRetry: _vm.load);
         }
+
+        final user = _vm.user;
+        final stats = _vm.stats;
+
         return AppScrollView(
           children: [
-            TopHeader(
-              title: 'Child Profile',
-              subtitle: 'Achievements, learning, and parent view.',
-              actionIcon: AppState.role.isStudent ? Icons.edit_rounded : Icons.settings_outlined,
-              onActionTap: AppState.role.isStudent ? _openEditProfile : null,
+            _ProfileHeader(
+              onNotificationTap: () => _showComingSoon('Notifications'),
+              onSettingsTap: () => _showComingSoon('Settings'),
             ),
-
-            // ── Role badge (visible to all roles) ─────────────────────────
-            _RoleBadge(role: AppState.role),
-
-            ProfileHeroCard(user: _vm.user),
-            const SectionHeader(title: 'Skill Badges'),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: _vm.badges
-                  .map(
-                    (ub) => BadgePill(
-                      icon: IconMapper.fromName(ub.badge.iconName),
-                      label: ub.badge.label,
-                    ),
-                  )
-                  .toList(),
+            _StudentSummaryCard(
+              user: user,
+              stats: stats,
+              badgeCount: _vm.badges.length,
+              onEditProfile: _openEditProfile,
             ),
-
-            const CounsellingHistoryCard(),
-
-            // ── Admin panel shortcut ──────────────────────────────────────
-            RoleGuard(
-              allowed: const [UserRole.admin, UserRole.superAdmin],
-              child: GestureDetector(
-                onTap: () =>
-                    Navigator.of(context).pushReplacementNamed('/home'),
-                child: AppCard(
-                  color: AppColors.accent.withValues(alpha: 0.06),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.admin_panel_settings_rounded,
-                          color: AppColors.accent,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Admin Dashboard',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                            Text(
-                              'Manage users, approvals, events and more.',
-                              style: TextStyle(
-                                color: AppColors.muted,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppColors.muted,
-                      ),
-                    ],
-                  ),
+            _QuickActionBar(
+              actions: [
+                _QuickAction(
+                  icon: Icons.person_outline_rounded,
+                  label: 'My Activity',
+                  color: const Color(0xFF20BF6B),
+                  onTap: () => _showComingSoon('My Activity'),
                 ),
-              ),
+                _QuickAction(
+                  icon: Icons.bookmark_rounded,
+                  label: 'Saved Lessons',
+                  color: const Color(0xFF1E6BFF),
+                  onTap: () => _showComingSoon('Saved Lessons'),
+                ),
+                _QuickAction(
+                  icon: Icons.chat_bubble_rounded,
+                  label: 'Messages',
+                  color: const Color(0xFF8B5CF6),
+                  onTap: () => _showComingSoon('Messages'),
+                ),
+                _QuickAction(
+                  icon: Icons.calendar_month_rounded,
+                  label: 'My Calendar',
+                  color: const Color(0xFFFF8800),
+                  onTap: () => _showComingSoon('My Calendar'),
+                ),
+              ],
             ),
-
-            // ── Mentor panel hint ─────────────────────────────────────────
-            RoleGuard(
-              allowed: const [UserRole.mentor],
-              child: AppCard(
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.support_agent_rounded,
-                      color: AppColors.secondary,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'Mentor Access',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
-                            ),
-                          ),
-                          Text(
-                            'You can view student progress and award badges.',
-                            style: TextStyle(
-                              color: AppColors.muted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+            const _SectionTitle('Profile Information'),
+            _InfoCard(
+              rows: [
+                _InfoRowData(
+                  icon: Icons.person_outline_rounded,
+                  tint: const Color(0xFF126BFF),
+                  label: 'Full Name',
+                  value: _value(user?.name),
+                  onTap: _openEditProfile,
                 ),
-              ),
+                _InfoRowData(
+                  icon: Icons.school_rounded,
+                  tint: const Color(0xFF17B86A),
+                  label: 'Class',
+                  value: _value(user?.className),
+                  onTap: _openEditProfile,
+                ),
+                _InfoRowData(
+                  icon: Icons.account_balance_rounded,
+                  tint: const Color(0xFF8B5CF6),
+                  label: 'School',
+                  value: _value(user?.schoolName),
+                  onTap: _openEditProfile,
+                ),
+                _InfoRowData(
+                  icon: Icons.location_on_outlined,
+                  tint: const Color(0xFFFF8800),
+                  label: 'Location',
+                  value: _value(user?.location),
+                  onTap: _openEditProfile,
+                ),
+                _InfoRowData(
+                  icon: Icons.mail_outline_rounded,
+                  tint: const Color(0xFFFF9800),
+                  label: 'Parent Email',
+                  value: _value(user?.parentEmail),
+                  onTap: _openEditProfile,
+                ),
+                _InfoRowData(
+                  icon: Icons.calendar_month_rounded,
+                  tint: const Color(0xFF11B8C9),
+                  label: 'Date of Birth',
+                  value: _dateOrAge(user),
+                  onTap: _openEditProfile,
+                ),
+              ],
             ),
-
-            // ── Sign out ──────────────────────────────────────────────────
-            const SizedBox(height: 8),
-            ListenableBuilder(
-              listenable: _authVm,
-              builder: (context, _) => OutlinedButton.icon(
-                onPressed: _authVm.state == ViewState.loading ? null : _logout,
-                icon: _authVm.state == ViewState.loading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(
-                        Icons.logout_rounded,
-                        color: AppColors.softRed,
-                      ),
-                label: const Text(
-                  'Sign Out',
-                  style: TextStyle(color: AppColors.softRed),
+            const _SectionTitle('Preferences & Security'),
+            _InfoCard(
+              rows: [
+                _InfoRowData(
+                  icon: Icons.lock_outline_rounded,
+                  tint: const Color(0xFF126BFF),
+                  label: 'Change Password',
+                  onTap: () => _showComingSoon('Change Password'),
                 ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.softRed),
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+                _InfoRowData(
+                  icon: Icons.logout_rounded,
+                  tint: Colors.redAccent,
+                  label: 'Logout',
+                  labelColor: Colors.red,
+                  onTap: _logout,
                 ),
-              ),
+              ],
             ),
           ],
         );
@@ -265,44 +225,253 @@ class _ProfileViewState extends State<ProfileView> {
   }
 }
 
-// ── sub-widgets ───────────────────────────────────────────────────────────────
+String _value(String? value) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? 'Not set' : trimmed;
+}
 
-class _RoleBadge extends StatelessWidget {
-  const _RoleBadge({required this.role});
-  final UserRole role;
+String _dateOrAge(AppUser? user) {
+  if (user?.dateOfBirth != null) return _formatDate(user!.dateOfBirth!);
+  if (user?.age != null) return 'Age ${user!.age}';
+  return 'Not set';
+}
+
+String _formatDate(DateTime date) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+class _ProfileError extends StatelessWidget {
+  const _ProfileError({required this.message, required this.onRetry});
+
+  final String? message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final (color, icon) = switch (role) {
-      UserRole.superAdmin     => (AppColors.softRed,    Icons.shield_rounded),
-      UserRole.admin          => (AppColors.accent,     Icons.admin_panel_settings_rounded),
-      UserRole.mentor         => (AppColors.secondary,  Icons.psychology_outlined),
-      UserRole.contentCreator => (AppColors.lavender,   Icons.edit_rounded),
-      UserRole.student        => (AppColors.primary,    Icons.school_rounded),
-      UserRole.eventManager   => (const Color(0xFF6B48FF), Icons.event_available_rounded),
-      UserRole.supportStaff   => (const Color(0xFF009688), Icons.support_agent_rounded),
-      UserRole.guest          => (AppColors.muted,      Icons.person_outline_rounded),
-    };
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
+    return Center(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
           Text(
-            role.displayName,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
+            message ?? 'Failed to load profile.',
+            style: const TextStyle(color: AppColors.muted),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.onNotificationTap,
+    required this.onSettingsTap,
+  });
+
+  final VoidCallback onNotificationTap;
+  final VoidCallback onSettingsTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Profile',
+                style: TextStyle(
+                  color: Color(0xFF08164A),
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Manage your account and preferences',
+                style: TextStyle(
+                  color: Color(0xFF4A587C),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _RoundIconButton(
+          icon: Icons.notifications_none_rounded,
+          tooltip: 'Notifications',
+          onTap: onNotificationTap,
+        ),
+        const SizedBox(width: 10),
+        _RoundIconButton(
+          icon: Icons.settings_outlined,
+          tooltip: 'Settings',
+          onTap: onSettingsTap,
+        ),
+      ],
+    );
+  }
+}
+
+class _RoundIconButton extends StatelessWidget {
+  const _RoundIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFFE9EEF9)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0B1B4D).withValues(alpha: 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: const Color(0xFF08164A), size: 24),
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentSummaryCard extends StatelessWidget {
+  const _StudentSummaryCard({
+    required this.user,
+    required this.stats,
+    required this.badgeCount,
+    required this.onEditProfile,
+  });
+
+  final AppUser? user;
+  final UserStats? stats;
+  final int badgeCount;
+  final VoidCallback onEditProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF4FF),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFCFE3FF)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A2B68).withValues(alpha: 0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 460;
+              final details = _ProfileIdentity(user: user);
+              final editButton = OutlinedButton.icon(
+                onPressed: onEditProfile,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Edit Profile'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF126BFF),
+                  side: const BorderSide(color: Color(0xFF8FBCFF)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                ),
+              );
+              if (compact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    details,
+                    const SizedBox(height: 14),
+                    Align(alignment: Alignment.centerLeft, child: editButton),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: details),
+                  const SizedBox(width: 14),
+                  editButton,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+          _StatsPanel(
+            stats: [
+              _StatData(
+                icon: Icons.school_rounded,
+                label: 'Courses Enrolled',
+                value: '${stats?.coursesEnrolled ?? 0}',
+                color: const Color(0xFF126BFF),
+              ),
+              _StatData(
+                icon: Icons.check_rounded,
+                label: 'Lessons Completed',
+                value: '${stats?.lessonsCompleted ?? 0}',
+                color: const Color(0xFF18B86D),
+              ),
+              _StatData(
+                icon: Icons.local_fire_department_rounded,
+                label: 'Study Streak',
+                value: '${stats?.studyStreakDays ?? 0}',
+                suffix: 'days',
+                color: const Color(0xFFFF7A00),
+              ),
+              _StatData(
+                icon: Icons.star_rounded,
+                label: 'Badges Earned',
+                value: '$badgeCount',
+                color: const Color(0xFF8B5CF6),
+              ),
+            ],
           ),
         ],
       ),
@@ -310,7 +479,492 @@ class _RoleBadge extends StatelessWidget {
   }
 }
 
-// ── Edit Profile Bottom Sheet ─────────────────────────────────────────────────
+class _ProfileIdentity extends StatelessWidget {
+  const _ProfileIdentity({required this.user});
+
+  final AppUser? user;
+
+  @override
+  Widget build(BuildContext context) {
+    final classAndSchool = [
+      if (user?.className?.trim().isNotEmpty == true)
+        'Class ${user!.className!.trim()}',
+      if (user?.schoolName?.trim().isNotEmpty == true) user!.schoolName!.trim(),
+    ].join('  •  ');
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 104,
+              height: 104,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 4),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFEAF7FF), Color(0xFF8ED3FF)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  _initials(user?.name),
+                  style: const TextStyle(
+                    color: Color(0xFF08164A),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 8,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFD8E3F5)),
+                ),
+                child: const Icon(
+                  Icons.photo_camera_outlined,
+                  size: 17,
+                  color: Color(0xFF4A587C),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 18),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                user?.name ?? AppState.studentName ?? 'Student',
+                style: const TextStyle(
+                  color: Color(0xFF08164A),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  height: 1.1,
+                ),
+              ),
+              if (classAndSchool.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  classAndSchool,
+                  style: const TextStyle(
+                    color: Color(0xFF4A587C),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+              if (user?.parentEmail?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 12),
+                _InlineMeta(
+                  icon: Icons.mail_outline_rounded,
+                  text: user!.parentEmail!.trim(),
+                ),
+              ],
+              if (user?.phone?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 8),
+                _InlineMeta(
+                  icon: Icons.phone_outlined,
+                  text: user!.phone!.trim(),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _initials(String? name) {
+  final parts = (name ?? 'Student')
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return 'S';
+  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+  return '${parts.first.substring(0, 1)}${parts.last.substring(0, 1)}'
+      .toUpperCase();
+}
+
+class _InlineMeta extends StatelessWidget {
+  const _InlineMeta({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: const Color(0xFF4A587C), size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF4A587C),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatsPanel extends StatelessWidget {
+  const _StatsPanel({required this.stats});
+
+  final List<_StatData> stats;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF08164A).withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth < 420 ? 2 : 4;
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              mainAxisExtent: 112,
+            ),
+            itemCount: stats.length,
+            itemBuilder: (context, index) {
+              return _StatTile(
+                data: stats[index],
+                showDivider: columns == 4 && index != stats.length - 1,
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  const _StatTile({required this.data, required this.showDivider});
+
+  final _StatData data;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: showDivider
+            ? const Border(right: BorderSide(color: Color(0xFFE8ECF4)))
+            : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(data.icon, color: data.color, size: 30),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              data.label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF435174),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            data.value,
+            style: TextStyle(
+              color: data.color,
+              fontSize: 23,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          if (data.suffix != null)
+            Text(
+              data.suffix!,
+              style: const TextStyle(
+                color: Color(0xFF08164A),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatData {
+  const _StatData({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.suffix,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final String? suffix;
+}
+
+class _QuickActionBar extends StatelessWidget {
+  const _QuickActionBar({required this.actions});
+
+  final List<_QuickAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8ECF4)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF08164A).withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth < 420 ? 2 : 4;
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              mainAxisExtent: 82,
+            ),
+            itemCount: actions.length,
+            itemBuilder: (context, index) {
+              final action = actions[index];
+              return InkWell(
+                onTap: action.onTap,
+                borderRadius: BorderRadius.circular(14),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: columns == 4 && index != actions.length - 1
+                        ? const Border(
+                            right: BorderSide(color: Color(0xFFE8ECF4)),
+                          )
+                        : null,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(action.icon, color: action.color, size: 28),
+                      const SizedBox(height: 8),
+                      Text(
+                        action.label,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF08164A),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _QuickAction {
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Color(0xFF08164A),
+          fontSize: 18,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({required this.rows});
+
+  final List<_InfoRowData> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8ECF4)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF08164A).withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++)
+            _InfoRow(data: rows[i], showDivider: i != rows.length - 1),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.data, required this.showDivider});
+
+  final _InfoRowData data;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelColor = data.labelColor ?? const Color(0xFF08164A);
+    return InkWell(
+      onTap: data.onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 18),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          border: showDivider
+              ? const Border(bottom: BorderSide(color: Color(0xFFE8ECF4)))
+              : null,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: data.tint.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: data.tint.withValues(alpha: 0.18)),
+              ),
+              child: Icon(data.icon, color: data.tint, size: 22),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                data.label,
+                style: TextStyle(
+                  color: labelColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (data.value != null) ...[
+              Flexible(
+                child: Text(
+                  data.value!,
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF3F4D70),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF4A587C)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoRowData {
+  const _InfoRowData({
+    required this.icon,
+    required this.tint,
+    required this.label,
+    this.value,
+    this.labelColor,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final Color tint;
+  final String label;
+  final String? value;
+  final Color? labelColor;
+  final VoidCallback? onTap;
+}
 
 class _EditProfileSheet extends StatefulWidget {
   const _EditProfileSheet({required this.user, required this.onSave});
@@ -322,9 +976,11 @@ class _EditProfileSheet extends StatefulWidget {
     String? schoolName,
     String? location,
     int? age,
+    DateTime? dateOfBirth,
     String? parentEmail,
     String? phone,
-  ) onSave;
+  )
+  onSave;
 
   @override
   State<_EditProfileSheet> createState() => _EditProfileSheetState();
@@ -339,19 +995,21 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _ageCtrl;
   late final TextEditingController _parentEmailCtrl;
   late final TextEditingController _phoneCtrl;
+  DateTime? _dateOfBirth;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    final u = widget.user;
-    _nameCtrl = TextEditingController(text: u.name);
-    _classCtrl = TextEditingController(text: u.className ?? '');
-    _schoolCtrl = TextEditingController(text: u.schoolName ?? '');
-    _locationCtrl = TextEditingController(text: u.location ?? '');
-    _ageCtrl = TextEditingController(text: u.age?.toString() ?? '');
-    _parentEmailCtrl = TextEditingController(text: u.parentEmail ?? '');
-    _phoneCtrl = TextEditingController(text: u.phone ?? '');
+    final user = widget.user;
+    _nameCtrl = TextEditingController(text: user.name);
+    _classCtrl = TextEditingController(text: user.className ?? '');
+    _schoolCtrl = TextEditingController(text: user.schoolName ?? '');
+    _locationCtrl = TextEditingController(text: user.location ?? '');
+    _ageCtrl = TextEditingController(text: user.age?.toString() ?? '');
+    _parentEmailCtrl = TextEditingController(text: user.parentEmail ?? '');
+    _phoneCtrl = TextEditingController(text: user.phone ?? '');
+    _dateOfBirth = user.dateOfBirth;
   }
 
   @override
@@ -366,20 +1024,38 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     super.dispose();
   }
 
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ?? DateTime(now.year - 15, now.month, now.day),
+      firstDate: DateTime(now.year - 30),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() => _dateOfBirth = picked);
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
-    final age = int.tryParse(_ageCtrl.text.trim());
     await widget.onSave(
-      _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
-      _classCtrl.text.trim().isEmpty ? null : _classCtrl.text.trim(),
-      _schoolCtrl.text.trim().isEmpty ? null : _schoolCtrl.text.trim(),
-      _locationCtrl.text.trim().isEmpty ? null : _locationCtrl.text.trim(),
-      age,
-      _parentEmailCtrl.text.trim().isEmpty ? null : _parentEmailCtrl.text.trim(),
-      _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+      _emptyToNull(_nameCtrl.text),
+      _emptyToNull(_classCtrl.text),
+      _emptyToNull(_schoolCtrl.text),
+      _emptyToNull(_locationCtrl.text),
+      int.tryParse(_ageCtrl.text.trim()),
+      _dateOfBirth,
+      _emptyToNull(_parentEmailCtrl.text),
+      _emptyToNull(_phoneCtrl.text),
     );
     if (mounted) setState(() => _saving = false);
+  }
+
+  String? _emptyToNull(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   @override
@@ -389,11 +1065,14 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        padding: const EdgeInsets.fromLTRB(22, 14, 22, 22),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -401,60 +1080,88 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Handle ───────────────────────────────────────
                 Center(
                   child: Container(
-                    width: 40,
+                    width: 42,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.muted.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+                      color: const Color(0xFFD6DCEA),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 const Text(
                   'Edit Profile',
                   style: TextStyle(
-                    fontSize: 18,
+                    color: Color(0xFF08164A),
+                    fontSize: 20,
                     fontWeight: FontWeight.w900,
-                    color: AppColors.ink,
                   ),
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Update your name, class, school, and location.',
-                  style: TextStyle(color: AppColors.muted, fontSize: 13),
+                  'Update the details shown on your student profile.',
+                  style: TextStyle(
+                    color: Color(0xFF4A587C),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                const SizedBox(height: 20),
-
+                const SizedBox(height: 18),
                 _SheetField(
                   controller: _nameCtrl,
                   label: 'Full Name',
-                  icon: Icons.badge_outlined,
+                  icon: Icons.person_outline_rounded,
                   enabled: !_saving,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Name is required'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 _SheetField(
                   controller: _classCtrl,
-                  label: 'Class / Grade',
-                  icon: Icons.class_outlined,
+                  label: 'Class',
+                  icon: Icons.school_outlined,
                   enabled: !_saving,
                 ),
                 const SizedBox(height: 12),
                 _SheetField(
                   controller: _schoolCtrl,
-                  label: 'School Name',
-                  icon: Icons.apartment_outlined,
+                  label: 'School',
+                  icon: Icons.account_balance_outlined,
                   enabled: !_saving,
                 ),
                 const SizedBox(height: 12),
                 _SheetField(
                   controller: _locationCtrl,
-                  label: 'Location / City',
+                  label: 'Location',
                   icon: Icons.location_on_outlined,
+                  enabled: !_saving,
+                ),
+                const SizedBox(height: 12),
+                _SheetField(
+                  controller: _parentEmailCtrl,
+                  label: 'Parent Email',
+                  icon: Icons.mail_outline_rounded,
+                  keyboardType: TextInputType.emailAddress,
+                  enabled: !_saving,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    if (!RegExp(
+                      r'^[^@]+@[^@]+\.[^@]+$',
+                    ).hasMatch(value.trim())) {
+                      return 'Enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                _SheetField(
+                  controller: _phoneCtrl,
+                  label: 'Phone',
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
                   enabled: !_saving,
                 ),
                 const SizedBox(height: 12),
@@ -464,43 +1171,43 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   icon: Icons.cake_outlined,
                   keyboardType: TextInputType.number,
                   enabled: !_saving,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return null;
-                    final a = int.tryParse(v.trim());
-                    if (a == null || a < 5 || a > 25) return 'Enter a valid age (5–25)';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                _SheetField(
-                  controller: _parentEmailCtrl,
-                  label: 'Parent / Guardian Email',
-                  icon: Icons.family_restroom_outlined,
-                  keyboardType: TextInputType.emailAddress,
-                  enabled: !_saving,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return null;
-                    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(v.trim())) {
-                      return 'Enter a valid email';
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    final age = int.tryParse(value.trim());
+                    if (age == null || age < 5 || age > 30) {
+                      return 'Enter a valid age';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 12),
-                _SheetField(
-                  controller: _phoneCtrl,
-                  label: 'Phone Number',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  enabled: !_saving,
+                OutlinedButton.icon(
+                  onPressed: _saving ? null : _pickDate,
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  label: Text(
+                    _dateOfBirth == null
+                        ? 'Add Date of Birth'
+                        : _formatDate(_dateOfBirth!),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    foregroundColor: const Color(0xFF08164A),
+                    side: const BorderSide(color: Color(0xFFDDE6F4)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 15,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 24),
-
+                const SizedBox(height: 22),
                 FilledButton(
                   onPressed: _saving ? null : _save,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: const Color(0xFF126BFF),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -510,15 +1217,15 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
+                            strokeWidth: 2.4,
                             color: Colors.white,
                           ),
                         )
                       : const Text(
                           'Save Changes',
                           style: TextStyle(
+                            fontWeight: FontWeight.w800,
                             fontSize: 15,
-                            fontWeight: FontWeight.w700,
                           ),
                         ),
                 ),
@@ -557,16 +1264,16 @@ class _SheetField extends StatelessWidget {
       textInputAction: TextInputAction.next,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: AppColors.muted),
+        prefixIcon: Icon(icon, color: const Color(0xFF4A587C)),
         filled: true,
-        fillColor: AppColors.background,
+        fillColor: const Color(0xFFF7FAFF),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: const BorderSide(color: Color(0xFF126BFF), width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -574,7 +1281,7 @@ class _SheetField extends StatelessWidget {
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.softRed, width: 2),
+          borderSide: const BorderSide(color: AppColors.softRed, width: 1.5),
         ),
       ),
       validator: validator,

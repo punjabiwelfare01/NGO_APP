@@ -7,10 +7,13 @@ def ensure_sqlite_schema(engine: Engine) -> None:
         return
 
     inspector = inspect(engine)
-    if "events" not in inspector.get_table_names():
-        return
+    table_names = inspector.get_table_names()
 
-    event_columns = {column["name"] for column in inspector.get_columns("events")}
+    event_columns = (
+        {column["name"] for column in inspector.get_columns("events")}
+        if "events" in table_names
+        else set()
+    )
     event_additions = {
         "quiz_id": "INTEGER",
         "is_daily_challenge": "BOOLEAN NOT NULL DEFAULT 0",
@@ -19,11 +22,43 @@ def ensure_sqlite_schema(engine: Engine) -> None:
     }
 
     with engine.begin() as connection:
-        for column, ddl_type in event_additions.items():
-            if column not in event_columns:
-                connection.execute(
-                    text(f"ALTER TABLE events ADD COLUMN {column} {ddl_type}")
+        if "users" in table_names:
+            user_columns = {
+                column["name"]
+                for column in inspector.get_columns("users")
+            }
+            user_additions = {
+                "date_of_birth": "DATE",
+            }
+            for column, ddl_type in user_additions.items():
+                if column not in user_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE users ADD COLUMN {column} {ddl_type}")
+                    )
+
+        if "student_reminders" not in table_names:
+            connection.execute(text("""
+                CREATE TABLE student_reminders (
+                    id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    title VARCHAR NOT NULL,
+                    scheduled_at DATETIME NOT NULL,
+                    is_done BOOLEAN NOT NULL DEFAULT 0,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(user_id) REFERENCES users (id)
                 )
+            """))
+            connection.execute(text("CREATE INDEX ix_student_reminders_id ON student_reminders (id)"))
+            connection.execute(text("CREATE INDEX ix_student_reminders_user_id ON student_reminders (user_id)"))
+
+        if "events" in table_names:
+            for column, ddl_type in event_additions.items():
+                if column not in event_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE events ADD COLUMN {column} {ddl_type}")
+                    )
 
         if "event_participants" in inspector.get_table_names():
             participant_columns = {

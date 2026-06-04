@@ -8,6 +8,7 @@ class AppUser {
     required this.level,
     required this.xp,
     this.age,
+    this.dateOfBirth,
     this.parentEmail,
     this.className,
     this.schoolName,
@@ -22,6 +23,7 @@ class AppUser {
   final int id;
   final String name;
   final int? age;
+  final DateTime? dateOfBirth;
   final int level;
   final int xp;
   final String? parentEmail;
@@ -37,6 +39,7 @@ class AppUser {
   AppUser copyWith({
     String? name,
     int? age,
+    DateTime? dateOfBirth,
     String? parentEmail,
     String? className,
     String? schoolName,
@@ -52,6 +55,7 @@ class AppUser {
     level: level,
     xp: xp,
     age: age ?? this.age,
+    dateOfBirth: dateOfBirth ?? this.dateOfBirth,
     parentEmail: parentEmail ?? this.parentEmail,
     className: className ?? this.className,
     schoolName: schoolName ?? this.schoolName,
@@ -67,6 +71,9 @@ class AppUser {
     id: j['id'] as int,
     name: j['name'] as String,
     age: j['age'] as int?,
+    dateOfBirth: j['date_of_birth'] == null
+        ? null
+        : DateTime.parse(j['date_of_birth'] as String),
     level: (j['level'] as int?) ?? 1,
     xp: (j['xp'] as int?) ?? 0,
     parentEmail: j['parent_email'] as String?,
@@ -154,10 +161,10 @@ class AdminUserItem {
   final String? location;
   final String? verificationNote;
 
-  bool get isBlocked    => accessStatus == 'deactivated';
-  bool get isPending    => accessStatus == 'pending_verification';
-  bool get isApproved   => accessStatus == 'approved';
-  bool get isRejected   => accessStatus == 'rejected';
+  bool get isBlocked => accessStatus == 'deactivated';
+  bool get isPending => accessStatus == 'pending_verification';
+  bool get isApproved => accessStatus == 'approved';
+  bool get isRejected => accessStatus == 'rejected';
 
   AdminUserItem copyWith({String? role, String? accessStatus}) => AdminUserItem(
     id: id,
@@ -209,13 +216,15 @@ class AdminStats {
   final Map<String, int> roleCounts;
 
   factory AdminStats.fromJson(Map<String, dynamic> j) => AdminStats(
-    totalUsers:    (j['total_users']    as int?) ?? 0,
-    activeUsers:   (j['active_users']   as int?) ?? 0,
-    pendingUsers:  (j['pending_users']  as int?) ?? 0,
-    blockedUsers:  (j['blocked_users']  as int?) ?? 0,
+    totalUsers: (j['total_users'] as int?) ?? 0,
+    activeUsers: (j['active_users'] as int?) ?? 0,
+    pendingUsers: (j['pending_users'] as int?) ?? 0,
+    blockedUsers: (j['blocked_users'] as int?) ?? 0,
     rejectedUsers: (j['rejected_users'] as int?) ?? 0,
-    roleCounts: (j['role_counts'] as Map<String, dynamic>?)
-            ?.map((k, v) => MapEntry(k, (v as int?) ?? 0)) ??
+    roleCounts:
+        (j['role_counts'] as Map<String, dynamic>?)?.map(
+          (k, v) => MapEntry(k, (v as int?) ?? 0),
+        ) ??
         const {},
   );
 
@@ -261,16 +270,17 @@ class AdminNotification {
     actionUrl: actionUrl,
   );
 
-  factory AdminNotification.fromJson(Map<String, dynamic> j) => AdminNotification(
-    id: j['id'] as int,
-    title: j['title'] as String,
-    message: j['message'] as String,
-    type: (j['type'] ?? 'general') as String,
-    isRead: (j['is_read'] as bool?) ?? false,
-    createdAt: DateTime.parse(j['created_at'] as String),
-    userId: j['user_id'] as int?,
-    actionUrl: j['action_url'] as String?,
-  );
+  factory AdminNotification.fromJson(Map<String, dynamic> j) =>
+      AdminNotification(
+        id: j['id'] as int,
+        title: j['title'] as String,
+        message: j['message'] as String,
+        type: (j['type'] ?? 'general') as String,
+        isRead: (j['is_read'] as bool?) ?? false,
+        createdAt: DateTime.parse(j['created_at'] as String),
+        userId: j['user_id'] as int?,
+        actionUrl: j['action_url'] as String?,
+      );
 }
 
 class UserStats {
@@ -279,18 +289,27 @@ class UserStats {
     required this.weeklyLearningHours,
     required this.skillGrowthPercent,
     required this.quizRank,
+    this.coursesEnrolled = 0,
+    this.lessonsCompleted = 0,
+    this.studyStreakDays = 0,
   });
 
   final int userId;
   final double weeklyLearningHours;
   final int skillGrowthPercent;
   final int quizRank;
+  final int coursesEnrolled;
+  final int lessonsCompleted;
+  final int studyStreakDays;
 
   factory UserStats.fromJson(Map<String, dynamic> j) => UserStats(
     userId: j['user_id'] as int,
     weeklyLearningHours: (j['weekly_learning_hours'] as num).toDouble(),
     skillGrowthPercent: j['skill_growth_percent'] as int,
     quizRank: j['quiz_rank'] as int,
+    coursesEnrolled: (j['courses_enrolled'] as int?) ?? 0,
+    lessonsCompleted: (j['lessons_completed'] as int?) ?? 0,
+    studyStreakDays: (j['study_streak_days'] as int?) ?? 0,
   );
 }
 

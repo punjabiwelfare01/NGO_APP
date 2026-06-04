@@ -32,20 +32,25 @@ class AuthRepository {
     String? parentEmail,
     String? requestedRole,
   }) async {
-    final raw = await ApiClient.post('/auth/register', {
+    final body = <String, dynamic>{
       'name': name,
       'email': email,
       'password': password,
-      if (phone != null && phone.isNotEmpty) 'phone': phone,
-      if (className != null && className.isNotEmpty) 'class_name': className,
-      if (schoolName != null && schoolName.isNotEmpty) 'school_name': schoolName,
-      if (location != null && location.isNotEmpty) 'location': location,
-      if (age != null) 'age': age,
-      if (parentEmail != null && parentEmail.isNotEmpty)
-        'parent_email': parentEmail,
-      if (requestedRole != null && requestedRole.isNotEmpty)
-        'requested_role': requestedRole,
-    }) as Map<String, dynamic>;
+    };
+    void addIfFilled(String key, String? value) {
+      if (value != null && value.isNotEmpty) body[key] = value;
+    }
+
+    addIfFilled('phone', phone);
+    addIfFilled('class_name', className);
+    addIfFilled('school_name', schoolName);
+    addIfFilled('location', location);
+    if (age != null) body['age'] = age;
+    addIfFilled('parent_email', parentEmail);
+    addIfFilled('requested_role', requestedRole);
+
+    final raw =
+        await ApiClient.post('/auth/register', body) as Map<String, dynamic>;
     return TokenResponse.fromJson(raw);
   }
 
@@ -64,20 +69,25 @@ class AuthRepository {
     String? phone,
     String? requestedRole,
   }) async {
-    final raw = await ApiClient.post('/auth/register', {
+    final body = <String, dynamic>{
       'name': name,
       'email': email,
       'password': password,
       'class_name': className,
       'school_name': schoolName,
       'location': location,
-      if (age != null) 'age': age,
-      if (parentEmail != null && parentEmail.isNotEmpty)
-        'parent_email': parentEmail,
-      if (phone != null && phone.isNotEmpty) 'phone': phone,
-      if (requestedRole != null && requestedRole.isNotEmpty)
-        'requested_role': requestedRole,
-    }) as Map<String, dynamic>;
+    };
+    void addIfFilled(String key, String? value) {
+      if (value != null && value.isNotEmpty) body[key] = value;
+    }
+
+    if (age != null) body['age'] = age;
+    addIfFilled('parent_email', parentEmail);
+    addIfFilled('phone', phone);
+    addIfFilled('requested_role', requestedRole);
+
+    final raw =
+        await ApiClient.post('/auth/register', body) as Map<String, dynamic>;
     return TokenResponse.fromJson(raw);
   }
 

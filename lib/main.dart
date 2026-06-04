@@ -13,6 +13,7 @@ import 'screens/auth/auth_page.dart';
 import 'screens/auth/pending_approval_screen.dart';
 import 'screens/auth/rejected_screen.dart';
 import 'screens/auth/student_register_screen.dart';
+import 'screens/creator/content_creator_shell.dart';
 import 'screens/events/events_view.dart';
 import 'screens/events/student/event_detail_screen.dart';
 import 'screens/home/home_view.dart';
@@ -48,10 +49,10 @@ void main() async {
 String _resolveInitialRoute() {
   if (!AppState.isAuthenticated) return '/login';
   return switch (AppState.accessStatus) {
-    AccessStatus.approved            => '/home',
+    AccessStatus.approved => '/home',
     AccessStatus.pendingVerification => '/pending-approval',
-    AccessStatus.rejected            => '/rejected',
-    AccessStatus.deactivated         => '/rejected',
+    AccessStatus.rejected => '/rejected',
+    AccessStatus.deactivated => '/rejected',
   };
 }
 
@@ -84,12 +85,14 @@ class CareSkillApp extends StatelessWidget {
       // Route on startup based on both auth state and access status.
       initialRoute: _resolveInitialRoute(),
       routes: {
-        '/login':                    (_) => const AuthPage(),
-        '/home':                     (_) => const AppShell(),
-        '/register/student':         (_) => const StudentRegisterScreen(),
-        '/pending-approval':         (_) => const PendingApprovalScreen(),
-        '/rejected':                 (_) => const RejectedScreen(),
-        '/admin/pending-approvals':  (_) => const PendingApprovalsScreen(),
+        '/login': (_) => const AuthPage(),
+        '/home': (_) => AppState.role.isContentCreator
+            ? const ContentCreatorShell()
+            : const AppShell(),
+        '/register/student': (_) => const StudentRegisterScreen(),
+        '/pending-approval': (_) => const PendingApprovalScreen(),
+        '/rejected': (_) => const RejectedScreen(),
+        '/admin/pending-approvals': (_) => const PendingApprovalsScreen(),
       },
       onGenerateRoute: (settings) {
         final name = settings.name ?? '';

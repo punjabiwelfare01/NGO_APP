@@ -18,11 +18,11 @@ class WelcomeBanner extends StatelessWidget {
     final school = student?.schoolName;
     final location = student?.location;
 
-    final subtitle = [
-      if (className != null) 'Class $className',
-      if (school != null) school,
-      if (location != null) location,
-    ].join(' • ');
+    final subtitleParts = <String>[];
+    if (className != null) subtitleParts.add('Class $className');
+    if (school != null) subtitleParts.add(school);
+    if (location != null) subtitleParts.add(location);
+    final subtitle = subtitleParts.join(' • ');
 
     return AppCard(
       color: AppColors.primary,
@@ -103,7 +103,11 @@ class FriendlyIllustration extends StatelessWidget {
                 color: AppColors.accent,
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.menu_book_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ),
           Positioned(
