@@ -53,12 +53,6 @@ class _ContentCreatorProfileViewState extends State<ContentCreatorProfileView> {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
-  void _showComingSoon(String label) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$label will be available soon.')));
-  }
-
   Future<void> _openEditProfile() async {
     final user = _vm.user;
     if (user == null) return;
@@ -115,7 +109,7 @@ class _ContentCreatorProfileViewState extends State<ContentCreatorProfileView> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
             children: [
-              _ProfileHeader(onSettingsTap: () => _showComingSoon('Settings')),
+              const _ProfileHeader(),
               const SizedBox(height: 18),
               _CreatorHeroCard(
                 user: user,
@@ -127,9 +121,7 @@ class _ContentCreatorProfileViewState extends State<ContentCreatorProfileView> {
               const SizedBox(height: 16),
               _InfoSection(user: user),
               const SizedBox(height: 16),
-              _ActivitySection(onTap: _showComingSoon),
-              const SizedBox(height: 16),
-              _SupportSection(onTap: _showComingSoon, onLogout: _logout),
+              _LogoutCard(onLogout: _logout),
             ],
           ),
         );
@@ -139,31 +131,18 @@ class _ContentCreatorProfileViewState extends State<ContentCreatorProfileView> {
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.onSettingsTap});
-
-  final VoidCallback onSettingsTap;
+  const _ProfileHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            'Profile',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: AppColors.ink,
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              height: 1,
-            ),
-          ),
-        ),
-        IconButton.filledTonal(
-          onPressed: onSettingsTap,
-          tooltip: 'Settings',
-          icon: const Icon(Icons.settings_outlined),
-        ),
-      ],
+    return Text(
+      'Profile',
+      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+        color: AppColors.ink,
+        fontSize: 32,
+        fontWeight: FontWeight.w900,
+        height: 1,
+      ),
     );
   }
 }
@@ -549,85 +528,49 @@ class _InfoSection extends StatelessWidget {
   }
 }
 
-class _ActivitySection extends StatelessWidget {
-  const _ActivitySection({required this.onTap});
+class _LogoutCard extends StatelessWidget {
+  const _LogoutCard({required this.onLogout});
 
-  final ValueChanged<String> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'My Activity',
-      rows: [
-        _ProfileRow(
-          icon: Icons.description_outlined,
-          label: 'My Content',
-          color: AppColors.primary,
-          trailing: Icons.chevron_right_rounded,
-          onTap: () => onTap('My Content'),
-        ),
-        _ProfileRow(
-          icon: Icons.schedule_rounded,
-          label: 'Drafts & Pending Review',
-          color: AppColors.accent,
-          trailing: Icons.chevron_right_rounded,
-          onTap: () => onTap('Drafts & Pending Review'),
-        ),
-        _ProfileRow(
-          icon: Icons.bar_chart_rounded,
-          label: 'Performance Reports',
-          color: const Color(0xFF7F5AF0),
-          trailing: Icons.chevron_right_rounded,
-          showDivider: false,
-          onTap: () => onTap('Performance Reports'),
-        ),
-      ],
-    );
-  }
-}
-
-class _SupportSection extends StatelessWidget {
-  const _SupportSection({required this.onTap, required this.onLogout});
-
-  final ValueChanged<String> onTap;
   final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
-    return _SectionCard(
-      title: 'Account & Support',
-      rows: [
-        _ProfileRow(
-          icon: Icons.notifications_rounded,
-          label: 'Notifications',
-          color: AppColors.primary,
-          trailing: Icons.chevron_right_rounded,
-          onTap: () => onTap('Notifications'),
+    return _SoftCard(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onLogout,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.softRed.withValues(alpha: 0.11),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.logout_rounded,
+                    color: AppColors.softRed, size: 20),
+              ),
+              const SizedBox(width: 13),
+              const Expanded(
+                child: Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.muted, size: 24),
+            ],
+          ),
         ),
-        _ProfileRow(
-          icon: Icons.shield_outlined,
-          label: 'Privacy & Security',
-          color: AppColors.secondary,
-          trailing: Icons.chevron_right_rounded,
-          onTap: () => onTap('Privacy & Security'),
-        ),
-        _ProfileRow(
-          icon: Icons.help_outline_rounded,
-          label: 'Help & Support',
-          color: const Color(0xFF7F5AF0),
-          trailing: Icons.chevron_right_rounded,
-          onTap: () => onTap('Help & Support'),
-        ),
-        _ProfileRow(
-          icon: Icons.logout_rounded,
-          label: 'Logout',
-          color: AppColors.softRed,
-          labelColor: Colors.red,
-          trailing: Icons.chevron_right_rounded,
-          showDivider: false,
-          onTap: onLogout,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -667,24 +610,18 @@ class _ProfileRow extends StatelessWidget {
     required this.label,
     required this.color,
     this.value,
-    this.trailing,
-    this.labelColor,
     this.showDivider = true,
-    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String? value;
-  final IconData? trailing;
   final Color color;
-  final Color? labelColor;
   final bool showDivider;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final row = Column(
+    return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -705,8 +642,8 @@ class _ProfileRow extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: labelColor ?? AppColors.ink,
+                  style: const TextStyle(
+                    color: AppColors.ink,
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                   ),
@@ -726,8 +663,6 @@ class _ProfileRow extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (trailing != null)
-                Icon(trailing, color: AppColors.ink, size: 24),
             ],
           ),
         ),
@@ -735,8 +670,6 @@ class _ProfileRow extends StatelessWidget {
           Divider(height: 1, color: AppColors.ink.withValues(alpha: 0.08)),
       ],
     );
-    if (onTap == null) return row;
-    return InkWell(onTap: onTap, child: row);
   }
 }
 
