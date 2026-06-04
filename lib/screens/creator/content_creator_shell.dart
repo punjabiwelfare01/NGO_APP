@@ -6,10 +6,15 @@ import '../../models/creator_content.dart';
 import '../../repositories/api_client.dart';
 import '../../repositories/creator_repository.dart';
 import '../../widgets/app_card.dart';
+import '../events/admin/create_event/create_event_view.dart';
+import '../events/admin/create_event/quiz/create_quiz_screen.dart';
+import '../learn/admin/create_course_screen.dart';
+import '../learn/learn_view.dart';
 import 'content_analytics_view.dart';
 import 'content_creator_content_view.dart';
 import 'content_creator_profile_view.dart';
 import 'content_creator_upload_view.dart';
+import 'create_post_screen.dart';
 
 class ContentCreatorShell extends StatefulWidget {
   const ContentCreatorShell({super.key});
@@ -446,22 +451,62 @@ class _CreationToolsSection extends StatelessWidget {
 
   final int drafts;
 
+  Future<void> _openScaffold(BuildContext context, Widget screen) =>
+      Navigator.of(context).push<void>(
+        MaterialPageRoute(builder: (_) => screen),
+      );
+
   @override
   Widget build(BuildContext context) {
     final tools = [
-      (Icons.edit_outlined, 'Create Post', 'Learning & NGO posts',
-          const Color(0xFF3B82F6)),
-      (Icons.school_outlined, 'Add Course', 'Course structure',
-          const Color(0xFF10B981)),
-      (Icons.play_circle_outline_rounded, 'Add Lesson', 'Video, PDF, notes',
-          const Color(0xFF8B5CF6)),
-      (Icons.help_outline_rounded, 'Create Quiz', 'Questions & rewards',
-          const Color(0xFFF59E0B)),
-      (Icons.calendar_today_outlined, 'Create Event', 'Workshops & drives',
-          const Color(0xFFEF4444)),
-      (Icons.folder_open_outlined, 'Drafts',
-          drafts > 0 ? '$drafts items' : 'No drafts yet',
-          const Color(0xFF6B7280)),
+      _ToolEntry(
+        icon: Icons.edit_outlined,
+        title: 'Create Post',
+        subtitle: 'Learning & NGO posts',
+        color: const Color(0xFF3B82F6),
+        onTap: () => _openScaffold(
+          context,
+          const CreatePostScreen(courses: [], events: [], quizzes: []),
+        ),
+      ),
+      _ToolEntry(
+        icon: Icons.school_outlined,
+        title: 'Add Course',
+        subtitle: 'Course structure',
+        color: const Color(0xFF10B981),
+        onTap: () => _openScaffold(context, const CreateCourseScreen()),
+      ),
+      _ToolEntry(
+        icon: Icons.play_circle_outline_rounded,
+        title: 'Add Lesson',
+        subtitle: 'Video, PDF, notes',
+        color: const Color(0xFF8B5CF6),
+        onTap: () => _openScaffold(
+          context,
+          const Scaffold(body: LearnView()),
+        ),
+      ),
+      _ToolEntry(
+        icon: Icons.help_outline_rounded,
+        title: 'Create Quiz',
+        subtitle: 'Questions & rewards',
+        color: const Color(0xFFF59E0B),
+        onTap: () => _openScaffold(context, const CreateQuizScreen()),
+      ),
+      _ToolEntry(
+        icon: Icons.calendar_today_outlined,
+        title: 'Create Event',
+        subtitle: 'Workshops & drives',
+        color: const Color(0xFFEF4444),
+        onTap: () => _openScaffold(context, const CreateEventView()),
+      ),
+      _ToolEntry(
+        icon: Icons.folder_open_outlined,
+        title: 'Drafts',
+        subtitle: drafts > 0 ? '$drafts items' : 'No drafts yet',
+        color: const Color(0xFF6B7280),
+        onTap: null,
+      ),
     ];
 
     return Column(
@@ -483,23 +528,9 @@ class _CreationToolsSection extends StatelessWidget {
               for (int i = 0; i < tools.length; i += 2)
                 Row(
                   children: [
-                    Expanded(
-                      child: _ToolTile(
-                        icon: tools[i].$1,
-                        title: tools[i].$2,
-                        subtitle: tools[i].$3,
-                        color: tools[i].$4,
-                      ),
-                    ),
+                    Expanded(child: _ToolTile(entry: tools[i])),
                     if (i + 1 < tools.length)
-                      Expanded(
-                        child: _ToolTile(
-                          icon: tools[i + 1].$1,
-                          title: tools[i + 1].$2,
-                          subtitle: tools[i + 1].$3,
-                          color: tools[i + 1].$4,
-                        ),
-                      ),
+                      Expanded(child: _ToolTile(entry: tools[i + 1])),
                   ],
                 ),
             ],
@@ -510,24 +541,32 @@ class _CreationToolsSection extends StatelessWidget {
   }
 }
 
-class _ToolTile extends StatelessWidget {
-  const _ToolTile({
+class _ToolEntry {
+  const _ToolEntry({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.color,
+    required this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
+  final VoidCallback? onTap;
+}
+
+class _ToolTile extends StatelessWidget {
+  const _ToolTile({required this.entry});
+
+  final _ToolEntry entry;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
-      onTap: () {},
+      onTap: entry.onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         child: Row(
@@ -536,10 +575,10 @@ class _ToolTile extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
+                color: entry.color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: color, size: 18),
+              child: Icon(entry.icon, color: entry.color, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -547,7 +586,7 @@ class _ToolTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
+                    entry.title,
                     style: const TextStyle(
                       color: AppColors.ink,
                       fontSize: 13,
@@ -555,7 +594,7 @@ class _ToolTile extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    subtitle,
+                    entry.subtitle,
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 11,

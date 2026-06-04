@@ -195,9 +195,11 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
   }
 
   Future<void> _openCreateLesson() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const LearnView()));
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const Scaffold(body: LearnView()),
+      ),
+    );
     await _load();
   }
 
