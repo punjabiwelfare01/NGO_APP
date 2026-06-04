@@ -1,0 +1,156 @@
+Event Creation Pipeline
+
+flowchart TD
+    A[Create Event] --> B[Step 1: Basic Info]
+    B --> C[Auto Save Draft]
+    C --> D[Step 2: Timeline]
+    D --> E[Auto Save Draft]
+    E --> F[Step 3: Rules]
+    F --> G[Step 4: Quiz]
+
+    G --> H{Quiz Required?}
+    H -->|Yes| I[Attach Existing Quiz or Create New]
+    H -->|No| J[Skip Quiz]
+
+    I --> K[Step 5: Selection Criteria]
+    J --> K
+
+    K --> L[Step 6: Rewards]
+    L --> M[Step 7: Notifications]
+    M --> N[Step 8: Preview]
+
+    N --> O{Validation Passed?}
+    O -->|No| P[Show Missing Fields Checklist]
+    O -->|Yes| Q[Publish Event]
+
+    Q --> R{Already Published?}
+    R -->|Yes| S[Show Unpublish Button]
+    R -->|No| T[Published Successfully]
+
+
+Learning Flow Pipeline
+
+flowchart TD
+    A[Student Opens Learn] --> B[Load Categories + Enrolled Courses]
+    B --> C{Enrolled Courses Exist?}
+
+    C -->|Yes| D[Show Continue Learning First]
+    C -->|No| E[Show Recommended Courses]
+
+    D --> F[Open Last Lesson]
+    E --> G[Browse Course Categories]
+
+    F --> H[Lesson Viewer]
+    H --> I{Lesson Has Content Type?}
+
+    I -->|Video| J[Show Video Player]
+    I -->|Text| K[Show Reading Mode]
+    I -->|PDF/Notes| L[Open Notes Viewer]
+    I -->|Quiz| M[Start Quiz]
+
+    H --> N[Mark Lesson Complete]
+    N --> O[Update Progress ]
+
+Learning UX Improvements
+
+Add:
+
+- Continue Learning card
+- Course progress bar
+- Lesson completion state
+- Notes/PDF viewer
+- Save lesson as favorite
+- Download resources
+
+
+Mentor Slot Creation Pipeline
+flowchart TD
+    A[Mentor taps Create Slot] --> B[Bottom Sheet Opens]
+    B --> C[Select Topic]
+    C --> D[Select Date + Time]
+    D --> E[Select Duration]
+    E --> F[Set Capacity]
+    F --> G{Meeting URL Provided?}
+
+    G -->|Yes| H[Use Provided URL]
+    G -->|No| I[Auto Generate Google Meet]
+
+    I --> J{Calendar Connected?}
+    J -->|Yes| K[Create Meet Link]
+    J -->|No| L[Save Slot Without Meet Link + Show Warning]
+
+    H --> M[Create Slot]
+    K --> M
+    L --> M
+
+    M --> N[Optimistic UI Update]
+    N --> O[Slot Appears in My Slots]
+
+
+Counselling Booking Pipeline
+Student Booking Flow
+sequenceDiagram
+    actor Student
+    participant App as Flutter App
+    participant VM as CounsellingViewModel
+    participant API as FastAPI Backend
+    participant DB as Database
+
+    Student->>App: Opens Helping Support
+    App->>VM: Load mentors + available slots
+    VM->>API: GET mentors + slots in parallel
+    API->>DB: Fetch active mentors and open slots
+    DB-->>API: Data
+    API-->>VM: Mentor list + slot list
+    VM-->>App: Render recommended mentors first
+
+    Student->>App: Selects mentor
+    App->>App: Show available slots calendar view
+    Student->>App: Taps slot
+    App->>App: Show confirmation bottom sheet
+    Student->>App: Confirms booking
+
+    App->>VM: Optimistic booking state
+    VM->>API: POST book slot
+    API->>DB: Transaction check capacity
+    DB-->>API: Booking saved
+    API-->>VM: Session with Meet link
+    VM-->>App: Show success screen    
+
+
+mentor dashboard flow
+flowchart TD
+    A[Mentor Home] --> B[Today's Sessions]
+    A --> C[Pending Student Chats]
+    A --> D[Create New Slot]
+    A --> E[Upcoming Bookings]
+    A --> F[Student Wellness Summary]
+
+    B --> G{Meet Link Available?}
+    G -->|Yes| H[Join / Copy Meet Link]
+    G -->|No| I[Generate or Add Meeting URL]
+
+    C --> J[Open Chat]
+    D --> K[Create Slot Bottom Sheet]    
+
+
+student dashboard flow
+flowchart TD
+    A[Student Home] --> B[Welcome + Progress Summary]
+    B --> C[Next Counselling Session]
+    B --> D[Continue Learning]
+    B --> E[Daily Challenge]
+    B --> F[Upcoming Events]
+    B --> G[Emergency Help Shortcut]
+
+    C --> C1{Session Available?}
+    C1 -->|Yes| C2[Show Join Meet Button]
+    C1 -->|No| C3[Show Book Session CTA]
+
+    D --> D1{Enrolled Course?}
+    D1 -->|Yes| D2[Resume Last Lesson]
+    D1 -->|No| D3[Recommend Beginner Courses]
+
+    E --> E1{Challenge Completed?}
+    E1 -->|No| E2[Start Quiz]
+    E1 -->|Yes| E3[Show XP Earned]
