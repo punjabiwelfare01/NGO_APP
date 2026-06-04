@@ -230,6 +230,40 @@ def _all_items(db: Session, user: User) -> list[dict[str, Any]]:
     return items
 
 
+@router.get("/home")
+def creator_home(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(content_creator_or_above),
+):
+    items = _all_items(db, current_user)
+
+    total = len(items)
+    published = sum(1 for i in items if i["status"] == "published")
+    pending_review = sum(1 for i in items if i["status"] == "pending_review")
+    drafts = sum(1 for i in items if i["status"] == "draft")
+    total_views = sum(i["views"] for i in items)
+
+    recent = items[:5]
+
+    top_performing = sorted(
+        [i for i in items if i["status"] == "published"],
+        key=lambda i: i["views"],
+        reverse=True,
+    )[:3]
+
+    return {
+        "stats": {
+            "total_content": total,
+            "published": published,
+            "pending_review": pending_review,
+            "drafts": drafts,
+            "total_views": total_views,
+        },
+        "recent_content": recent,
+        "top_performing": top_performing,
+    }
+
+
 @router.get("/content")
 def list_creator_content(
     status: str | None = Query(default=None),

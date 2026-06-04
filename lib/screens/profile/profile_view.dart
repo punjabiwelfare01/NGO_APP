@@ -33,6 +33,39 @@ class _ProfileViewState extends State<ProfileView> {
     super.dispose();
   }
 
+  Future<void> _openChangePassword() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ChangePasswordSheet(
+        onSave: (currentPw, newPw) async {
+          final error = await _authVm.changePassword(
+            currentPassword: currentPw,
+            newPassword: newPw,
+          );
+          if (!mounted) return;
+          if (error == null) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Password changed successfully.'),
+                backgroundColor: Color(0xFF18B86D),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(error),
+                backgroundColor: AppColors.softRed,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
   Future<void> _logout() async {
     await _authVm.logout();
     if (!mounted) return;
@@ -207,7 +240,7 @@ class _ProfileViewState extends State<ProfileView> {
                   icon: Icons.lock_outline_rounded,
                   tint: const Color(0xFF126BFF),
                   label: 'Change Password',
-                  onTap: () => _showComingSoon('Change Password'),
+                  onTap: _openChangePassword,
                 ),
                 _InfoRowData(
                   icon: Icons.logout_rounded,
@@ -1246,6 +1279,8 @@ class _SheetField extends StatelessWidget {
     this.keyboardType,
     this.enabled = true,
     this.validator,
+    this.obscureText = false,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
@@ -1254,6 +1289,8 @@ class _SheetField extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool enabled;
   final String? Function(String?)? validator;
+  final bool obscureText;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -1261,10 +1298,12 @@ class _SheetField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       enabled: enabled,
+      obscureText: obscureText,
       textInputAction: TextInputAction.next,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: const Color(0xFF4A587C)),
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: const Color(0xFFF7FAFF),
         border: OutlineInputBorder(
@@ -1285,6 +1324,184 @@ class _SheetField extends StatelessWidget {
         ),
       ),
       validator: validator,
+    );
+  }
+}
+
+class _ChangePasswordSheet extends StatefulWidget {
+  const _ChangePasswordSheet({required this.onSave});
+
+  final Future<void> Function(String currentPw, String newPw) onSave;
+
+  @override
+  State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
+}
+
+class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _currentCtrl = TextEditingController();
+  final _newCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+
+  bool _showCurrent = false;
+  bool _showNew = false;
+  bool _showConfirm = false;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _currentCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    await widget.onSave(_currentCtrl.text, _newCtrl.text);
+    if (mounted) setState(() => _saving = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 14, 22, 28),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD6DCEA),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Change Password',
+                style: TextStyle(
+                  color: Color(0xFF08164A),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Your new password must be at least 8 characters.',
+                style: TextStyle(
+                  color: Color(0xFF4A587C),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _SheetField(
+                controller: _currentCtrl,
+                label: 'Current Password',
+                icon: Icons.lock_outline_rounded,
+                obscureText: !_showCurrent,
+                enabled: !_saving,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showCurrent
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: const Color(0xFF4A587C),
+                  ),
+                  onPressed: () => setState(() => _showCurrent = !_showCurrent),
+                ),
+                validator: (v) =>
+                    v == null || v.isEmpty ? 'Enter your current password' : null,
+              ),
+              const SizedBox(height: 12),
+              _SheetField(
+                controller: _newCtrl,
+                label: 'New Password',
+                icon: Icons.lock_reset_rounded,
+                obscureText: !_showNew,
+                enabled: !_saving,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showNew
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: const Color(0xFF4A587C),
+                  ),
+                  onPressed: () => setState(() => _showNew = !_showNew),
+                ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Enter a new password';
+                  if (v.length < 8) return 'Must be at least 8 characters';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              _SheetField(
+                controller: _confirmCtrl,
+                label: 'Confirm New Password',
+                icon: Icons.check_circle_outline_rounded,
+                obscureText: !_showConfirm,
+                enabled: !_saving,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _showConfirm
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: const Color(0xFF4A587C),
+                  ),
+                  onPressed: () =>
+                      setState(() => _showConfirm = !_showConfirm),
+                ),
+                validator: (v) => v != _newCtrl.text
+                    ? 'Passwords do not match'
+                    : null,
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _saving ? null : _save,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF126BFF),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Update Password',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

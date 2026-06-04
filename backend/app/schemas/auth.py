@@ -39,3 +39,18 @@ class TokenData(BaseModel):
     sub: str    # user_id as string
     role: str
     jti: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str

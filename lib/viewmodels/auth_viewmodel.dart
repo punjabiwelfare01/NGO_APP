@@ -167,6 +167,69 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  /// Returns `(otp: code, error: null)` when the OTP was generated,
+  /// `(otp: null, error: null)` when the email is not registered (backend
+  /// deliberately stays silent), or `(otp: null, error: message)` on failure.
+  Future<({String? otp, String? error})> forgotPassword(String email) async {
+    try {
+      final otp = await AuthRepository.forgotPassword(email.trim());
+      return (otp: otp, error: null);
+    } on ApiException catch (e) {
+      return (
+        otp: null,
+        error: 'Server error (${e.statusCode}). Please try again.',
+      );
+    } catch (_) {
+      return (otp: null, error: 'Connection failed. Is the backend running?');
+    }
+  }
+
+  /// Returns null on success, an error message string on failure.
+  Future<String?> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      await AuthRepository.resetPassword(
+        email: email,
+        otp: otp,
+        newPassword: newPassword,
+      );
+      return null;
+    } on ApiException catch (e) {
+      return switch (e.statusCode) {
+        400 => e.message,
+        422 => 'New password must be at least 8 characters.',
+        _ => 'Server error (${e.statusCode}). Please try again.',
+      };
+    } catch (_) {
+      return 'Connection failed. Is the backend running?';
+    }
+  }
+
+  /// Returns null on success, an error message string on failure.
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await AuthRepository.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      return null;
+    } on ApiException catch (e) {
+      return switch (e.statusCode) {
+        400 => e.message,
+        422 => 'New password must be at least 8 characters.',
+        _ => 'Server error (${e.statusCode}). Please try again.',
+      };
+    } catch (_) {
+      return 'Connection failed. Is the backend running?';
+    }
+  }
+
   Future<void> logout() async {
     await AuthRepository.logout();
     await AuthRepository.auth0Logout();

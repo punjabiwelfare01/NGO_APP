@@ -17,10 +17,12 @@ class _AuthPageState extends State<AuthPage>
     with SingleTickerProviderStateMixin {
   bool _onRegister = false;
   bool _registrationSuccess = false;
+  bool _onForgotPassword = false;
 
   void _switchTab(bool toRegister) {
     setState(() {
       _onRegister = toRegister;
+      _onForgotPassword = false;
       if (!toRegister) _registrationSuccess = false;
     });
   }
@@ -40,6 +42,7 @@ class _AuthPageState extends State<AuthPage>
 
   @override
   Widget build(BuildContext context) {
+    final showTabs = !_registrationSuccess && !_onForgotPassword;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -54,7 +57,7 @@ class _AuthPageState extends State<AuthPage>
               const SizedBox(height: 28),
 
               // ── Tab toggle ────────────────────────────────────────────
-              if (!_registrationSuccess) ...[
+              if (showTabs) ...[
                 _TabToggle(
                   onLogin: !_onRegister,
                   onSwitch: _switchTab,
@@ -82,18 +85,29 @@ class _AuthPageState extends State<AuthPage>
                         key: const ValueKey('success'),
                         onGoToLogin: () => _switchTab(false),
                       )
-                    : _onRegister
-                        ? _RegisterForm(
-                            key: const ValueKey('register'),
-                            onSuccess: _onRegisterSuccess,
-                            onGoToLogin: () => _switchTab(false),
+                    : _onForgotPassword
+                        ? _ForgotPasswordFlow(
+                            key: const ValueKey('forgot'),
+                            onBackToLogin: () => setState(() {
+                              _onForgotPassword = false;
+                              _onRegister = false;
+                            }),
                           )
-                        : _LoginForm(
-                            key: const ValueKey('login'),
-                            onSuccess: (status) =>
-                                _navigateByStatus(context, status),
-                            onGoToRegister: () => _switchTab(true),
-                          ),
+                        : _onRegister
+                            ? _RegisterForm(
+                                key: const ValueKey('register'),
+                                onSuccess: _onRegisterSuccess,
+                                onGoToLogin: () => _switchTab(false),
+                              )
+                            : _LoginForm(
+                                key: const ValueKey('login'),
+                                onSuccess: (status) =>
+                                    _navigateByStatus(context, status),
+                                onGoToRegister: () => _switchTab(true),
+                                onForgotPassword: () => setState(
+                                  () => _onForgotPassword = true,
+                                ),
+                              ),
               ),
             ],
           ),
@@ -262,11 +276,13 @@ class _LoginForm extends StatefulWidget {
   const _LoginForm({
     required this.onSuccess,
     required this.onGoToRegister,
+    required this.onForgotPassword,
     super.key,
   });
 
   final ValueChanged<AccessStatus> onSuccess;
   final VoidCallback onGoToRegister;
+  final VoidCallback onForgotPassword;
 
   @override
   State<_LoginForm> createState() => _LoginFormState();
@@ -368,7 +384,29 @@ class _LoginFormState extends State<_LoginForm> {
               obscure: _obscure,
               onToggle: () => setState(() => _obscure = !_obscure),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 6),
+
+            // ── Forgot password link ─────────────────────────────────
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: loading ? null : widget.onForgotPassword,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'Forgot password?',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
 
             // ── API error ───────────────────────────────────────────
             if (_vm.state == ViewState.error &&
@@ -1377,6 +1415,390 @@ class _RoleCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Forgot password flow ──────────────────────────────────────────────────────
+
+enum _FpStep { email, reset, done }
+
+class _ForgotPasswordFlow extends StatefulWidget {
+  const _ForgotPasswordFlow({required this.onBackToLogin, super.key});
+
+  final VoidCallback onBackToLogin;
+
+  @override
+  State<_ForgotPasswordFlow> createState() => _ForgotPasswordFlowState();
+}
+
+class _ForgotPasswordFlowState extends State<_ForgotPasswordFlow> {
+  final _vm           = AuthViewModel();
+  final _emailFormKey = GlobalKey<FormState>();
+  final _resetFormKey = GlobalKey<FormState>();
+  final _emailCtrl    = TextEditingController();
+  final _otpCtrl      = TextEditingController();
+  final _newPwCtrl    = TextEditingController();
+  final _confirmCtrl  = TextEditingController();
+
+  _FpStep _step      = _FpStep.email;
+  String? _demoCode;
+  String? _email;
+  String? _error;
+  bool    _loading    = false;
+  bool    _showNew    = false;
+  bool    _showConfirm = false;
+
+  @override
+  void dispose() {
+    _vm.dispose();
+    _emailCtrl.dispose();
+    _otpCtrl.dispose();
+    _newPwCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestOtp() async {
+    if (!_emailFormKey.currentState!.validate()) return;
+    setState(() { _loading = true; _error = null; });
+    final result = await _vm.forgotPassword(_emailCtrl.text.trim());
+    if (!mounted) return;
+    if (result.error != null) {
+      setState(() { _loading = false; _error = result.error; });
+      return;
+    }
+    setState(() {
+      _loading  = false;
+      _email    = _emailCtrl.text.trim();
+      _demoCode = result.otp;
+      _step     = _FpStep.reset;
+    });
+  }
+
+  Future<void> _resetPassword() async {
+    if (!_resetFormKey.currentState!.validate()) return;
+    setState(() { _loading = true; _error = null; });
+    final error = await _vm.resetPassword(
+      email:       _email!,
+      otp:         _otpCtrl.text.trim(),
+      newPassword: _newPwCtrl.text,
+    );
+    if (!mounted) return;
+    if (error != null) {
+      setState(() { _loading = false; _error = error; });
+    } else {
+      setState(() { _loading = false; _step = _FpStep.done; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, anim) => FadeTransition(
+        opacity: anim,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.03),
+            end: Offset.zero,
+          ).animate(anim),
+          child: child,
+        ),
+      ),
+      child: switch (_step) {
+        _FpStep.email => _buildEmailStep(),
+        _FpStep.reset => _buildResetStep(),
+        _FpStep.done  => _buildDoneStep(),
+      },
+    );
+  }
+
+  Widget _buildEmailStep() {
+    return Form(
+      key: _emailFormKey,
+      child: Column(
+        key: const ValueKey('fp-email'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Back + title
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                color: AppColors.ink,
+                onPressed: widget.onBackToLogin,
+              ),
+              const SizedBox(width: 2),
+              const Text(
+                'Reset Password',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.ink,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Padding(
+            padding: EdgeInsets.only(left: 4),
+            child: Text(
+              'Enter your registered email and we\'ll generate a reset code.',
+              style: TextStyle(color: AppColors.muted, fontSize: 13),
+            ),
+          ),
+          const SizedBox(height: 22),
+          _ValidatedField(
+            controller: _emailCtrl,
+            label: 'Email address',
+            icon: Icons.email_outlined,
+            keyboardType: TextInputType.emailAddress,
+            enabled: !_loading,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Email is required';
+              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(v.trim())) {
+                return 'Enter a valid email address';
+              }
+              return null;
+            },
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            _InlineBanner(message: _error!, kind: _StatusKind.blocked),
+          ],
+          const SizedBox(height: 18),
+          _PrimaryButton(
+            label: 'Get Reset Code',
+            loading: _loading,
+            onPressed: _requestOtp,
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: TextButton(
+              onPressed: widget.onBackToLogin,
+              child: const Text('Back to Sign In'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResetStep() {
+    return Form(
+      key: _resetFormKey,
+      child: Column(
+        key: const ValueKey('fp-reset'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Back + title
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                color: AppColors.ink,
+                onPressed: () => setState(() {
+                  _step  = _FpStep.email;
+                  _error = null;
+                }),
+              ),
+              const SizedBox(width: 2),
+              const Text(
+                'Enter Reset Code',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.ink,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Demo code banner
+          if (_demoCode != null) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        size: 15,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Demo mode — your reset code:',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _demoCode!,
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'In production this would be sent to your email.',
+                    style: TextStyle(color: AppColors.muted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ] else ...[
+            // No OTP returned — email wasn't found / social account
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3CD),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFD600)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      size: 16, color: Color(0xFF8A6A00)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No password account found for this email. '
+                      'Social-login accounts cannot use this flow.',
+                      style: TextStyle(
+                        color: Color(0xFF8A6A00),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          _ValidatedField(
+            controller: _otpCtrl,
+            label: 'Reset Code (6 digits)',
+            icon: Icons.pin_outlined,
+            keyboardType: TextInputType.number,
+            enabled: !_loading,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Enter the reset code';
+              if (v.trim().length != 6) return 'Code must be exactly 6 digits';
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          _PasswordField(
+            controller: _newPwCtrl,
+            label: 'New Password',
+            enabled: !_loading,
+            obscure: !_showNew,
+            onToggle: () => setState(() => _showNew = !_showNew),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Enter a new password';
+              if (v.length < 8) return 'Must be at least 8 characters';
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          _PasswordField(
+            controller: _confirmCtrl,
+            label: 'Confirm New Password',
+            enabled: !_loading,
+            obscure: !_showConfirm,
+            onToggle: () => setState(() => _showConfirm = !_showConfirm),
+            validator: (v) =>
+                v != _newPwCtrl.text ? 'Passwords do not match' : null,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            _InlineBanner(message: _error!, kind: _StatusKind.blocked),
+          ],
+          const SizedBox(height: 18),
+          _PrimaryButton(
+            label: 'Reset Password',
+            loading: _loading,
+            onPressed: () => _resetPassword(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDoneStep() {
+    return Column(
+      key: const ValueKey('fp-done'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Center(
+          child: Container(
+            width: 84,
+            height: 84,
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.lock_open_rounded,
+              color: AppColors.secondary,
+              size: 42,
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+        const Text(
+          'Password Reset!',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: AppColors.ink,
+          ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'Your password has been updated successfully.\nYou can now sign in with your new password.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.muted,
+            fontSize: 13,
+            height: 1.55,
+          ),
+        ),
+        const SizedBox(height: 28),
+        _PrimaryButton(
+          label: 'Back to Sign In',
+          loading: false,
+          onPressed: widget.onBackToLogin,
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 }

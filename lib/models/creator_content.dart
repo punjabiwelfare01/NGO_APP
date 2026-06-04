@@ -99,6 +99,53 @@ class CreatorContentItem {
   }
 }
 
+class CreatorHomeStats {
+  const CreatorHomeStats({
+    required this.totalContent,
+    required this.published,
+    required this.pendingReview,
+    required this.drafts,
+    required this.totalViews,
+    required this.recentContent,
+    required this.topPerforming,
+  });
+
+  final int totalContent;
+  final int published;
+  final int pendingReview;
+  final int drafts;
+  final int totalViews;
+  final List<CreatorContentItem> recentContent;
+  final List<CreatorContentItem> topPerforming;
+
+  factory CreatorHomeStats.fromJson(Map<String, dynamic> json) {
+    final stats = json['stats'] as Map<String, dynamic>? ?? {};
+    List<CreatorContentItem> parseList(String key) {
+      final raw = json[key] as List<dynamic>? ?? [];
+      return raw
+          .map((e) => CreatorContentItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
+    return CreatorHomeStats(
+      totalContent: stats['total_content'] as int? ?? 0,
+      published: stats['published'] as int? ?? 0,
+      pendingReview: stats['pending_review'] as int? ?? 0,
+      drafts: stats['drafts'] as int? ?? 0,
+      totalViews: stats['total_views'] as int? ?? 0,
+      recentContent: parseList('recent_content'),
+      topPerforming: parseList('top_performing'),
+    );
+  }
+
+  String get totalViewsLabel {
+    if (totalViews >= 1000) {
+      return '${(totalViews / 1000).toStringAsFixed(1)}K';
+    }
+    return '$totalViews';
+  }
+}
+
 DateTime? _parseDate(String? value) {
   if (value == null || value.trim().isEmpty) return null;
   return DateTime.tryParse(value);

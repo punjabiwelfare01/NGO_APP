@@ -91,6 +91,37 @@ class AuthRepository {
     return TokenResponse.fromJson(raw);
   }
 
+  /// Returns the OTP string when the email is registered with a password
+  /// account, null otherwise (backend never reveals non-existent emails).
+  static Future<String?> forgotPassword(String email) async {
+    final json =
+        await ApiClient.post('/auth/forgot-password', {'email': email})
+            as Map<String, dynamic>;
+    return json['reset_token'] as String?;
+  }
+
+  static Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await ApiClient.post('/auth/reset-password', {
+      'email': email,
+      'otp': otp,
+      'new_password': newPassword,
+    });
+  }
+
+  static Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await ApiClient.post('/auth/change-password', {
+      'current_password': currentPassword,
+      'new_password': newPassword,
+    });
+  }
+
   static Future<void> logout() async {
     try {
       await ApiClient.post('/auth/logout', {});

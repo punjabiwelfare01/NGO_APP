@@ -5,6 +5,12 @@ import 'api_client.dart';
 class CreatorRepository {
   const CreatorRepository._();
 
+  static Future<CreatorHomeStats> getHomeStats() async {
+    final json =
+        await ApiClient.get('/creator/home') as Map<String, dynamic>;
+    return CreatorHomeStats.fromJson(json);
+  }
+
   static Future<List<CreatorContentItem>> getContent({
     String? status,
     String? type,

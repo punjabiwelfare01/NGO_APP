@@ -1,4 +1,6 @@
 import logging
+import random
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -18,6 +20,7 @@ from ..crud.auth_crud import (
     get_or_create_auth0_user,
     get_or_create_google_user,
     get_user_by_email,
+    hash_password,
     register_user,
     revoke_token,
     verify_password,
@@ -26,7 +29,14 @@ from ..database import get_db
 from ..dependencies import get_current_user, require_role
 from ..google_calendar import exchange_code_for_tokens, get_authorization_url, is_calendar_authorized
 from ..models.user import User, UserRole
-from ..schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from ..schemas.auth import (
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    LoginRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    TokenResponse,
+)
 from ..schemas.user import UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -90,6 +100,81 @@ def logout(
             summary="Return the profile of the currently authenticated user")
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/change-password", status_code=200,
+             summary="Change the current user's password (all roles)")
+def change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.hashed_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Password change is not available for social-login accounts.",
+        )
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    if len(payload.new_password) < 8:
+        raise HTTPException(
+            status_code=422,
+            detail="New password must be at least 8 characters.",
+        )
+    current_user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    return {"message": "Password changed successfully."}
+
+
+@router.post("/forgot-password", status_code=200,
+             summary="Request a 6-digit password reset OTP (all roles)")
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    user = get_user_by_email(db, payload.email.strip().lower())
+    if user and user.hashed_password:
+        otp = str(random.randint(100000, 999999))
+        user.reset_token = otp
+        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+        db.commit()
+        # In production, send otp via email. Returned here for demo only.
+        return {
+            "message": "Reset code generated.",
+            "reset_token": otp,
+            "expires_in_minutes": 15,
+        }
+    # Don't reveal whether the email exists.
+    return {
+        "message": "If this email is registered with a password account, a reset code has been sent.",
+        "reset_token": None,
+    }
+
+
+@router.post("/reset-password", status_code=200,
+             summary="Reset password using the OTP (all roles)")
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    user = get_user_by_email(db, payload.email.strip().lower())
+    if not user or not user.reset_token:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset code.")
+    if user.reset_token != payload.otp.strip():
+        raise HTTPException(status_code=400, detail="Incorrect reset code.")
+    expires = user.reset_token_expires
+    if expires is None or datetime.now(timezone.utc) > expires.replace(tzinfo=timezone.utc):
+        user.reset_token = None
+        user.reset_token_expires = None
+        db.commit()
+        raise HTTPException(status_code=400, detail="Reset code has expired. Please request a new one.")
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=422, detail="New password must be at least 8 characters.")
+    user.hashed_password = hash_password(payload.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    return {"message": "Password reset successfully. You can now sign in with your new password."}
 
 
 class GoogleLoginRequest(BaseModel):

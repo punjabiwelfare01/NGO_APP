@@ -29,6 +29,8 @@ def ensure_sqlite_schema(engine: Engine) -> None:
             }
             user_additions = {
                 "date_of_birth": "DATE",
+                "reset_token": "VARCHAR",
+                "reset_token_expires": "DATETIME",
             }
             for column, ddl_type in user_additions.items():
                 if column not in user_columns:
