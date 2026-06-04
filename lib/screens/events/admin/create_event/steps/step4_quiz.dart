@@ -61,90 +61,151 @@ class QuizStep extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Quiz Setup',
+                'Quiz Requirement',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(color: AppColors.ink),
               ),
-              const SizedBox(height: 20),
-              _MethodCard(
-                method: 'create',
-                selected: vm.quizAttachmentMethod,
-                title: 'Create Quiz',
-                description: 'Build a new quiz from scratch',
-                icon: Icons.add_circle_outline_rounded,
-                onTap: () => vm.setQuizAttachmentMethod('create'),
-              ),
-              const SizedBox(height: 10),
-              _MethodCard(
-                method: 'upload',
-                selected: vm.quizAttachmentMethod,
-                title: 'Upload File',
-                description: 'CSV or JSON — auto-creates questions',
-                icon: Icons.upload_file_rounded,
-                onTap: () => vm.setQuizAttachmentMethod('upload'),
-              ),
-              const SizedBox(height: 10),
-              _MethodCard(
-                method: 'existing',
-                selected: vm.quizAttachmentMethod,
-                title: 'Attach Existing',
-                description: 'Link a quiz by its ID',
-                icon: Icons.link_rounded,
-                onTap: () => vm.setQuizAttachmentMethod('existing'),
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
+              _QuizRequirementPanel(vm: vm),
+              if (vm.quizRequired) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Attach Existing Quiz or Create New',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: AppColors.ink),
+                ),
+                const SizedBox(height: 12),
+                _MethodCard(
+                  method: 'create',
+                  selected: vm.quizAttachmentMethod,
+                  title: 'Create Quiz',
+                  description: 'Build a new quiz from scratch',
+                  icon: Icons.add_circle_outline_rounded,
+                  onTap: () => vm.setQuizAttachmentMethod('create'),
+                ),
+                const SizedBox(height: 10),
+                _MethodCard(
+                  method: 'upload',
+                  selected: vm.quizAttachmentMethod,
+                  title: 'Upload File',
+                  description: 'CSV or JSON - auto-creates questions',
+                  icon: Icons.upload_file_rounded,
+                  onTap: () => vm.setQuizAttachmentMethod('upload'),
+                ),
+                const SizedBox(height: 10),
+                _MethodCard(
+                  method: 'existing',
+                  selected: vm.quizAttachmentMethod,
+                  title: 'Attach Existing',
+                  description: 'Link a quiz by its ID',
+                  icon: Icons.link_rounded,
+                  onTap: () => vm.setQuizAttachmentMethod('existing'),
+                ),
+                const SizedBox(height: 20),
 
-              if (vm.quizAttachmentMethod == 'create') ...[
-                if (vm.createdQuiz != null)
-                  _CreatedQuizPanel(vm: vm)
-                else
+                if (vm.quizAttachmentMethod == 'create') ...[
+                  if (vm.createdQuiz != null)
+                    _CreatedQuizPanel(vm: vm)
+                  else
+                    TextFormField(
+                      initialValue: vm.quizTitle,
+                      decoration: const InputDecoration(
+                        labelText: 'Quiz Title',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: vm.setQuizTitle,
+                    ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => _openCreator(context),
+                      icon: Icon(
+                        vm.createdQuiz == null
+                            ? Icons.add_task_rounded
+                            : Icons.edit_note_rounded,
+                      ),
+                      label: Text(
+                        vm.createdQuiz == null
+                            ? 'Build Quiz Questions'
+                            : 'Replace Created Quiz',
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ] else if (vm.quizAttachmentMethod == 'upload') ...[
+                  _UploadPanel(vm: vm, onPick: () => _pickAndUpload(context)),
+                ] else if (vm.quizAttachmentMethod == 'existing') ...[
                   TextFormField(
                     initialValue: vm.quizTitle,
                     decoration: const InputDecoration(
-                      labelText: 'Quiz Title',
+                      labelText: 'Quiz ID',
+                      hintText: 'Enter the numeric quiz ID',
                       border: OutlineInputBorder(),
                     ),
+                    keyboardType: TextInputType.number,
                     onChanged: vm.setQuizTitle,
                   ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => _openCreator(context),
-                    icon: Icon(
-                      vm.createdQuiz == null
-                          ? Icons.add_task_rounded
-                          : Icons.edit_note_rounded,
-                    ),
-                    label: Text(
-                      vm.createdQuiz == null
-                          ? 'Build Quiz Questions'
-                          : 'Replace Created Quiz',
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ] else if (vm.quizAttachmentMethod == 'upload') ...[
-                _UploadPanel(vm: vm, onPick: () => _pickAndUpload(context)),
-              ] else if (vm.quizAttachmentMethod == 'existing') ...[
-                TextFormField(
-                  initialValue: vm.quizTitle,
-                  decoration: const InputDecoration(
-                    labelText: 'Quiz ID',
-                    hintText: 'Enter the numeric quiz ID',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  onChanged: vm.setQuizTitle,
-                ),
+                ],
               ],
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _QuizRequirementPanel extends StatelessWidget {
+  const _QuizRequirementPanel({required this.vm});
+
+  final CreateEventViewModel vm;
+
+  @override
+  Widget build(BuildContext context) {
+    final locked = !vm.quizCanBeSkipped;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: vm.quizRequired
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : AppColors.secondary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: vm.quizRequired
+              ? AppColors.primary.withValues(alpha: 0.32)
+              : AppColors.secondary.withValues(alpha: 0.36),
+        ),
+      ),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        secondary: Icon(
+          vm.quizRequired ? Icons.quiz_rounded : Icons.skip_next_rounded,
+          color: vm.quizRequired ? AppColors.primary : AppColors.secondary,
+        ),
+        title: Text(
+          vm.quizRequired ? 'Quiz required' : 'Skip quiz',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: AppColors.ink,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        subtitle: Text(
+          locked
+              ? '${vm.selectedEventType.displayName} events always include a quiz.'
+              : vm.quizRequired
+              ? 'Attach an existing quiz or create one with at least 3 questions.'
+              : 'Continue without attaching quiz questions.',
+        ),
+        value: vm.quizRequired,
+        onChanged: locked ? null : vm.setQuizRequired,
+        activeThumbColor: AppColors.primary,
+      ),
     );
   }
 }

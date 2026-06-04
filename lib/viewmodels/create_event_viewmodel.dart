@@ -7,8 +7,34 @@ import '../repositories/api_client.dart';
 import '../repositories/event_repository.dart';
 import 'view_state.dart';
 
+class EventValidationItem {
+  const EventValidationItem({
+    required this.step,
+    required this.label,
+    required this.message,
+  });
+
+  final String step;
+  final String label;
+  final String message;
+}
+
 class CreateEventViewModel extends ChangeNotifier {
   bool _disposed = false;
+  DateTime? _lastDraftSavedAt;
+
+  DateTime? get lastDraftSavedAt => _lastDraftSavedAt;
+  String get draftStatusLabel {
+    if (_lastDraftSavedAt == null) return 'Draft auto-save ready';
+    final hour = _lastDraftSavedAt!.hour.toString().padLeft(2, '0');
+    final minute = _lastDraftSavedAt!.minute.toString().padLeft(2, '0');
+    return 'Draft auto-saved at $hour:$minute';
+  }
+
+  void autosaveDraft() {
+    _lastDraftSavedAt = DateTime.now();
+    if (!_disposed) notifyListeners();
+  }
 
   // ── Step 1: Basic Info ─────────────────────────────────────────────────────
   String _title = '';
@@ -40,6 +66,7 @@ class CreateEventViewModel extends ChangeNotifier {
 
   void setEventType(EventType v) {
     _selectedEventType = v;
+    _quizRequired = _isQuizRequiredByType;
     notifyListeners();
   }
 
@@ -163,6 +190,7 @@ class CreateEventViewModel extends ChangeNotifier {
   String _quizTitle = '';
   String _quizAttachmentMethod = 'create';
   bool _hasQuiz = false;
+  bool _quizRequired = false;
   QuizSummary? _createdQuiz;
 
   // Upload-specific state
@@ -175,6 +203,18 @@ class CreateEventViewModel extends ChangeNotifier {
   String get quizTitle => _quizTitle;
   String get quizAttachmentMethod => _quizAttachmentMethod;
   bool get hasQuiz => _hasQuiz;
+  bool get quizRequired => _isQuizRequiredByType || _quizRequired;
+  bool get quizCanBeSkipped => !_isQuizRequiredByType;
+  bool get quizReady {
+    if (!quizRequired) return true;
+    return switch (_quizAttachmentMethod) {
+      'create' => _createdQuiz != null && _createdQuiz!.questionCount >= 3,
+      'existing' => int.tryParse(_quizTitle.trim()) != null,
+      'upload' => _uploadedQuizId != null,
+      _ => false,
+    };
+  }
+
   QuizSummary? get createdQuiz => _createdQuiz;
   int? get createdQuizId => _createdQuiz?.id;
   String? get uploadFileName => _uploadFileName;
@@ -182,6 +222,10 @@ class CreateEventViewModel extends ChangeNotifier {
   bool get uploadingFile => _uploadingFile;
   String? get uploadError => _uploadError;
   bool get uploadReady => _uploadedQuizId != null;
+
+  bool get _isQuizRequiredByType =>
+      _selectedEventType == EventType.quiz ||
+      _selectedEventType == EventType.dailyChallenge;
 
   void setQuizTitle(String v) {
     _quizTitle = v;
@@ -206,6 +250,18 @@ class CreateEventViewModel extends ChangeNotifier {
 
   void setHasQuiz(bool v) {
     _hasQuiz = v;
+    notifyListeners();
+  }
+
+  void setQuizRequired(bool v) {
+    if (_isQuizRequiredByType) return;
+    _quizRequired = v;
+    if (!v) {
+      _hasQuiz = false;
+      _createdQuiz = null;
+      _uploadedQuizId = null;
+      _minQuizScore = null;
+    }
     notifyListeners();
   }
 
@@ -253,6 +309,9 @@ class CreateEventViewModel extends ChangeNotifier {
 
   void setSelectionMethod(SelectionMethod v) {
     _selectedSelectionMethod = v;
+    if (v == SelectionMethod.scoreBased) {
+      _quizRequired = true;
+    }
     notifyListeners();
   }
 
@@ -364,6 +423,145 @@ class CreateEventViewModel extends ChangeNotifier {
     return errors;
   }
 
+  List<EventValidationItem> getValidationItems() {
+    final items = <EventValidationItem>[];
+
+    if (_title.trim().isEmpty) {
+      items.add(
+        const EventValidationItem(
+          step: 'Basic Info',
+          label: 'Event title',
+          message: 'Add an event title.',
+        ),
+      );
+    }
+
+    for (final entry in getTimelineErrors().entries) {
+      items.add(
+        EventValidationItem(
+          step: 'Timeline',
+          label: _timelineFieldLabel(entry.key),
+          message: entry.value,
+        ),
+      );
+    }
+
+    if (_ageMin == null) {
+      items.add(
+        const EventValidationItem(
+          step: 'Rules',
+          label: 'Min age',
+          message: 'Minimum age is required.',
+        ),
+      );
+    }
+    if (_ageMax == null) {
+      items.add(
+        const EventValidationItem(
+          step: 'Rules',
+          label: 'Max age',
+          message: 'Maximum age is required.',
+        ),
+      );
+    }
+    if (_ageMin != null && _ageMax != null && _ageMin! > _ageMax!) {
+      items.add(
+        const EventValidationItem(
+          step: 'Rules',
+          label: 'Age range',
+          message: 'Minimum age must be lower than maximum age.',
+        ),
+      );
+    }
+    if (quizRequired && _minQuizScore == null) {
+      items.add(
+        const EventValidationItem(
+          step: 'Rules',
+          label: 'Minimum quiz score',
+          message: 'Minimum quiz score is required.',
+        ),
+      );
+    }
+    if (_minQuizScore != null && (_minQuizScore! < 0 || _minQuizScore! > 100)) {
+      items.add(
+        const EventValidationItem(
+          step: 'Rules',
+          label: 'Minimum quiz score',
+          message: 'Use a score between 0 and 100.',
+        ),
+      );
+    }
+    if (_maxParticipants == null) {
+      items.add(
+        const EventValidationItem(
+          step: 'Rules',
+          label: 'Max participants',
+          message: 'Max participants is required. Use 0 for unlimited.',
+        ),
+      );
+    } else if (_maxParticipants! < 0) {
+      items.add(
+        const EventValidationItem(
+          step: 'Rules',
+          label: 'Max participants',
+          message: 'Use 0 for unlimited or a positive number.',
+        ),
+      );
+    }
+
+    if (quizRequired && !quizReady) {
+      items.add(
+        EventValidationItem(
+          step: 'Quiz',
+          label: 'Quiz attachment',
+          message: _quizMissingMessage(),
+        ),
+      );
+    }
+
+    if (_maxSelections != null && _maxSelections! < 1) {
+      items.add(
+        const EventValidationItem(
+          step: 'Selection',
+          label: 'Max selections',
+          message: 'Use a positive number, or leave it blank for unlimited.',
+        ),
+      );
+    }
+
+    if (!_pushNotification && !_inAppNotification && !_emailNotification) {
+      items.add(
+        const EventValidationItem(
+          step: 'Notifications',
+          label: 'Notification channel',
+          message: 'Keep at least one notification channel enabled.',
+        ),
+      );
+    }
+
+    return items;
+  }
+
+  bool get canPublish => getValidationItems().isEmpty;
+
+  String _timelineFieldLabel(String key) => switch (key) {
+    'registrationStart' => 'Registration start',
+    'registrationEnd' => 'Registration end',
+    'eventStart' => 'Event start',
+    'eventEnd' => 'Event end',
+    'resultDate' => 'Result date',
+    'counsellingDate' => 'Counselling date',
+    _ => key,
+  };
+
+  String _quizMissingMessage() {
+    return switch (_quizAttachmentMethod) {
+      'existing' => 'Enter a valid numeric quiz ID.',
+      'upload' => 'Upload a CSV or JSON quiz file.',
+      _ => 'Build and save a quiz with at least 3 questions.',
+    };
+  }
+
   // ── Submission ─────────────────────────────────────────────────────────────
   ViewState _state = ViewState.idle;
   String? _errorMessage;
@@ -374,25 +572,24 @@ class CreateEventViewModel extends ChangeNotifier {
   EventModel? get createdEvent => _createdEvent;
 
   Map<String, dynamic> toApiBody() {
+    final effectiveQuizId = quizRequired
+        ? _quizAttachmentMethod == 'create' && _createdQuiz != null
+              ? _createdQuiz!.id
+              : _quizAttachmentMethod == 'existing'
+              ? int.tryParse(_quizTitle.trim())
+              : _quizAttachmentMethod == 'upload'
+              ? _uploadedQuizId
+              : null
+        : null;
+
     return {
       'title': _title,
       'subtitle': _subtitle.isEmpty ? null : _subtitle,
       'description': _description.isEmpty ? null : _description,
       'event_type': _selectedEventType.apiValue,
       'is_daily_challenge': _selectedEventType == EventType.dailyChallenge,
-      'quiz_id': _quizAttachmentMethod == 'create' && _createdQuiz != null
-          ? _createdQuiz!.id
-          : _quizAttachmentMethod == 'existing'
-          ? int.tryParse(_quizTitle.trim())
-          : _quizAttachmentMethod == 'upload'
-          ? _uploadedQuizId
-          : null,
-      'quiz_title':
-          _quizAttachmentMethod == 'create' &&
-              _createdQuiz == null &&
-              _quizTitle.isNotEmpty
-          ? _quizTitle
-          : null,
+      'quiz_id': effectiveQuizId,
+      'quiz_title': null,
       'theme_color': _themeColor,
       'registration_start': _registrationStart?.toIso8601String(),
       'registration_end': _registrationEnd?.toIso8601String(),
@@ -406,9 +603,9 @@ class CreateEventViewModel extends ChangeNotifier {
       'auto_notification': _autoNotification,
       'age_min': _ageMin,
       'age_max': _ageMax,
-      'min_quiz_score': _minQuizScore,
+      'min_quiz_score': quizRequired ? _minQuizScore : null,
       'required_challenges': _requiredChallenges,
-      'max_participants': _maxParticipants,
+      'max_participants': _maxParticipants == 0 ? null : _maxParticipants,
       'selection_method': _selectedSelectionMethod.apiValue,
       'max_selections': _maxSelections,
       'counselling_enabled': _counsellingEnabled,
@@ -422,22 +619,36 @@ class CreateEventViewModel extends ChangeNotifier {
   }
 
   Future<bool> submit() async {
+    if (!canPublish) {
+      _state = ViewState.error;
+      _errorMessage = 'Fix the missing fields checklist before publishing.';
+      if (!_disposed) notifyListeners();
+      return false;
+    }
     _state = ViewState.loading;
     _errorMessage = null;
     if (!_disposed) notifyListeners();
     try {
       final body = toApiBody();
       _createdEvent = await EventRepository.createEvent(body);
+      if (!_isPublicStatus(_createdEvent!.status)) {
+        _createdEvent = await EventRepository.publishEvent(_createdEvent!.id);
+      }
       _state = ViewState.idle;
       if (!_disposed) notifyListeners();
       return true;
     } catch (e) {
       _state = ViewState.error;
-      _errorMessage = 'Failed to create event. Please try again.';
+      _errorMessage = 'Failed to publish event. Please try again.';
       if (!_disposed) notifyListeners();
       return false;
     }
   }
+
+  bool _isPublicStatus(EventStatus status) =>
+      status == EventStatus.published ||
+      status == EventStatus.registrationOpen ||
+      status == EventStatus.live;
 
   @override
   void dispose() {

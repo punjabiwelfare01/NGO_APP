@@ -1,8 +1,9 @@
 from pathlib import Path
+import mimetypes
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
@@ -83,8 +84,102 @@ def health():
 
 
 # ── Uploaded files static serving ─────────────────────────────────────────────
-_uploads_dir = Path(__file__).parent.parent.parent / "uploads"
+_uploads_dir = Path(__file__).parent.parent / "uploads"
 _uploads_dir.mkdir(exist_ok=True)
+
+
+@app.api_route(
+    "/uploads/{filename}",
+    methods=["GET", "HEAD"],
+    include_in_schema=False,
+)
+async def serve_upload(filename: str, request: Request):
+    upload_path = _uploads_dir / filename
+    if not upload_path.is_file() or upload_path.parent != _uploads_dir:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    content_type = (
+        mimetypes.guess_type(upload_path.name)[0] or "application/octet-stream"
+    )
+    file_size = upload_path.stat().st_size
+    disposition = "attachment" if request.query_params.get("download") else "inline"
+    requested_name = request.query_params.get("filename") or upload_path.name
+    response_filename = Path(requested_name).name.replace('"', "")
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f'{disposition}; filename="{response_filename}"',
+    }
+
+    range_header = request.headers.get("range")
+    if not range_header:
+        if request.method == "HEAD":
+            return Response(
+                headers={**headers, "Content-Length": str(file_size)},
+                media_type=content_type,
+            )
+        return FileResponse(str(upload_path), media_type=content_type, headers=headers)
+
+    unit, _, byte_range = range_header.partition("=")
+    if unit.strip().lower() != "bytes" or "-" not in byte_range:
+        return Response(
+            status_code=416,
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+
+    start_text, end_text = byte_range.split("-", 1)
+    try:
+        if start_text:
+            start = int(start_text)
+            end = int(end_text) if end_text else file_size - 1
+        else:
+            suffix_length = int(end_text)
+            start = max(file_size - suffix_length, 0)
+            end = file_size - 1
+    except ValueError:
+        return Response(
+            status_code=416,
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+
+    if start >= file_size or end < start:
+        return Response(
+            status_code=416,
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+
+    end = min(end, file_size - 1)
+    chunk_size = end - start + 1
+    response_headers = {
+        **headers,
+        "Content-Range": f"bytes {start}-{end}/{file_size}",
+        "Content-Length": str(chunk_size),
+    }
+    if request.method == "HEAD":
+        return Response(
+            status_code=206,
+            headers=response_headers,
+            media_type=content_type,
+        )
+
+    def iter_file_range():
+        with upload_path.open("rb") as file:
+            file.seek(start)
+            remaining = chunk_size
+            while remaining > 0:
+                chunk = file.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    return StreamingResponse(
+        iter_file_range(),
+        status_code=206,
+        media_type=content_type,
+        headers=response_headers,
+    )
+
+
 app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
 
 # ── Flutter Web static file serving ───────────────────────────────────────────

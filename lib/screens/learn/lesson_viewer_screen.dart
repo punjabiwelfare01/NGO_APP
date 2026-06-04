@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/colors.dart';
 import '../../models/lesson.dart';
+import '../../repositories/api_client.dart';
 import '../../repositories/course_repository.dart';
 import '../../utils/platform_video.dart';
 
@@ -33,7 +34,9 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
     setState(() => _marking = true);
     try {
       await CourseRepository.markLessonComplete(
-          widget.courseId, widget.lesson.id);
+        widget.courseId,
+        widget.lesson.id,
+      );
       if (mounted) {
         setState(() {
           _completed = true;
@@ -91,10 +94,8 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
                   Row(
                     children: [
                       _Badge(
-                        lesson.contentType == 'video'
-                            ? Icons.play_circle_outline_rounded
-                            : Icons.article_outlined,
-                        lesson.contentType == 'video' ? 'Video' : 'Text',
+                        _contentIcon(lesson.contentType),
+                        _contentLabel(lesson.contentType),
                       ),
                       if (lesson.durationLabel.isNotEmpty) ...[
                         const SizedBox(width: 10),
@@ -102,8 +103,11 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
                       ],
                       if (_completed) ...[
                         const SizedBox(width: 10),
-                        _Badge(Icons.check_circle_rounded, 'Completed',
-                            color: AppColors.secondary),
+                        _Badge(
+                          Icons.check_circle_rounded,
+                          'Completed',
+                          color: AppColors.secondary,
+                        ),
                       ],
                     ],
                   ),
@@ -123,10 +127,17 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
                     const Divider(),
                     const SizedBox(height: 20),
                   ],
-                  // Content
-                  if (lesson.contentType == 'video')
-                    _VideoContent(url: lesson.contentUrl)
-                  else
+                  if (lesson.contentType == 'video') ...[
+                    _VideoContent(url: lesson.contentUrl),
+                  ] else if (lesson.contentType == 'mixed') ...[
+                    if (lesson.contentUrl != null &&
+                        lesson.contentUrl!.trim().isNotEmpty) ...[
+                      _VideoContent(url: lesson.contentUrl),
+                    ] else
+                      const _EmptyLessonMessage(
+                        'No video available for this lesson.',
+                      ),
+                  ] else
                     _TextContent(text: lesson.contentText),
                 ],
               ),
@@ -154,12 +165,11 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
                               ? Icons.check_circle_rounded
                               : Icons.check_rounded,
                         ),
-                  label: Text(
-                    _completed ? 'Completed' : 'Mark as Complete',
-                  ),
+                  label: Text(_completed ? 'Completed' : 'Mark as Complete'),
                   style: FilledButton.styleFrom(
-                    backgroundColor:
-                        _completed ? AppColors.secondary : AppColors.primary,
+                    backgroundColor: _completed
+                        ? AppColors.secondary
+                        : AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -167,6 +177,38 @@ class _LessonViewerScreenState extends State<LessonViewerScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  IconData _contentIcon(String type) => switch (type) {
+    'video' => Icons.play_circle_outline_rounded,
+    'mixed' => Icons.dynamic_feed_rounded,
+    _ => Icons.article_outlined,
+  };
+
+  String _contentLabel(String type) => switch (type) {
+    'video' => 'Video',
+    'mixed' => 'Mixed',
+    _ => 'Text',
+  };
+}
+
+class _EmptyLessonMessage extends StatelessWidget {
+  const _EmptyLessonMessage(this.message);
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Text(
+          message,
+          style: const TextStyle(color: AppColors.muted),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
@@ -196,16 +238,11 @@ class _TextContent extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: AppColors.muted.withValues(alpha: 0.15)),
+        border: Border.all(color: AppColors.muted.withValues(alpha: 0.15)),
       ),
       child: Text(
         text!,
-        style: const TextStyle(
-          fontSize: 15,
-          color: AppColors.ink,
-          height: 1.7,
-        ),
+        style: const TextStyle(fontSize: 15, color: AppColors.ink, height: 1.7),
       ),
     );
   }
@@ -240,6 +277,13 @@ class _VideoContent extends StatelessWidget {
         child: buildYouTubeEmbed(videoId),
       );
     }
+    final resolvedUrl = _resolvedVideoUrl;
+    if (resolvedUrl != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: buildNetworkVideo(resolvedUrl),
+      );
+    }
     // Fallback for non-YouTube or missing URLs
     return Container(
       padding: const EdgeInsets.all(20),
@@ -250,8 +294,11 @@ class _VideoContent extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(Icons.play_circle_outline_rounded,
-              size: 56, color: AppColors.primary),
+          const Icon(
+            Icons.play_circle_outline_rounded,
+            size: 56,
+            color: AppColors.primary,
+          ),
           const SizedBox(height: 12),
           if (url != null && url!.isNotEmpty) ...[
             Text(
@@ -278,6 +325,12 @@ class _VideoContent extends StatelessWidget {
       ),
     );
   }
+
+  String? get _resolvedVideoUrl {
+    final value = url?.trim();
+    if (value == null || value.isEmpty) return null;
+    return ApiClient.resolveUrl(value);
+  }
 }
 
 class _Badge extends StatelessWidget {
@@ -303,7 +356,10 @@ class _Badge extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.w600, color: color),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),

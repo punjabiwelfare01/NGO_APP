@@ -4,6 +4,7 @@ import 'app_state.dart';
 import 'core/colors.dart';
 import 'core/config.dart';
 import 'models/auth_models.dart';
+import 'models/skill_category.dart';
 import 'repositories/auth0_strategy.dart';
 import 'repositories/auth_repository.dart';
 import 'screens/auth/login_view.dart';
@@ -116,26 +117,40 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
+  SkillCategory? _selectedLearnCategory;
+  int _learnOpenVersion = 0;
 
-  // Role-specific UI lives inside each view.
-  final _pages = const [
-    HomeView(),
-    LearnView(),
-    EventsView(),
-    HelpingSupportView(),
-    ProfileView(),
-  ];
+  void _openLearn([SkillCategory? category]) {
+    setState(() {
+      _selectedIndex = 1;
+      _selectedLearnCategory = category;
+      _learnOpenVersion++;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      HomeView(onOpenLearn: _openLearn),
+      LearnView(
+        key: ValueKey('learn-$_learnOpenVersion'),
+        initialCategory: _selectedLearnCategory,
+      ),
+      const EventsView(),
+      const HelpingSupportView(),
+      const ProfileView(),
+    ];
     return Scaffold(
-      body: SafeArea(child: _pages[_selectedIndex]),
+      body: SafeArea(child: pages[_selectedIndex]),
       bottomNavigationBar: NavigationBar(
         height: 72,
         selectedIndex: _selectedIndex,
         indicatorColor: AppColors.primary.withValues(alpha: 0.16),
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
+        onDestinationSelected: (index) => setState(() {
+          _selectedIndex = index;
+          if (index != 1) _selectedLearnCategory = null;
+          if (index == 1) _learnOpenVersion++;
+        }),
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.home_outlined),

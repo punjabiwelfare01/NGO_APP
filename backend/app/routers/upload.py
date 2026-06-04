@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, UploadFile
 
-from ..dependencies import non_student
+from ..dependencies import content_creator_or_above
 from ..models.user import User
 
 router = APIRouter(tags=["Upload"])
@@ -14,14 +14,17 @@ _UPLOADS_DIR.mkdir(exist_ok=True)
 _ALLOWED_EXTENSIONS = {
     ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp",
     ".mp4", ".mov", ".avi", ".mkv", ".webm",
-    ".txt", ".docx",
+    ".txt", ".docx", ".zip",
 }
 
 
-@router.post("/upload", summary="Upload a file [all roles except student]")
+@router.post(
+    "/upload",
+    summary="Upload a file [content_creator, mentor, admin, super_admin]",
+)
 async def upload_file(
     file: UploadFile,
-    _: User = Depends(non_student),
+    _: User = Depends(content_creator_or_above),
 ):
     original = Path(file.filename or "upload")
     ext = original.suffix.lower()

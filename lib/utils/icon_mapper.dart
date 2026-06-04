@@ -11,8 +11,11 @@ class IconMapper {
 
   static const _icons = <String, IconData>{
     'code_rounded': Icons.code_rounded,
+    'devices_rounded': Icons.devices_rounded,
+    'computer_rounded': Icons.computer_rounded,
     'shield_rounded': Icons.shield_rounded,
     'record_voice_over_rounded': Icons.record_voice_over_rounded,
+    'account_balance_wallet_rounded': Icons.account_balance_wallet_rounded,
     'palette_rounded': Icons.palette_rounded,
     'music_note_rounded': Icons.music_note_rounded,
     'language_rounded': Icons.language_rounded,

@@ -12,6 +12,18 @@ class CategoryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CategoryCreate(BaseModel):
+    title: str
+    icon_name: str
+    color_hex: str
+
+
+class CategoryUpdate(BaseModel):
+    title: Optional[str] = None
+    icon_name: Optional[str] = None
+    color_hex: Optional[str] = None
+
+
 class CourseCreate(BaseModel):
     title: str
     duration: str
@@ -19,6 +31,27 @@ class CourseCreate(BaseModel):
     icon_name: str
     color_hex: str
     category_id: Optional[int] = None
+    learn_items: Optional[list[str]] = None
+    skill_tags: Optional[list[str]] = None
+    course_description: Optional[str] = None
+    offer_price: Optional[int] = None
+    original_price: Optional[int] = None
+    offer_label: Optional[str] = None
+
+
+class CourseUpdate(BaseModel):
+    title: Optional[str] = None
+    duration: Optional[str] = None
+    level: Optional[str] = None
+    icon_name: Optional[str] = None
+    color_hex: Optional[str] = None
+    category_id: Optional[int] = None
+    learn_items: Optional[list[str]] = None
+    skill_tags: Optional[list[str]] = None
+    course_description: Optional[str] = None
+    offer_price: Optional[int] = None
+    original_price: Optional[int] = None
+    offer_label: Optional[str] = None
 
 
 class CourseResponse(BaseModel):
@@ -30,6 +63,12 @@ class CourseResponse(BaseModel):
     color_hex: str
     category_id: Optional[int]
     lesson_count: int = 0
+    learn_items: Optional[list[str]] = None
+    skill_tags: Optional[list[str]] = None
+    course_description: Optional[str] = None
+    offer_price: Optional[int] = None
+    original_price: Optional[int] = None
+    offer_label: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -128,7 +167,7 @@ class LessonResponse(BaseModel):
 
 # ── LearningResource schemas ────────────────────────────────────────────────────
 
-RESOURCE_TYPES = {"video", "pdf", "image", "note", "link"}
+RESOURCE_TYPES = {"video", "pdf", "image", "note", "link", "zip"}
 
 
 class LearningResourceCreate(BaseModel):

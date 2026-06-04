@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Float, Integer, String, ForeignKey, DateTime, Text, func
+from sqlalchemy import Boolean, Column, Float, Integer, JSON, String, ForeignKey, DateTime, Text, func
 from sqlalchemy.orm import relationship
 from ..database import Base
 
@@ -24,6 +24,14 @@ class Course(Base):
     icon_name = Column(String, nullable=False)
     color_hex = Column(String, nullable=False)
     category_id = Column(Integer, ForeignKey("skill_categories.id"), nullable=True)
+
+    # Admin-editable sales/preview card fields
+    learn_items = Column(JSON, nullable=True)       # list[str] | null
+    skill_tags = Column(JSON, nullable=True)        # list[str] | null
+    course_description = Column(Text, nullable=True)
+    offer_price = Column(Integer, nullable=True)
+    original_price = Column(Integer, nullable=True)
+    offer_label = Column(String, nullable=True)
 
     category = relationship("SkillCategory", back_populates="courses")
     user_progress = relationship("UserCourseProgress", back_populates="course", cascade="all, delete-orphan")

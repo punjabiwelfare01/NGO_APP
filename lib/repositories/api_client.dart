@@ -10,6 +10,15 @@ class ApiClient {
 
   static String get baseUrl => AppConfig.apiBaseUrl;
 
+  static String resolveUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('/')) return '$baseUrl$trimmed';
+    return '$baseUrl/$trimmed';
+  }
+
   // Getter so the Authorization header is included dynamically after login.
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json',

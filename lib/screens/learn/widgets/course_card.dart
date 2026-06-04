@@ -5,9 +5,16 @@ import '../../../widgets/app_card.dart';
 import '../course_detail_screen.dart';
 
 class CourseCard extends StatelessWidget {
-  const CourseCard({required this.course, super.key});
+  const CourseCard({
+    required this.course,
+    this.onEdit,
+    this.onDelete,
+    super.key,
+  });
 
   final Course course;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +64,45 @@ class CourseCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
+          if (onEdit != null || onDelete != null) ...[
+            PopupMenuButton<String>(
+              tooltip: 'Manage course',
+              icon: const Icon(Icons.more_vert_rounded),
+              onSelected: (value) {
+                if (value == 'edit') onEdit?.call();
+                if (value == 'delete') onDelete?.call();
+              },
+              itemBuilder: (_) => [
+                if (onEdit != null)
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                if (onDelete != null)
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: AppColors.softRed,
+                        ),
+                        SizedBox(width: 8),
+                        Text('Delete'),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 4),
+          ],
           FilledButton(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(

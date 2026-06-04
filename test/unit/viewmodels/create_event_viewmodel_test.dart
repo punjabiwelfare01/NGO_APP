@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_application_1/models/event_models.dart';
+import 'package:flutter_application_1/models/quiz_models.dart';
 import 'package:flutter_application_1/viewmodels/create_event_viewmodel.dart';
 
 void main() {
@@ -7,6 +8,28 @@ void main() {
 
   setUp(() => vm = CreateEventViewModel());
   tearDown(() => vm.dispose());
+
+  QuizSummary quizSummary({int questionCount = 3}) {
+    return QuizSummary(
+      id: 7,
+      title: 'Cyber Quiz Round 1',
+      description: 'A short cyber safety quiz',
+      category: 'Cyber Safety',
+      difficulty: 'easy',
+      xpReward: 80,
+      timeLimitSeconds: 240,
+      questionCount: questionCount,
+      isActive: true,
+    );
+  }
+
+  void fillRequiredRules() {
+    vm.setAgeMin(10);
+    vm.setAgeMax(18);
+    vm.setMinQuizScore(70);
+    vm.setRequiredChallenges(0);
+    vm.setMaxParticipants(0);
+  }
 
   // ── getTimelineErrors ──────────────────────────────────────────────────────
 
@@ -31,7 +54,9 @@ void main() {
 
   group('getTimelineErrors — past date rejection', () {
     test('registrationStart in the past is an error', () {
-      vm.setRegistrationStart(DateTime.now().subtract(const Duration(hours: 1)));
+      vm.setRegistrationStart(
+        DateTime.now().subtract(const Duration(hours: 1)),
+      );
       final errors = vm.getTimelineErrors();
       expect(errors['registrationStart'], isNotNull);
     });
@@ -134,6 +159,53 @@ void main() {
       vm.setEventType(EventType.workshop);
       expect(notified, isTrue);
       expect(vm.selectedEventType, EventType.workshop);
+    });
+  });
+
+  group('event pipeline validation', () {
+    test('optional event types can skip quiz and omit quiz payload fields', () {
+      vm.setEventType(EventType.workshop);
+      vm.setQuizTitle('Should not attach');
+
+      expect(vm.quizRequired, isFalse);
+      expect(vm.quizCanBeSkipped, isTrue);
+      expect(vm.toApiBody()['quiz_id'], isNull);
+      expect(vm.toApiBody()['quiz_title'], isNull);
+    });
+
+    test('rules fields shown in the form are mandatory', () {
+      final items = vm.getValidationItems();
+
+      expect(items.any((item) => item.label == 'Min age'), isTrue);
+      expect(items.any((item) => item.label == 'Max age'), isTrue);
+      expect(items.any((item) => item.label == 'Minimum quiz score'), isTrue);
+      expect(items.any((item) => item.label == 'Max participants'), isTrue);
+    });
+
+    test('quiz title alone is blocked until a 3 question quiz is created', () {
+      final now = DateTime.now();
+
+      vm.setTitle('Cyber Quiz');
+      vm.setRegistrationStart(now.add(const Duration(days: 1)));
+      vm.setRegistrationEnd(now.add(const Duration(days: 2)));
+      vm.setEventStart(now.add(const Duration(days: 3)));
+      vm.setEventEnd(now.add(const Duration(days: 4)));
+      fillRequiredRules();
+
+      vm.setQuizTitle('Cyber Quiz Round 1');
+      expect(
+        vm.getValidationItems().any((item) => item.label == 'Quiz attachment'),
+        isTrue,
+      );
+
+      vm.setCreatedQuiz(quizSummary(questionCount: 2));
+      expect(
+        vm.getValidationItems().any((item) => item.label == 'Quiz attachment'),
+        isTrue,
+      );
+
+      vm.setCreatedQuiz(quizSummary(questionCount: 3));
+      expect(vm.getValidationItems(), isEmpty);
     });
   });
 }

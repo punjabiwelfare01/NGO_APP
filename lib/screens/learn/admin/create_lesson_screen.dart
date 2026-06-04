@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/colors.dart';
@@ -22,11 +23,14 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
 
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  final _contentTextCtrl = TextEditingController();
-  final _contentUrlCtrl = TextEditingController();
+  final _learningOutcomesCtrl = TextEditingController();
+  final _videoUrlCtrl = TextEditingController();
+  final _pdfUrlCtrl = TextEditingController();
+  final _notesUrlCtrl = TextEditingController();
   final _durationCtrl = TextEditingController();
 
-  String _contentType = 'text';
+  _PickedUpload? _videoUpload;
+  _PickedUpload? _notesUpload;
   bool _isPublished = true;
   bool _saving = false;
 
@@ -34,34 +38,90 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
   void dispose() {
     _titleCtrl.dispose();
     _descCtrl.dispose();
-    _contentTextCtrl.dispose();
-    _contentUrlCtrl.dispose();
+    _learningOutcomesCtrl.dispose();
+    _videoUrlCtrl.dispose();
+    _pdfUrlCtrl.dispose();
+    _notesUrlCtrl.dispose();
     _durationCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _pickVideo() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.video,
+      withData: true,
+    );
+    final file = result?.files.single;
+    if (file?.bytes == null) return;
+    setState(() {
+      _videoUpload = _PickedUpload(file!.name, file.bytes!.toList());
+    });
+  }
+
+  Future<void> _pickNotesFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'txt', 'docx'],
+      withData: true,
+    );
+    final file = result?.files.single;
+    if (file?.bytes == null) return;
+    setState(() {
+      _notesUpload = _PickedUpload(file!.name, file.bytes!.toList());
+    });
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_hasAnyContent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Add a video, PDF, notes file, URL, or learning outcomes.',
+          ),
+          backgroundColor: AppColors.softRed,
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
+      final uploadedVideoUrl = _videoUpload == null
+          ? null
+          : await CourseRepository.uploadFile(
+              bytes: _videoUpload!.bytes,
+              fileName: _videoUpload!.name,
+            );
+      final uploadedNotesUrl = _notesUpload == null
+          ? null
+          : await CourseRepository.uploadFile(
+              bytes: _notesUpload!.bytes,
+              fileName: _notesUpload!.name,
+            );
+      final videoUrl = uploadedVideoUrl ?? _emptyToNull(_videoUrlCtrl.text);
+      final learningOutcomes = _emptyToNull(_learningOutcomesCtrl.text);
+
       final lesson = await CourseRepository.createLesson(
         widget.courseId,
         title: _titleCtrl.text.trim(),
-        description:
-            _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-        contentType: _contentType,
-        contentUrl: _contentType == 'video' &&
-                _contentUrlCtrl.text.trim().isNotEmpty
-            ? _contentUrlCtrl.text.trim()
-            : null,
-        contentText: _contentType == 'text' &&
-                _contentTextCtrl.text.trim().isNotEmpty
-            ? _contentTextCtrl.text.trim()
-            : null,
+        description: _emptyToNull(_descCtrl.text),
+        contentType: 'mixed',
+        contentUrl: videoUrl ?? _emptyToNull(_pdfUrlCtrl.text),
+        contentText: learningOutcomes,
         order: widget.nextOrder,
         durationMinutes: int.tryParse(_durationCtrl.text.trim()),
         isPublished: _isPublished,
       );
+
+      await _createResources(
+        lessonId: lesson.id,
+        videoUrl: videoUrl,
+        pdfUrl: _emptyToNull(_pdfUrlCtrl.text),
+        notesUrl: _emptyToNull(_notesUrlCtrl.text),
+        uploadedNotesUrl: uploadedNotesUrl,
+      );
+
       if (mounted) Navigator.of(context).pop(lesson);
     } catch (_) {
       if (mounted) {
@@ -74,6 +134,64 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
         );
       }
     }
+  }
+
+  Future<void> _createResources({
+    required int lessonId,
+    required String? videoUrl,
+    required String? pdfUrl,
+    required String? notesUrl,
+    required String? uploadedNotesUrl,
+  }) async {
+    if (videoUrl != null) {
+      await CourseRepository.createResource(
+        widget.courseId,
+        lessonId,
+        type: 'video',
+        title: 'Lesson Video',
+        fileUrl: videoUrl,
+      );
+    }
+    if (pdfUrl != null) {
+      await CourseRepository.createResource(
+        widget.courseId,
+        lessonId,
+        type: 'pdf',
+        title: 'PDF Notes',
+        fileUrl: pdfUrl,
+      );
+    }
+    if (notesUrl != null) {
+      await CourseRepository.createResource(
+        widget.courseId,
+        lessonId,
+        type: 'link',
+        title: 'Notes Link',
+        fileUrl: notesUrl,
+      );
+    }
+    if (uploadedNotesUrl != null && _notesUpload != null) {
+      await CourseRepository.createResource(
+        widget.courseId,
+        lessonId,
+        type: _notesUpload!.resourceType,
+        title: _notesUpload!.title,
+        fileUrl: uploadedNotesUrl,
+      );
+    }
+  }
+
+  bool get _hasAnyContent =>
+      _videoUpload != null ||
+      _notesUpload != null ||
+      _videoUrlCtrl.text.trim().isNotEmpty ||
+      _pdfUrlCtrl.text.trim().isNotEmpty ||
+      _notesUrlCtrl.text.trim().isNotEmpty ||
+      _learningOutcomesCtrl.text.trim().isNotEmpty;
+
+  String? _emptyToNull(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   @override
@@ -98,15 +216,20 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
             child: FilledButton(
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8)),
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+              ),
               child: _saving
                   ? const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Save'),
             ),
@@ -118,7 +241,11 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            // Title
+            const _SectionTitle(
+              icon: Icons.dynamic_feed_rounded,
+              title: 'Mixed Lesson Content',
+            ),
+            const SizedBox(height: 16),
             _SectionLabel('Title'),
             const SizedBox(height: 6),
             TextFormField(
@@ -128,8 +255,6 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
                   (v == null || v.trim().isEmpty) ? 'Title is required' : null,
             ),
             const SizedBox(height: 20),
-
-            // Description (optional)
             _SectionLabel('Description (optional)'),
             const SizedBox(height: 6),
             TextFormField(
@@ -137,54 +262,73 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
               decoration: _inputDecoration('Short description of this lesson'),
               maxLines: 2,
             ),
-            const SizedBox(height: 20),
-
-            // Content type
-            _SectionLabel('Content Type'),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _TypeToggle(
-                  icon: Icons.article_outlined,
-                  label: 'Text',
-                  selected: _contentType == 'text',
-                  onTap: () => setState(() => _contentType = 'text'),
-                ),
-                const SizedBox(width: 12),
-                _TypeToggle(
-                  icon: Icons.play_circle_outline_rounded,
-                  label: 'Video',
-                  selected: _contentType == 'video',
-                  onTap: () => setState(() => _contentType = 'video'),
-                ),
-              ],
+            const SizedBox(height: 24),
+            const _SectionTitle(
+              icon: Icons.play_circle_outline_rounded,
+              title: 'Video',
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _videoUrlCtrl,
+              decoration: _inputDecoration('Video URL'),
+              keyboardType: TextInputType.url,
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 10),
+            _UploadField(
+              icon: Icons.video_file_outlined,
+              label: _videoUpload?.name ?? 'Upload video from local storage',
+              selected: _videoUpload != null,
+              onPick: _pickVideo,
+              onClear: _videoUpload == null
+                  ? null
+                  : () => setState(() => _videoUpload = null),
+            ),
+            const SizedBox(height: 24),
+            const _SectionTitle(
+              icon: Icons.sticky_note_2_outlined,
+              title: 'What the student will learn',
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _learningOutcomesCtrl,
+              decoration: _inputDecoration(
+                'e.g. Understand variables, write simple code, and complete a mini task',
+              ),
+              minLines: 4,
+              maxLines: 8,
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            const _SectionTitle(
+              icon: Icons.note_add_outlined,
+              title: 'Notes & Resources',
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _pdfUrlCtrl,
+              decoration: _inputDecoration('PDF notes URL'),
+              keyboardType: TextInputType.url,
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _notesUrlCtrl,
+              decoration: _inputDecoration('Notes link URL'),
+              keyboardType: TextInputType.url,
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 10),
+            _UploadField(
+              icon: Icons.upload_file_rounded,
+              label: _notesUpload?.name ?? 'Upload PDF/TXT/DOCX notes',
+              selected: _notesUpload != null,
+              onPick: _pickNotesFile,
+              onClear: _notesUpload == null
+                  ? null
+                  : () => setState(() => _notesUpload = null),
             ),
             const SizedBox(height: 20),
-
-            // Content field
-            if (_contentType == 'text') ...[
-              _SectionLabel('Lesson Content'),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: _contentTextCtrl,
-                decoration: _inputDecoration(
-                    'Write the lesson content here…'),
-                maxLines: 10,
-                minLines: 5,
-              ),
-            ] else ...[
-              _SectionLabel('Video URL'),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: _contentUrlCtrl,
-                decoration:
-                    _inputDecoration('https://youtube.com/watch?v=...'),
-                keyboardType: TextInputType.url,
-              ),
-            ],
-            const SizedBox(height: 20),
-
-            // Duration
             _SectionLabel('Duration (minutes, optional)'),
             const SizedBox(height: 6),
             TextFormField(
@@ -193,24 +337,24 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 24),
-
-            // Publish toggle
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: AppColors.muted.withValues(alpha: 0.15)),
+                  color: AppColors.muted.withValues(alpha: 0.15),
+                ),
               ),
               child: SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text(
                   'Publish immediately',
                   style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ink),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink,
+                  ),
                 ),
                 subtitle: const Text(
                   'Students will see this lesson right away',
@@ -228,29 +372,66 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
   }
 
   InputDecoration _inputDecoration(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle:
-            const TextStyle(color: AppColors.muted, fontSize: 13),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:
-              BorderSide(color: AppColors.muted.withValues(alpha: 0.2)),
+    hintText: hint,
+    hintStyle: const TextStyle(color: AppColors.muted, fontSize: 13),
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: AppColors.muted.withValues(alpha: 0.2)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: AppColors.muted.withValues(alpha: 0.2)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+  );
+}
+
+class _PickedUpload {
+  const _PickedUpload(this.name, this.bytes);
+
+  final String name;
+  final List<int> bytes;
+
+  String get extension {
+    final dot = name.lastIndexOf('.');
+    return dot == -1 ? '' : name.substring(dot + 1).toLowerCase();
+  }
+
+  String get resourceType => extension == 'pdf' ? 'pdf' : 'note';
+
+  String get title =>
+      extension == 'pdf' ? 'Uploaded PDF Notes' : 'Uploaded Notes';
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: AppColors.ink,
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:
-              BorderSide(color: AppColors.muted.withValues(alpha: 0.2)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      );
+      ],
+    );
+  }
 }
 
 class _SectionLabel extends StatelessWidget {
@@ -271,56 +452,59 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _TypeToggle extends StatelessWidget {
-  const _TypeToggle({
+class _UploadField extends StatelessWidget {
+  const _UploadField({
     required this.icon,
     required this.label,
     required this.selected,
-    required this.onTap,
+    required this.onPick,
+    this.onClear,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback onPick;
+  final VoidCallback? onClear;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.primary.withValues(alpha: 0.1)
-                : Colors.white,
-            border: Border.all(
-              color: selected
-                  ? AppColors.primary
-                  : AppColors.muted.withValues(alpha: 0.2),
-              width: selected ? 1.5 : 1,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              Icon(icon,
-                  color: selected ? AppColors.primary : AppColors.muted,
-                  size: 24),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? AppColors.primary : AppColors.muted,
-                ),
-              ),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: selected
+              ? AppColors.primary
+              : AppColors.muted.withValues(alpha: 0.2),
+          width: selected ? 1.5 : 1,
+        ),
+      ),
+      child: ListTile(
+        onTap: onPick,
+        leading: Icon(
+          selected ? Icons.check_circle_rounded : icon,
+          color: selected ? AppColors.primary : AppColors.muted,
+        ),
+        title: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: selected ? AppColors.primary : AppColors.muted,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
           ),
         ),
+        trailing: onClear == null
+            ? const Icon(Icons.upload_rounded, color: AppColors.muted)
+            : IconButton(
+                onPressed: onClear,
+                icon: const Icon(Icons.close_rounded),
+                tooltip: 'Remove file',
+              ),
       ),
     );
   }

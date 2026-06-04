@@ -12,6 +12,7 @@ from passlib.context import CryptContext
 from app.database import Base, SessionLocal, engine
 from app.models import (  # noqa: F401
     Badge, BlacklistedToken, Course, CounsellingAvailability, CounsellingSession,
+    Lesson, LearningResource,
     SkillCategory, User, UserBadge, UserCourseProgress,
     DailyChallenge, Question, Quiz, QuizDifficulty,
 )
@@ -37,12 +38,11 @@ db = SessionLocal()
 
 def seed_categories() -> list[SkillCategory]:
     data = [
-        SkillCategory(title="Coding",        icon_name="code_rounded",              color_hex="#DDF1FF"),
-        SkillCategory(title="Cyber Safety",  icon_name="shield_rounded",            color_hex="#E0F8E8"),
-        SkillCategory(title="Communication", icon_name="record_voice_over_rounded", color_hex="#FFE7C8"),
-        SkillCategory(title="Art",           icon_name="palette_rounded",           color_hex="#E9E2FF"),
-        SkillCategory(title="Music",         icon_name="music_note_rounded",        color_hex="#FFDCDC"),
-        SkillCategory(title="Languages",     icon_name="language_rounded",          color_hex="#DDF7F4"),
+        SkillCategory(title="Communication Skill", icon_name="record_voice_over_rounded",      color_hex="#FFE7C8"),
+        SkillCategory(title="Digital Literacy",    icon_name="devices_rounded",                color_hex="#DDF1FF"),
+        SkillCategory(title="Career Guidance",     icon_name="explore_rounded",                color_hex="#E9E2FF"),
+        SkillCategory(title="Safety Awareness",    icon_name="shield_rounded",                 color_hex="#E0F8E8"),
+        SkillCategory(title="Financial Literacy",  icon_name="account_balance_wallet_rounded", color_hex="#FFF3D0"),
     ]
     db.add_all(data)
     db.commit()
@@ -60,7 +60,7 @@ def seed_courses(categories: list[SkillCategory]) -> list[Course]:
             level="Beginner",
             icon_name="code_rounded",
             color_hex="#DDF1FF",
-            category_id=cat["Coding"],
+            category_id=cat["Digital Literacy"],
         ),
         Course(
             title="Speak with Confidence",
@@ -68,7 +68,7 @@ def seed_courses(categories: list[SkillCategory]) -> list[Course]:
             level="Beginner",
             icon_name="campaign_rounded",
             color_hex="#FFE7C8",
-            category_id=cat["Communication"],
+            category_id=cat["Communication Skill"],
         ),
         Course(
             title="Internet Safety Heroes",
@@ -76,7 +76,7 @@ def seed_courses(categories: list[SkillCategory]) -> list[Course]:
             level="Intermediate",
             icon_name="security_rounded",
             color_hex="#E0F8E8",
-            category_id=cat["Cyber Safety"],
+            category_id=cat["Safety Awareness"],
         ),
     ]
     db.add_all(data)
@@ -84,6 +84,104 @@ def seed_courses(categories: list[SkillCategory]) -> list[Course]:
     for d in data:
         db.refresh(d)
     return data
+
+
+def seed_lessons(courses: list[Course]) -> list[Lesson]:
+    course_by_title = {c.title: c for c in courses}
+    lessons = [
+        Lesson(
+            course_id=course_by_title["Coding Basics for Kids"].id,
+            title="What is Coding?",
+            description="A friendly introduction to how instructions become apps and websites.",
+            content_type="mixed",
+            content_url="https://www.youtube.com/watch?v=rfscVS0vtbw",
+            content_text=(
+                "Coding means writing clear instructions for a computer. "
+                "In this lesson, students learn what programs are, how logic works, "
+                "and why small steps make problem solving easier."
+            ),
+            order=0,
+            duration_minutes=14,
+            is_published=True,
+        ),
+        Lesson(
+            course_id=course_by_title["Coding Basics for Kids"].id,
+            title="Build Your First Web Page",
+            description="Create a simple page with headings, text, and a button.",
+            content_type="mixed",
+            content_url="https://www.youtube.com/watch?v=916GWv2Qs08",
+            content_text=(
+                "HTML gives structure to a web page. Try writing a heading, a paragraph, "
+                "and one button. Keep names simple and test each change."
+            ),
+            order=1,
+            duration_minutes=18,
+            is_published=True,
+        ),
+        Lesson(
+            course_id=course_by_title["Speak with Confidence"].id,
+            title="Speak Clearly in Class",
+            description="Practice voice, posture, and short answers.",
+            content_type="mixed",
+            content_url="https://www.youtube.com/watch?v=tShavGuo0_E",
+            content_text=(
+                "Good communication starts with breathing, listening, and speaking one idea "
+                "at a time. Use a calm voice and look at the person you are speaking to."
+            ),
+            order=0,
+            duration_minutes=12,
+            is_published=True,
+        ),
+        Lesson(
+            course_id=course_by_title["Internet Safety Heroes"].id,
+            title="Strong Passwords and Safe Links",
+            description="Learn how to identify suspicious links and protect accounts.",
+            content_type="mixed",
+            content_url="https://www.youtube.com/watch?v=HxySrSbSY7o",
+            content_text=(
+                "Never share passwords. Use long passwords with words, numbers, and symbols. "
+                "If a link feels urgent or strange, stop and ask a trusted adult."
+            ),
+            order=0,
+            duration_minutes=16,
+            is_published=True,
+        ),
+    ]
+    db.add_all(lessons)
+    db.commit()
+    for lesson in lessons:
+        db.refresh(lesson)
+
+    resources = []
+    for lesson in lessons:
+        resources.extend([
+            LearningResource(
+                lesson_id=lesson.id,
+                type="pdf",
+                title=f"{lesson.title} Notes.pdf",
+                file_url=f"https://example.com/careskill/{lesson.id}-notes.pdf",
+                text_content=None,
+            ),
+            LearningResource(
+                lesson_id=lesson.id,
+                type="note",
+                title="Quick Revision Notes",
+                file_url=None,
+                text_content=lesson.content_text,
+            ),
+        ])
+    resources.append(
+        LearningResource(
+            lesson_id=lessons[1].id,
+            type="zip",
+            title="Practice Web Page Files.zip",
+            file_url="https://example.com/careskill/practice-web-page.zip",
+            text_content=None,
+        )
+    )
+    db.add_all(resources)
+    db.commit()
+    return lessons
 
 
 def seed_badges() -> list[Badge]:
@@ -315,6 +413,7 @@ if __name__ == "__main__":
     print("Seeding database...")
     cats    = seed_categories();  print(f"  {len(cats)} skill categories")
     crs     = seed_courses(cats); print(f"  {len(crs)} courses")
+    lessons = seed_lessons(crs);   print(f"  {len(lessons)} demo lessons")
     bdgs    = seed_badges();      print(f"  {len(bdgs)} badges")
     student, super_admin, admin, mentor, content_creator = seed_users()
     print(f"  Users: {student.name} (student), {super_admin.name} (super_admin), "

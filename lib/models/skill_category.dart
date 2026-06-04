@@ -10,22 +10,25 @@ class SkillCategory {
   final Color color;
 
   factory SkillCategory.fromJson(Map<String, dynamic> j) => SkillCategory(
-        j['title'] as String,
-        IconMapper.fromName(j['icon_name'] as String),
-        IconMapper.colorFromHex(j['color_hex'] as String),
-        id: j['id'] as int,
-      );
+    j['title'] as String,
+    IconMapper.fromName(j['icon_name'] as String),
+    IconMapper.colorFromHex(j['color_hex'] as String),
+    id: j['id'] as int,
+  );
 }
 
 const skillCategories = [
-  SkillCategory('Coding', Icons.code_rounded, Color(0xFFDDF1FF)),
-  SkillCategory('Cyber Safety', Icons.shield_rounded, Color(0xFFE0F8E8)),
   SkillCategory(
-    'Communication',
+    'Communication Skill',
     Icons.record_voice_over_rounded,
     Color(0xFFFFE7C8),
   ),
-  SkillCategory('Art', Icons.palette_rounded, Color(0xFFE9E2FF)),
-  SkillCategory('Music', Icons.music_note_rounded, Color(0xFFFFDCDC)),
-  SkillCategory('Languages', Icons.language_rounded, Color(0xFFDDF7F4)),
+  SkillCategory('Digital Literacy', Icons.devices_rounded, Color(0xFFDDF1FF)),
+  SkillCategory('Career Guidance', Icons.explore_rounded, Color(0xFFE9E2FF)),
+  SkillCategory('Safety Awareness', Icons.shield_rounded, Color(0xFFE0F8E8)),
+  SkillCategory(
+    'Financial Literacy',
+    Icons.account_balance_wallet_rounded,
+    Color(0xFFFFF3D0),
+  ),
 ];

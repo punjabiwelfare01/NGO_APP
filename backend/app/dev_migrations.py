@@ -124,6 +124,22 @@ def ensure_sqlite_schema(engine: Engine) -> None:
             """))
             connection.execute(text("CREATE INDEX ix_user_safety_answers_id ON user_safety_answers (id)"))
 
+        if "courses" in inspector.get_table_names():
+            course_columns = {col["name"] for col in inspector.get_columns("courses")}
+            course_additions = {
+                "learn_items": "TEXT",
+                "skill_tags": "TEXT",
+                "course_description": "TEXT",
+                "offer_price": "INTEGER",
+                "original_price": "INTEGER",
+                "offer_label": "VARCHAR",
+            }
+            for column, ddl_type in course_additions.items():
+                if column not in course_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE courses ADD COLUMN {column} {ddl_type}")
+                    )
+
         if "counselling_sessions" in inspector.get_table_names():
             counselling_columns = {
                 column["name"]

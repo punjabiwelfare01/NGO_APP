@@ -24,13 +24,18 @@ class CreateQuizScreen extends StatefulWidget {
 }
 
 class _CreateQuizScreenState extends State<CreateQuizScreen> {
+  static const _minQuestionCount = 3;
+
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _description = TextEditingController();
   final _category = TextEditingController(text: 'Cyber Safety');
   final _xpReward = TextEditingController(text: '80');
   final _timeLimit = TextEditingController(text: '240');
-  final List<_QuestionDraft> _questions = [_QuestionDraft()];
+  final List<_QuestionDraft> _questions = List.generate(
+    _minQuestionCount,
+    (_) => _QuestionDraft(),
+  );
 
   String _difficulty = 'easy';
   bool _setAsDaily = false;
@@ -63,7 +68,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   }
 
   void _removeQuestion(int index) {
-    if (_questions.length == 1) return;
+    if (_questions.length <= _minQuestionCount) return;
     final removed = _questions.removeAt(index);
     removed.dispose();
     setState(() {});
@@ -71,6 +76,12 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
 
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
+    if (_questions.length < _minQuestionCount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add at least 3 questions.')),
+      );
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
 
@@ -278,6 +289,13 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                       ),
                     ),
                   ),
+                  Text(
+                    '${_questions.length}/$_minQuestionCount required',
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   TextButton.icon(
                     onPressed: _addQuestion,
                     icon: const Icon(Icons.add_rounded),
@@ -290,7 +308,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                 (index) => _QuestionEditor(
                   index: index,
                   draft: _questions[index],
-                  canRemove: _questions.length > 1,
+                  canRemove: _questions.length > _minQuestionCount,
                   onRemove: () => _removeQuestion(index),
                   requiredValidator: _required,
                   numberValidator: _positiveInt,

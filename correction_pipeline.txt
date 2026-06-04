@@ -154,3 +154,5 @@ flowchart TD
     E --> E1{Challenge Completed?}
     E1 -->|No| E2[Start Quiz]
     E1 -->|Yes| E3[Show XP Earned]
+
+student have acess to 

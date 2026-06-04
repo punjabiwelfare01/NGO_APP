@@ -4,7 +4,10 @@ from sqlalchemy.orm import Session
 
 from ..models.course import Course, Lesson, LearningResource, SkillCategory, UserCourseProgress, UserLessonProgress
 from ..schemas.course import (
+    CategoryCreate,
+    CategoryUpdate,
     CourseCreate,
+    CourseUpdate,
     CourseDetailResponse,
     LearningResourceCreate,
     LearningResourceDetailResponse,
@@ -24,8 +27,61 @@ def create_course(db: Session, data: CourseCreate) -> Course:
     return course
 
 
+def update_course(db: Session, course_id: int, data: CourseUpdate) -> Course | None:
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        return None
+    for field, value in data.model_dump(exclude_none=True).items():
+        setattr(course, field, value)
+    db.commit()
+    db.refresh(course)
+    return course
+
+
+def delete_course(db: Session, course_id: int) -> bool:
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        return False
+    db.delete(course)
+    db.commit()
+    return True
+
+
 def get_categories(db: Session) -> list[SkillCategory]:
     return db.query(SkillCategory).all()
+
+
+def create_category(db: Session, data: CategoryCreate) -> SkillCategory:
+    category = SkillCategory(**data.model_dump())
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+def update_category(
+    db: Session, category_id: int, data: CategoryUpdate
+) -> SkillCategory | None:
+    category = db.query(SkillCategory).filter(SkillCategory.id == category_id).first()
+    if not category:
+        return None
+    for field, value in data.model_dump(exclude_none=True).items():
+        setattr(category, field, value)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+def delete_category(db: Session, category_id: int) -> bool:
+    category = db.query(SkillCategory).filter(SkillCategory.id == category_id).first()
+    if not category:
+        return False
+    db.query(Course).filter(Course.category_id == category_id).update(
+        {Course.category_id: None}
+    )
+    db.delete(category)
+    db.commit()
+    return True
 
 
 def get_courses(db: Session, skip: int = 0, limit: int = 100) -> list[Course]:

@@ -36,9 +36,10 @@ class LessonTextContent extends StatelessWidget {
 }
 
 class LessonVideoContent extends StatelessWidget {
-  const LessonVideoContent({this.url, super.key});
+  const LessonVideoContent({this.url, this.maxHeight, super.key});
 
   final String? url;
+  final double? maxHeight;
 
   static String? extractVideoId(String? url) {
     if (url == null || url.trim().isEmpty) return null;
@@ -59,9 +60,22 @@ class LessonVideoContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final videoId = extractVideoId(url);
     if (videoId != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: buildYouTubeEmbed(videoId),
+      return _VideoFrame(
+        maxHeight: maxHeight,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: buildYouTubeEmbed(videoId),
+        ),
+      );
+    }
+    final resolvedUrl = _resolvedVideoUrl;
+    if (resolvedUrl != null) {
+      return _VideoFrame(
+        maxHeight: maxHeight,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: buildNetworkVideo(resolvedUrl),
+        ),
       );
     }
     return Container(
@@ -91,6 +105,28 @@ class LessonVideoContent extends StatelessWidget {
       ),
     );
   }
+
+  String? get _resolvedVideoUrl {
+    final value = url?.trim();
+    if (value == null || value.isEmpty) return null;
+    return ApiClient.resolveUrl(value);
+  }
+}
+
+class _VideoFrame extends StatelessWidget {
+  const _VideoFrame({required this.child, this.maxHeight});
+
+  final Widget child;
+  final double? maxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    if (maxHeight == null) return child;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight!),
+      child: child,
+    );
+  }
 }
 
 class LearningResourceTile extends StatelessWidget {
@@ -106,8 +142,23 @@ class LearningResourceTile extends StatelessWidget {
   String? get _fullUrl {
     final fileUrl = resource.fileUrl;
     if (fileUrl == null || fileUrl.trim().isEmpty) return null;
-    if (fileUrl.startsWith('http')) return fileUrl;
-    return '${ApiClient.baseUrl}$fileUrl';
+    return ApiClient.resolveUrl(fileUrl);
+  }
+
+  String get _downloadName {
+    final url = _fullUrl;
+    if (url == null) return resource.title;
+    final parsed = Uri.tryParse(url);
+    final path = parsed?.pathSegments.isNotEmpty == true
+        ? parsed!.pathSegments.last
+        : '';
+    final dotIndex = path.lastIndexOf('.');
+    if (dotIndex == -1 || dotIndex == path.length - 1) return resource.title;
+    final extension = path.substring(dotIndex);
+    if (resource.title.toLowerCase().endsWith(extension.toLowerCase())) {
+      return resource.title;
+    }
+    return '${resource.title}$extension';
   }
 
   bool get _canPreview =>
@@ -120,7 +171,7 @@ class LearningResourceTile extends StatelessWidget {
   Future<void> _download(BuildContext context) async {
     final url = _fullUrl;
     if (url == null) return;
-    final ok = await downloadFile(url, resource.title);
+    final ok = await downloadFile(url, _downloadName);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -637,9 +688,9 @@ class _ResourcePreviewDialog extends StatelessWidget {
       return LessonVideoContent(url: url);
     }
     if (resource.type == 'pdf') {
-      return const _PreviewPlaceholder(
-        icon: Icons.picture_as_pdf_outlined,
-        text: 'PDF preview is available through the file action.',
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: buildDocumentEmbed(url),
       );
     }
     return _PreviewPlaceholder(icon: Icons.link_rounded, text: url);

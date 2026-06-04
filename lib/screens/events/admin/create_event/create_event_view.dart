@@ -24,6 +24,16 @@ class _CreateEventViewState extends State<CreateEventView> {
   late final PageController _pageController;
   int _currentStep = 0;
   static const int _totalSteps = 8;
+  static const _stepLabels = [
+    'Basic Info',
+    'Timeline',
+    'Rules',
+    'Quiz',
+    'Selection',
+    'Rewards',
+    'Notifications',
+    'Preview',
+  ];
 
   @override
   void initState() {
@@ -40,18 +50,8 @@ class _CreateEventViewState extends State<CreateEventView> {
   }
 
   void _goNext() {
-    if (_currentStep == 1) {
-      final errors = _vm.getTimelineErrors();
-      if (errors.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errors.values.first),
-            backgroundColor: AppColors.softRed,
-          ),
-        );
-        return;
-      }
-    }
+    if (!_validateCurrentStep()) return;
+    _vm.autosaveDraft();
     if (_currentStep < _totalSteps - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -59,6 +59,30 @@ class _CreateEventViewState extends State<CreateEventView> {
       );
       setState(() => _currentStep++);
     }
+  }
+
+  bool _validateCurrentStep() {
+    final stepLabel = _stepLabels[_currentStep];
+    final errors = _vm.getValidationItems().where(
+      (item) => item.step == stepLabel,
+    );
+    if (errors.isEmpty) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(errors.first.message),
+        backgroundColor: AppColors.softRed,
+      ),
+    );
+    return false;
+  }
+
+  void _goToStep(int step) {
+    _pageController.animateToPage(
+      step,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeInOut,
+    );
+    setState(() => _currentStep = step);
   }
 
   void _goBack() {
@@ -72,13 +96,23 @@ class _CreateEventViewState extends State<CreateEventView> {
   }
 
   Future<void> _submit() async {
+    if (!_vm.canPublish) {
+      _goToStep(_totalSteps - 1);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Fix the missing fields checklist before publishing.'),
+          backgroundColor: AppColors.softRed,
+        ),
+      );
+      return;
+    }
     final success = await _vm.submit();
     if (!mounted) return;
     if (success) {
       Navigator.of(context).pop(_vm.createdEvent);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Event created!'),
+          content: Text('Published successfully.'),
           backgroundColor: AppColors.secondary,
         ),
       );
@@ -109,7 +143,16 @@ class _CreateEventViewState extends State<CreateEventView> {
       ),
       body: Column(
         children: [
-          // Step indicator
+          ListenableBuilder(
+            listenable: _vm,
+            builder: (context, _) => _PipelineStatus(
+              stepLabel: _stepLabels[_currentStep],
+              current: _currentStep,
+              total: _totalSteps,
+              draftStatus: _vm.draftStatusLabel,
+              validationCount: _vm.getValidationItems().length,
+            ),
+          ),
           _StepIndicator(current: _currentStep, total: _totalSteps),
           // Page content
           Expanded(
@@ -156,7 +199,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                                 style: FilledButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                 ),
-                                child: const Text('Next'),
+                                child: Text(_nextLabel),
                               )
                             : FilledButton(
                                 onPressed: isLoading ? null : _submit,
@@ -181,6 +224,92 @@ class _CreateEventViewState extends State<CreateEventView> {
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+
+  String get _nextLabel {
+    if (_stepLabels[_currentStep] == 'Quiz' && !_vm.quizRequired) {
+      return 'Skip Quiz';
+    }
+    return 'Next';
+  }
+}
+
+class _PipelineStatus extends StatelessWidget {
+  const _PipelineStatus({
+    required this.stepLabel,
+    required this.current,
+    required this.total,
+    required this.draftStatus,
+    required this.validationCount,
+  });
+
+  final String stepLabel;
+  final int current;
+  final int total;
+  final String draftStatus;
+  final int validationCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Step ${current + 1} of $total · $stepLabel',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.cloud_done_outlined,
+                size: 17,
+                color: AppColors.secondary,
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  draftStatus,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (validationCount > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  size: 16,
+                  color: AppColors.accent,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '$validationCount item${validationCount == 1 ? '' : 's'} to fix before publishing',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.muted),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
