@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from ..crud import counselling_crud
 from ..database import get_db
-from ..dependencies import get_current_user, require_role
+from ..dependencies import admin_only, get_current_user, mentor_or_above, require_role
 from ..models.user import User, UserRole
 from ..schemas.counselling import (
     CounsellingAnalyticsResponse,
@@ -42,13 +42,11 @@ def get_mentor(
 
 
 @router.post("/mentors", response_model=MentorProfileResponse, status_code=201,
-             summary="Create mentor profile [admin, content_creator]")
+             summary="Create mentor profile [admin only]")
 def create_mentor_profile(
     payload: MentorProfileCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_role(UserRole.admin, UserRole.super_admin, UserRole.content_creator)
-    ),
+    current_user: User = Depends(admin_only),
 ):
     # Payload must target a user; use current_user.id or allow specifying user_id
     existing = counselling_crud.get_mentor_by_user(db, current_user.id)
@@ -58,14 +56,12 @@ def create_mentor_profile(
 
 
 @router.post("/mentors/for-user/{user_id}", response_model=MentorProfileResponse, status_code=201,
-             summary="Create mentor profile for a specific user [admin]")
+             summary="Create mentor profile for a specific user [admin only]")
 def create_mentor_profile_for_user(
     user_id: int,
     payload: MentorProfileCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_role(UserRole.admin, UserRole.super_admin, UserRole.content_creator)
-    ),
+    current_user: User = Depends(admin_only),
 ):
     existing = counselling_crud.get_mentor_by_user(db, user_id)
     if existing:
@@ -74,7 +70,7 @@ def create_mentor_profile_for_user(
 
 
 @router.patch("/mentors/{mentor_id}", response_model=MentorProfileResponse,
-              summary="Update mentor profile [admin, content_creator, self-mentor]")
+              summary="Update mentor profile [admin or the mentor themselves]")
 def update_mentor_profile(
     mentor_id: int,
     payload: MentorProfileUpdate,
@@ -84,8 +80,12 @@ def update_mentor_profile(
     profile = counselling_crud.get_mentor(db, mentor_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Mentor profile not found")
-    allowed_roles = (UserRole.admin, UserRole.super_admin, UserRole.content_creator)
-    if current_user.role not in allowed_roles and profile.user_id != current_user.id:
+    # Only admin/super_admin or the owning mentor may update a mentor profile.
+    # content_creator is intentionally excluded — creating/editing mentors is
+    # an administrative operation, not a content-management task.
+    is_admin = current_user.role in (UserRole.admin, UserRole.super_admin)
+    is_owner = (current_user.role == UserRole.mentor and profile.user_id == current_user.id)
+    if not is_admin and not is_owner:
         raise HTTPException(status_code=403, detail="Access denied")
     updated = counselling_crud.update_mentor_profile(db, mentor_id, payload)
     return updated
@@ -116,12 +116,10 @@ def list_mentor_slots(
 # ── Analytics ─────────────────────────────────────────────────────────────────
 
 @router.get("/analytics", response_model=CounsellingAnalyticsResponse,
-            summary="Booking analytics summary [admin, content_creator]")
+            summary="Booking analytics summary [mentor, admin, super_admin]")
 def get_analytics(
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_role(UserRole.admin, UserRole.super_admin, UserRole.content_creator)
-    ),
+    current_user: User = Depends(mentor_or_above),
 ):
     return counselling_crud.get_analytics(db)
 

@@ -39,7 +39,7 @@ class QuizResultScreen extends StatelessWidget {
             TopHeader(
               title: '$score% Score',
               subtitle:
-                  '${result.correctCount}/${result.totalQuestions} correct • ${result.xpEarned} XP earned',
+                  '${result.correctCount} of ${result.totalQuestions} correct',
               actionIcon: Icons.emoji_events_rounded,
             ),
             AppCard(

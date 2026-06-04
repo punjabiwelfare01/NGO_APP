@@ -7,7 +7,12 @@ import 'models/auth_models.dart';
 import 'models/skill_category.dart';
 import 'repositories/auth0_strategy.dart';
 import 'repositories/auth_repository.dart';
-import 'screens/auth/login_view.dart';
+import 'screens/admin/admin_dashboard_view.dart';
+import 'screens/admin/pending_approvals_screen.dart';
+import 'screens/auth/auth_page.dart';
+import 'screens/auth/pending_approval_screen.dart';
+import 'screens/auth/rejected_screen.dart';
+import 'screens/auth/student_register_screen.dart';
 import 'screens/events/events_view.dart';
 import 'screens/events/student/event_detail_screen.dart';
 import 'screens/home/home_view.dart';
@@ -40,6 +45,16 @@ void main() async {
   runApp(const CareSkillApp());
 }
 
+String _resolveInitialRoute() {
+  if (!AppState.isAuthenticated) return '/login';
+  return switch (AppState.accessStatus) {
+    AccessStatus.approved            => '/home',
+    AccessStatus.pendingVerification => '/pending-approval',
+    AccessStatus.rejected            => '/rejected',
+    AccessStatus.deactivated         => '/rejected',
+  };
+}
+
 class CareSkillApp extends StatelessWidget {
   const CareSkillApp({super.key});
 
@@ -66,11 +81,15 @@ class CareSkillApp extends StatelessWidget {
           bodyLarge: TextStyle(fontWeight: FontWeight.w500),
         ),
       ),
-      // After sign-in we push /home via pushReplacementNamed.
-      initialRoute: AppState.isAuthenticated ? '/home' : '/login',
+      // Route on startup based on both auth state and access status.
+      initialRoute: _resolveInitialRoute(),
       routes: {
-        '/login': (_) => const LoginView(),
-        '/home': (_) => const AppShell(),
+        '/login':                    (_) => const AuthPage(),
+        '/home':                     (_) => const AppShell(),
+        '/register/student':         (_) => const StudentRegisterScreen(),
+        '/pending-approval':         (_) => const PendingApprovalScreen(),
+        '/rejected':                 (_) => const RejectedScreen(),
+        '/admin/pending-approvals':  (_) => const PendingApprovalsScreen(),
       },
       onGenerateRoute: (settings) {
         final name = settings.name ?? '';
@@ -131,7 +150,11 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      HomeView(onOpenLearn: _openLearn),
+      // Admin/super-admin see the dedicated management dashboard on Home tab.
+      if (AppState.role.isAdmin)
+        const AdminDashboardView()
+      else
+        HomeView(onOpenLearn: _openLearn),
       LearnView(
         key: ValueKey('learn-$_learnOpenVersion'),
         initialCategory: _selectedLearnCategory,

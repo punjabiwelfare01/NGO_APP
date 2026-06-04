@@ -73,6 +73,11 @@ def _create_user(db, email: str, role: UserRole, name: str, age: int = 22):
 
 
 @pytest.fixture()
+def super_admin_user(db):
+    return _create_user(db, "superadmin@test.local", UserRole.super_admin, "Super Admin", age=40)
+
+
+@pytest.fixture()
 def admin_user(db):
     return _create_user(db, "admin@test.local", UserRole.admin, "Admin User", age=35)
 
@@ -98,6 +103,11 @@ def _get_token(client, email: str) -> str:
     resp = client.post("/auth/login", json={"email": email, "password": "testpass123"})
     assert resp.status_code == 200, f"Login failed for {email}: {resp.text}"
     return resp.json()["access_token"]
+
+
+@pytest.fixture()
+def super_admin_headers(client, super_admin_user):
+    return {"Authorization": f"Bearer {_get_token(client, 'superadmin@test.local')}"}
 
 
 @pytest.fixture()

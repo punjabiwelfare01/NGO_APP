@@ -1,51 +1,61 @@
 import 'package:flutter/material.dart';
+
+import '../../../app_state.dart';
 import '../../../core/colors.dart';
+import '../../../models/api_models.dart';
 import '../../../widgets/app_card.dart';
 
 class WelcomeBanner extends StatelessWidget {
-  const WelcomeBanner({super.key});
+  const WelcomeBanner({this.student, super.key});
+
+  final AppUser? student;
 
   @override
   Widget build(BuildContext context) {
+    final name = student?.name ?? AppState.studentName ?? 'Student';
+    final firstName = name.split(' ').first;
+    final className = student?.className;
+    final school = student?.schoolName;
+    final location = student?.location;
+
+    final subtitle = [
+      if (className != null) 'Class $className',
+      if (school != null) school,
+      if (location != null) location,
+    ].join(' • ');
+
     return AppCard(
       color: AppColors.primary,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Learn - Grow - Stay Safe',
-                  style: TextStyle(
+                Text(
+                  'Welcome back, $firstName!',
+                  style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Your friendly NGO learning space for skills, counselling, and safer choices.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.92),
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: () {},
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.primary,
-                  ),
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Continue'),
-                ),
+                ],
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           const FriendlyIllustration(),
         ],
       ),
@@ -59,24 +69,24 @@ class FriendlyIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 104,
-      height: 126,
+      width: 82,
+      height: 82,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Container(
-            width: 90,
-            height: 90,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.18),
               shape: BoxShape.circle,
             ),
           ),
           Positioned(
-            top: 20,
+            top: 12,
             child: Container(
-              width: 48,
-              height: 48,
+              width: 40,
+              height: 40,
               decoration: const BoxDecoration(
                 color: Color(0xFFFFD5A6),
                 shape: BoxShape.circle,
@@ -85,25 +95,25 @@ class FriendlyIllustration extends StatelessWidget {
             ),
           ),
           Positioned(
-            bottom: 16,
+            bottom: 8,
             child: Container(
-              width: 74,
-              height: 54,
+              width: 58,
+              height: 38,
               decoration: BoxDecoration(
                 color: AppColors.accent,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(Icons.menu_book_rounded, color: Colors.white),
+              child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 20),
             ),
           ),
           Positioned(
-            right: 10,
-            top: 8,
+            right: 6,
+            top: 4,
             child: _BubbleDot(color: AppColors.secondary),
           ),
           Positioned(
-            left: 4,
-            bottom: 24,
+            left: 2,
+            bottom: 18,
             child: _BubbleDot(color: AppColors.mint),
           ),
         ],
@@ -120,8 +130,8 @@ class _BubbleDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 18,
-      height: 18,
+      width: 14,
+      height: 14,
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }

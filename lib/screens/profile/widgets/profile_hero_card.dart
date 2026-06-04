@@ -12,13 +12,20 @@ class ProfileHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = user?.name ?? 'Loading…';
-    final subtitle = user != null
-        ? 'Age ${user!.age} · Level ${user!.level} Learner'
-        : '';
-    final xpLabel = user != null ? '${user!.xp} XP' : '';
+    final age = user?.age;
+    final className = user?.className;
+    final school = user?.schoolName;
+    final location = user?.location;
+
+    final schoolLine = [
+      if (className != null) 'Class $className',
+      if (school != null) school,
+      if (location != null) location,
+    ].join(' • ');
 
     return AppCard(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const CircleAvatar(
             radius: 38,
@@ -38,25 +45,27 @@ class ProfileHeroCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(subtitle,
-                      style: const TextStyle(color: AppColors.muted)),
-                ],
-                if (xpLabel.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                if (schoolLine.isNotEmpty) ...[
+                  const SizedBox(height: 3),
                   Text(
-                    xpLabel,
+                    schoolLine,
                     style: const TextStyle(
-                      color: AppColors.accent,
-                      fontWeight: FontWeight.w900,
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
+                  ),
+                ],
+                if (user != null && age != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Age $age',
+                    style: const TextStyle(color: AppColors.muted, fontSize: 13),
                   ),
                 ],
               ],
             ),
           ),
-          const Icon(Icons.workspace_premium_rounded, color: AppColors.accent),
         ],
       ),
     );

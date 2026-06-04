@@ -41,4 +41,42 @@ class ProfileViewModel extends ChangeNotifier {
     }
     if (!_disposed) notifyListeners();
   }
+
+  String? _updateError;
+  String? get updateError => _updateError;
+
+  /// Updates editable student profile fields via PATCH /users/me/profile.
+  /// Returns true on success. On failure keeps the view intact and returns false.
+  /// Does NOT set ViewState.error — that would replace the whole profile view.
+  Future<bool> updateProfile({
+    String? name,
+    String? className,
+    String? schoolName,
+    String? location,
+    int? age,
+    String? parentEmail,
+    String? phone,
+  }) async {
+    _updateError = null;
+    notifyListeners();
+    try {
+      final updated = await UserRepository.updateProfile(
+        name: name,
+        className: className,
+        schoolName: schoolName,
+        location: location,
+        age: age,
+        parentEmail: parentEmail,
+        phone: phone,
+      );
+      _user = updated;
+      if (name != null) AppState.studentName = name;
+      if (!_disposed) notifyListeners();
+      return true;
+    } catch (_) {
+      _updateError = 'Failed to update profile. Please try again.';
+      if (!_disposed) notifyListeners();
+      return false;
+    }
+  }
 }

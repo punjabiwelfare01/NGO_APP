@@ -9,9 +9,14 @@ class RegisterRequest(BaseModel):
     name: str
     email: str
     password: str
-    age: int
+    age: Optional[int] = None
     role: UserRole = UserRole.student
     parent_email: Optional[str] = None
+    class_name: Optional[str] = None
+    school_name: Optional[str] = None
+    location: Optional[str] = None
+    phone: Optional[str] = None
+    requested_role: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -25,6 +30,7 @@ class TokenResponse(BaseModel):
     role: str
     user_id: int
     name: str
+    access_status: Optional[str] = None
 
 
 class TokenData(BaseModel):

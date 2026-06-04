@@ -20,4 +20,28 @@ class UserRepository {
         as Map<String, dynamic>;
     return AppUser.fromJson(json);
   }
+
+  /// PATCH /users/me/profile — students can update editable fields only.
+  static Future<AppUser> updateProfile({
+    String? name,
+    String? className,
+    String? schoolName,
+    String? location,
+    int? age,
+    String? parentEmail,
+    String? phone,
+  }) async {
+    final body = <String, dynamic>{
+      if (name != null) 'name': name,
+      if (className != null) 'class_name': className,
+      if (schoolName != null) 'school_name': schoolName,
+      if (location != null) 'location': location,
+      if (age != null) 'age': age,
+      if (parentEmail != null) 'parent_email': parentEmail,
+      if (phone != null) 'phone': phone,
+    };
+    final json = await ApiClient.patch('/users/me/profile', body)
+        as Map<String, dynamic>;
+    return AppUser.fromJson(json);
+  }
 }

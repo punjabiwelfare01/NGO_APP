@@ -20,11 +20,12 @@ from .models import (  # noqa: F401 — registers all ORM models before create_a
     SafetyAwarenessQuestion, UserSafetyAnswer,
     EmergencyContact,
     ChatMessage,
+    AdminNotification,
 )
 from .database import Base
 from .dev_migrations import ensure_sqlite_schema
 from .middleware.rbac_logging import RBACLoggingMiddleware
-from .routers import auth, badges, courses, leaderboard, users, wellness
+from .routers import admin, auth, badges, courses, leaderboard, users, wellness
 from .routers import counselling
 from .routers import events
 from .routers import quiz
@@ -63,6 +64,7 @@ async def ngrok_skip_warning(request, call_next):
 
 # ── routers ────────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(users.router)
 app.include_router(courses.router)
 app.include_router(wellness.router)

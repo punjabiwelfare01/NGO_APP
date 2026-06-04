@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../app_state.dart';
 import '../models/api_models.dart';
+import '../models/course.dart';
 import '../models/event_models.dart';
 import '../models/quiz_models.dart';
 import '../models/skill_category.dart';
@@ -9,6 +10,7 @@ import '../repositories/api_client.dart';
 import '../repositories/course_repository.dart';
 import '../repositories/event_repository.dart';
 import '../repositories/quiz_repository.dart';
+import '../repositories/user_repository.dart';
 import '../repositories/wellness_repository.dart';
 import 'view_state.dart';
 
@@ -22,6 +24,8 @@ class HomeViewModel extends ChangeNotifier {
   EventModel? _upcomingCounsellingEvent;
   List<EventModel> _upcomingEvents = [];
   DailyChallengeModel? _dailyChallenge;
+  AppUser? _studentProfile;
+  Course? _continueLearningCourse;
   bool _disposed = false;
 
   ViewState get state => _state;
@@ -33,6 +37,8 @@ class HomeViewModel extends ChangeNotifier {
   EventModel? get upcomingCounsellingEvent => _upcomingCounsellingEvent;
   List<EventModel> get upcomingEvents => _upcomingEvents;
   DailyChallengeModel? get dailyChallenge => _dailyChallenge;
+  AppUser? get studentProfile => _studentProfile;
+  Course? get continueLearningCourse => _continueLearningCourse;
 
   @override
   void dispose() {
@@ -60,6 +66,8 @@ class HomeViewModel extends ChangeNotifier {
         ),
         WellnessRepository.getAvailableSlots(AppState.userId),
         EventRepository.getEvents(),
+        _loadStudentProfile(),
+        CourseRepository.getUserCourses(AppState.userId).catchError((_) => <Course>[]),
       ]);
       _categories = _mergeCoreSkillCategories(
         results[0] as List<SkillCategory>,
@@ -69,12 +77,15 @@ class HomeViewModel extends ChangeNotifier {
       final counsellingEvents = results[3] as List<EventModel>;
       _availableSlots = results[4] as List<ApiCounsellingSlot>;
       final events = results[5] as List<EventModel>;
+      _studentProfile = results[6] as AppUser?;
+      final userCourses = results[7] as List<Course>;
       _allUpcomingSessions = sessions.where((s) => s.isUpcoming).toList();
       _upcomingSession = _allUpcomingSessions.firstOrNull;
       _upcomingCounsellingEvent = _nextBookableCounsellingEvent(
         counsellingEvents,
       );
       _upcomingEvents = _publicUpcomingEvents(events);
+      _continueLearningCourse = _pickContinueLearningCourse(userCourses);
       _state = ViewState.idle;
     } on ApiException catch (e) {
       _state = ViewState.error;
@@ -195,4 +206,25 @@ class HomeViewModel extends ChangeNotifier {
       .replaceAll('skills', '')
       .replaceAll('skill', '')
       .replaceAll(RegExp(r'[^a-z0-9]+'), '');
+
+  Future<AppUser?> _loadStudentProfile() async {
+    try {
+      return await UserRepository.getUser(AppState.userId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Returns the most recently active in-progress course, or the first course
+  /// if none has been started yet. Returns null if no courses are enrolled.
+  Course? _pickContinueLearningCourse(List<Course> courses) {
+    if (courses.isEmpty) return null;
+    final inProgress = courses.where((c) => c.progress > 0 && c.progress < 1).toList();
+    if (inProgress.isNotEmpty) {
+      inProgress.sort((a, b) => b.progress.compareTo(a.progress));
+      return inProgress.first;
+    }
+    final notStarted = courses.where((c) => c.progress == 0).toList();
+    return notStarted.isNotEmpty ? notStarted.first : null;
+  }
 }

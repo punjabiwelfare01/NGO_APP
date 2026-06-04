@@ -5,26 +5,271 @@ class AppUser {
   const AppUser({
     required this.id,
     required this.name,
-    required this.age,
     required this.level,
     required this.xp,
+    this.age,
     this.parentEmail,
+    this.className,
+    this.schoolName,
+    this.location,
+    this.phone,
+    this.role,
+    this.accessStatus,
+    this.requestedRole,
+    this.verificationNote,
   });
 
   final int id;
   final String name;
-  final int age;
+  final int? age;
   final int level;
   final int xp;
   final String? parentEmail;
+  final String? className;
+  final String? schoolName;
+  final String? location;
+  final String? phone;
+  final String? role;
+  final String? accessStatus;
+  final String? requestedRole;
+  final String? verificationNote;
+
+  AppUser copyWith({
+    String? name,
+    int? age,
+    String? parentEmail,
+    String? className,
+    String? schoolName,
+    String? location,
+    String? phone,
+    String? role,
+    String? accessStatus,
+    String? requestedRole,
+    String? verificationNote,
+  }) => AppUser(
+    id: id,
+    name: name ?? this.name,
+    level: level,
+    xp: xp,
+    age: age ?? this.age,
+    parentEmail: parentEmail ?? this.parentEmail,
+    className: className ?? this.className,
+    schoolName: schoolName ?? this.schoolName,
+    location: location ?? this.location,
+    phone: phone ?? this.phone,
+    role: role ?? this.role,
+    accessStatus: accessStatus ?? this.accessStatus,
+    requestedRole: requestedRole ?? this.requestedRole,
+    verificationNote: verificationNote ?? this.verificationNote,
+  );
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
     id: j['id'] as int,
     name: j['name'] as String,
-    age: j['age'] as int,
-    level: j['level'] as int,
-    xp: j['xp'] as int,
+    age: j['age'] as int?,
+    level: (j['level'] as int?) ?? 1,
+    xp: (j['xp'] as int?) ?? 0,
     parentEmail: j['parent_email'] as String?,
+    className: j['class_name'] as String?,
+    schoolName: j['school_name'] as String?,
+    location: j['location'] as String?,
+    phone: j['phone'] as String?,
+    role: j['role'] as String?,
+    accessStatus: j['access_status'] as String?,
+    requestedRole: j['requested_role'] as String?,
+    verificationNote: j['verification_note'] as String?,
+  );
+}
+
+/// A user card shown in the admin pending-approvals list.
+class PendingUserItem {
+  const PendingUserItem({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.currentRole,
+    required this.accessStatus,
+    required this.createdAt,
+    this.requestedRole,
+    this.phone,
+    this.className,
+    this.schoolName,
+    this.location,
+  });
+
+  final int id;
+  final String name;
+  final String email;
+  final String currentRole;
+  final String accessStatus;
+  final DateTime createdAt;
+  final String? requestedRole;
+  final String? phone;
+  final String? className;
+  final String? schoolName;
+  final String? location;
+
+  factory PendingUserItem.fromJson(Map<String, dynamic> j) => PendingUserItem(
+    id: j['id'] as int,
+    name: j['name'] as String,
+    email: j['email'] as String,
+    currentRole: (j['current_role'] ?? j['role'] ?? 'student') as String,
+    accessStatus: (j['access_status'] ?? 'pending_verification') as String,
+    createdAt: DateTime.parse(j['created_at'] as String),
+    requestedRole: j['requested_role'] as String?,
+    phone: j['phone'] as String?,
+    className: j['class_name'] as String?,
+    schoolName: j['school_name'] as String?,
+    location: j['location'] as String?,
+  );
+}
+
+/// Full user record shown in the admin User Management table.
+class AdminUserItem {
+  const AdminUserItem({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.role,
+    required this.accessStatus,
+    required this.createdAt,
+    this.requestedRole,
+    this.phone,
+    this.className,
+    this.schoolName,
+    this.location,
+    this.verificationNote,
+  });
+
+  final int id;
+  final String name;
+  final String email;
+  final String role;
+  final String accessStatus;
+  final DateTime createdAt;
+  final String? requestedRole;
+  final String? phone;
+  final String? className;
+  final String? schoolName;
+  final String? location;
+  final String? verificationNote;
+
+  bool get isBlocked    => accessStatus == 'deactivated';
+  bool get isPending    => accessStatus == 'pending_verification';
+  bool get isApproved   => accessStatus == 'approved';
+  bool get isRejected   => accessStatus == 'rejected';
+
+  AdminUserItem copyWith({String? role, String? accessStatus}) => AdminUserItem(
+    id: id,
+    name: name,
+    email: email,
+    role: role ?? this.role,
+    accessStatus: accessStatus ?? this.accessStatus,
+    createdAt: createdAt,
+    requestedRole: requestedRole,
+    phone: phone,
+    className: className,
+    schoolName: schoolName,
+    location: location,
+    verificationNote: verificationNote,
+  );
+
+  factory AdminUserItem.fromJson(Map<String, dynamic> j) => AdminUserItem(
+    id: j['id'] as int,
+    name: j['name'] as String,
+    email: j['email'] as String,
+    role: (j['role'] ?? 'student') as String,
+    accessStatus: (j['access_status'] ?? 'pending_verification') as String,
+    createdAt: DateTime.parse(j['created_at'] as String),
+    requestedRole: j['requested_role'] as String?,
+    phone: j['phone'] as String?,
+    className: j['class_name'] as String?,
+    schoolName: j['school_name'] as String?,
+    location: j['location'] as String?,
+    verificationNote: j['verification_note'] as String?,
+  );
+}
+
+/// User statistics summary for the admin dashboard.
+class AdminStats {
+  const AdminStats({
+    required this.totalUsers,
+    required this.activeUsers,
+    required this.pendingUsers,
+    required this.blockedUsers,
+    required this.rejectedUsers,
+    this.roleCounts = const {},
+  });
+
+  final int totalUsers;
+  final int activeUsers;
+  final int pendingUsers;
+  final int blockedUsers;
+  final int rejectedUsers;
+  final Map<String, int> roleCounts;
+
+  factory AdminStats.fromJson(Map<String, dynamic> j) => AdminStats(
+    totalUsers:    (j['total_users']    as int?) ?? 0,
+    activeUsers:   (j['active_users']   as int?) ?? 0,
+    pendingUsers:  (j['pending_users']  as int?) ?? 0,
+    blockedUsers:  (j['blocked_users']  as int?) ?? 0,
+    rejectedUsers: (j['rejected_users'] as int?) ?? 0,
+    roleCounts: (j['role_counts'] as Map<String, dynamic>?)
+            ?.map((k, v) => MapEntry(k, (v as int?) ?? 0)) ??
+        const {},
+  );
+
+  factory AdminStats.empty() => const AdminStats(
+    totalUsers: 0,
+    activeUsers: 0,
+    pendingUsers: 0,
+    blockedUsers: 0,
+    rejectedUsers: 0,
+  );
+}
+
+/// Admin dashboard notification model.
+class AdminNotification {
+  const AdminNotification({
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.type,
+    required this.isRead,
+    required this.createdAt,
+    this.userId,
+    this.actionUrl,
+  });
+
+  final int id;
+  final String title;
+  final String message;
+  final String type;
+  final bool isRead;
+  final DateTime createdAt;
+  final int? userId;
+  final String? actionUrl;
+
+  AdminNotification copyWith({bool? isRead}) => AdminNotification(
+    id: id,
+    title: title,
+    message: message,
+    type: type,
+    isRead: isRead ?? this.isRead,
+    createdAt: createdAt,
+    userId: userId,
+    actionUrl: actionUrl,
+  );
+
+  factory AdminNotification.fromJson(Map<String, dynamic> j) => AdminNotification(
+    id: j['id'] as int,
+    title: j['title'] as String,
+    message: j['message'] as String,
+    type: (j['type'] ?? 'general') as String,
+    isRead: (j['is_read'] as bool?) ?? false,
+    createdAt: DateTime.parse(j['created_at'] as String),
+    userId: j['user_id'] as int?,
+    actionUrl: j['action_url'] as String?,
   );
 }
 

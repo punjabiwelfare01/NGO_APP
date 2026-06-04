@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../core/colors.dart';
+import '../../models/auth_models.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
+import 'student_register_screen.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -32,15 +34,25 @@ class _LoginViewState extends State<LoginView> {
   }
 
   Future<void> _submit() async {
-    final ok = await _vm.login(_emailCtrl.text, _passwordCtrl.text);
-    if (!mounted || !ok) return;
-    Navigator.of(context).pushReplacementNamed('/home');
+    final status = await _vm.login(_emailCtrl.text, _passwordCtrl.text);
+    if (!mounted || status == null) return;
+    _navigateByStatus(status);
   }
 
   Future<void> _auth0SignIn() async {
-    final ok = await _vm.loginWithAuth0();
-    if (!mounted || !ok) return;
-    Navigator.of(context).pushReplacementNamed('/home');
+    final status = await _vm.loginWithAuth0();
+    if (!mounted || status == null) return;
+    _navigateByStatus(status);
+  }
+
+  void _navigateByStatus(AccessStatus status) {
+    final route = switch (status) {
+      AccessStatus.approved            => '/home',
+      AccessStatus.pendingVerification => '/pending-approval',
+      AccessStatus.rejected            => '/rejected',
+      AccessStatus.deactivated         => '/rejected',
+    };
+    Navigator.of(context).pushReplacementNamed(route);
   }
 
   void _fillDemo(String email, String password) {
@@ -238,6 +250,42 @@ class _LoginViewState extends State<LoginView> {
                           color: AppColors.secondary,
                           onTap: () =>
                               _fillDemo('meera@careskill.demo', 'mentor123'),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+
+                    // ── New student CTA ─────────────────────────────────
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'New student? ',
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 14,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: loading
+                              ? null
+                              : () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const StudentRegisterScreen(),
+                                    ),
+                                  ),
+                          child: const Text(
+                            'Create account',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
                         ),
                       ],
                     ),

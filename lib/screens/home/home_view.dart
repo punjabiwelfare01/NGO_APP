@@ -5,14 +5,18 @@ import 'package:flutter/services.dart';
 
 import '../../app_state.dart';
 import '../../core/colors.dart';
+import '../../models/course.dart';
 import '../../models/event_models.dart';
 import '../../models/skill_category.dart';
+import '../../viewmodels/admin_viewmodel.dart';
 import '../../viewmodels/home_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
 import '../../utils/navigation_helper.dart';
+import '../../widgets/app_card.dart';
 import '../../widgets/app_scroll_view.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/top_header.dart';
+import '../admin/pending_approvals_screen.dart';
 import '../helping_support/student/all_slots_screen.dart';
 import 'widgets/counselling_session_card.dart';
 import 'widgets/daily_challenge_card.dart';
@@ -33,6 +37,7 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   late final HomeViewModel _vm;
+  AdminViewModel? _adminVm;
   late final TextEditingController _skillSearchCtrl;
   Timer? _notificationTimer;
   bool _bannerShown = false;
@@ -53,12 +58,18 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       const Duration(minutes: 1),
       (_) => _checkSessionNotification(),
     );
+    // Admins get a live notification + pending-approval count
+    if (AppState.role.isAdmin) {
+      _adminVm = AdminViewModel();
+      _adminVm!.load();
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _vm.load();
+      _adminVm?.load();
     }
   }
 
@@ -71,6 +82,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     _skillSearchCtrl.dispose();
     _vm.removeListener(_onVmChanged);
     _vm.dispose();
+    _adminVm?.dispose();
     super.dispose();
   }
 
@@ -187,26 +199,75 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           );
         }
         final visibleSkills = _filteredSkillCategories(_vm.categories);
+        final firstName = (_vm.studentProfile?.name ??
+                AppState.studentName ??
+                'Student')
+            .split(' ')
+            .first;
+        final adminBadge = _adminVm == null
+            ? null
+            : (_adminVm!.unreadCount + _adminVm!.pendingCount);
         return AppScrollView(
           children: [
-            const TopHeader(
-              title: 'Hi Aarav',
-              subtitle: 'Ready to learn, play, and grow today?',
-              actionIcon: Icons.notifications_none_rounded,
+            ListenableBuilder(
+              listenable: _adminVm ?? _vm,
+              builder: (_, _) => TopHeader(
+                title: 'Hi $firstName',
+                subtitle: AppState.role.isAdmin
+                    ? 'Welcome back, ${AppState.role.displayName}'
+                    : 'Ready to learn, play, and grow today?',
+                actionIcon: Icons.notifications_none_rounded,
+                badgeCount: adminBadge == 0 ? null : adminBadge,
+                onActionTap: AppState.role.isAdmin
+                    ? () => _openAdminNotifications()
+                    : null,
+              ),
             ),
-            const WelcomeBanner(),
+
+            // ── Admin: pending approvals card ──────────────────────────
+            if (AppState.role.isAdmin && _adminVm != null)
+              ListenableBuilder(
+                listenable: _adminVm!,
+                builder: (_, _) => _AdminDashboardCard(
+                  pendingCount: _adminVm!.pendingCount,
+                  unreadCount: _adminVm!.unreadCount,
+                  onViewPending: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PendingApprovalsScreen(),
+                    ),
+                  ),
+                  onViewNotifications: _openAdminNotifications,
+                ),
+              ),
+
+            // ── Personalised welcome card ──────────────────────────
+            WelcomeBanner(student: _vm.studentProfile),
+
+            // ── Upcoming events ────────────────────────────────────
             UpcomingEventsPanel(
               events: _vm.upcomingEvents,
               onEventTap: (event) =>
                   openEvent(context, event, onRefresh: () => _vm.load()),
             ),
+
+            // ── Next counselling session ───────────────────────────
             UpcomingCounsellingBanner(
               upcomingEvent: _vm.upcomingCounsellingEvent,
               liveSession: _vm.upcomingSession,
               onEventTap: () => _openCounsellingBooking(context),
               onJoinTap: () => _openCounsellingSession(context),
             ),
+
             const DailyMotivationCard(),
+
+            // ── Continue Learning ──────────────────────────────────
+            const SectionHeader(title: 'Continue Learning'),
+            _ContinueLearningCard(
+              course: _vm.continueLearningCourse,
+              onTap: () => widget.onOpenLearn?.call(null),
+            ),
+
+            // ── Skill development ──────────────────────────────────
             SectionHeader(
               title: 'Skill Development',
               action: 'View all',
@@ -283,7 +344,8 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-            // Counselling card — shows booked sessions + available slots
+
+            // ── Counselling card ───────────────────────────────────
             CounsellingSessionCard(
               upcomingSessions: _vm.allUpcomingSessions,
               availableSlots: _vm.availableSlots,
@@ -294,6 +356,8 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                 context,
               ).push(MaterialPageRoute(builder: (_) => const AllSlotsScreen())),
             ),
+
+            // ── Daily Challenge ────────────────────────────────────
             SectionHeader(
               title: 'Daily Challenge',
               action: _vm.dailyChallenge == null ? null : 'Start',
@@ -307,6 +371,11 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                   ? null
                   : () => _openDailyChallenge(context),
             ),
+
+            // ── Emergency Help shortcut ────────────────────────────
+            const SectionHeader(title: 'Emergency Help'),
+            const _EmergencyHelpCard(),
+
             const ParentPreviewPanel(),
           ],
         );
@@ -333,6 +402,16 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     return categories
         .where((category) => category.title.toLowerCase().contains(query))
         .toList();
+  }
+
+  void _openAdminNotifications() {
+    if (_adminVm == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AdminNotificationsSheet(adminVm: _adminVm!),
+    );
   }
 
   void _openCounsellingBooking(BuildContext context) {
@@ -689,6 +768,598 @@ class _EventNotificationToastState extends State<_EventNotificationToast>
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContinueLearningCard extends StatelessWidget {
+  const _ContinueLearningCard({required this.course, required this.onTap});
+
+  final Course? course;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (course == null) {
+      return AppCard(
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.school_rounded,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Start Learning',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Explore beginner courses and pick one to start.',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: onTap,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text('Browse', style: TextStyle(fontSize: 13)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final progressPct = (course!.progress * 100).round();
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: course!.color.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(course!.icon, color: AppColors.ink, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      course!.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      '${course!.level} · ${course!.duration}',
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton(
+                onPressed: onTap,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text('Continue', style: TextStyle(fontSize: 13)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: course!.progress.clamp(0.0, 1.0),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    minHeight: 7,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '$progressPct%',
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmergencyHelpCard extends StatelessWidget {
+  const _EmergencyHelpCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      color: const Color(0xFFFFF0F0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.softRed.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.emergency_rounded,
+                  color: AppColors.softRed,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Emergency Help',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.ink,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      'Reach out anytime — we are here for you.',
+                      style: TextStyle(color: AppColors.muted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _HelpChip(
+                icon: Icons.phone_rounded,
+                label: 'Emergency Contacts',
+                color: AppColors.softRed,
+                onTap: () {},
+              ),
+              _HelpChip(
+                icon: Icons.shield_rounded,
+                label: 'Safety Help',
+                color: AppColors.accent,
+                onTap: () {},
+              ),
+              _HelpChip(
+                icon: Icons.support_agent_rounded,
+                label: 'Counselling Support',
+                color: AppColors.secondary,
+                onTap: () => Navigator.of(context).pushNamed('/helping-support'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HelpChip extends StatelessWidget {
+  const _HelpChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Admin dashboard card ──────────────────────────────────────────────────────
+
+class _AdminDashboardCard extends StatelessWidget {
+  const _AdminDashboardCard({
+    required this.pendingCount,
+    required this.unreadCount,
+    required this.onViewPending,
+    required this.onViewNotifications,
+  });
+
+  final int pendingCount;
+  final int unreadCount;
+  final VoidCallback onViewPending;
+  final VoidCallback onViewNotifications;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      color: AppColors.primary.withValues(alpha: 0.05),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.admin_panel_settings_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Admin Overview',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _AdminStatTile(
+                  icon: Icons.pending_actions_rounded,
+                  label: 'Pending\nApprovals',
+                  count: pendingCount,
+                  color: const Color(0xFFFF8C00),
+                  onTap: onViewPending,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _AdminStatTile(
+                  icon: Icons.notifications_active_rounded,
+                  label: 'Unread\nNotifications',
+                  count: unreadCount,
+                  color: AppColors.secondary,
+                  onTap: onViewNotifications,
+                ),
+              ),
+            ],
+          ),
+          if (pendingCount > 0) ...[
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: onViewPending,
+              icon: const Icon(Icons.fact_check_outlined, size: 16),
+              label: Text('Review $pendingCount pending ${pendingCount == 1 ? "request" : "requests"}'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                minimumSize: const Size(double.infinity, 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminStatTile extends StatelessWidget {
+  const _AdminStatTile({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final int count;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$count',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                    ),
+                  ),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Admin notifications bottom sheet ─────────────────────────────────────────
+
+class _AdminNotificationsSheet extends StatelessWidget {
+  const _AdminNotificationsSheet({required this.adminVm});
+
+  final AdminViewModel adminVm;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      maxChildSize: 0.92,
+      minChildSize: 0.4,
+      builder: (ctx, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.muted.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Text(
+                    'Notifications',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (adminVm.unreadCount > 0)
+                    TextButton(
+                      onPressed: adminVm.markAllRead,
+                      child: const Text('Mark all read'),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: adminVm,
+                builder: (_, _) {
+                  final notes = adminVm.notifications;
+                  if (notes.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No notifications yet.',
+                        style: TextStyle(color: AppColors.muted),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: notes.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) => _NotificationTile(
+                      notification: notes[i],
+                      onTap: () => adminVm.markNotificationRead(notes[i].id),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationTile extends StatelessWidget {
+  const _NotificationTile({
+    required this.notification,
+    required this.onTap,
+  });
+
+  final dynamic notification;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isRead = notification.isRead as bool;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isRead ? Colors.white : AppColors.primary.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isRead
+                ? AppColors.muted.withValues(alpha: 0.15)
+                : AppColors.primary.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isRead
+                    ? Icons.notifications_none_rounded
+                    : Icons.notifications_active_rounded,
+                size: 16,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    notification.title as String,
+                    style: TextStyle(
+                      fontWeight:
+                          isRead ? FontWeight.w600 : FontWeight.w800,
+                      color: AppColors.ink,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    notification.message as String,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!isRead)
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
         ),
       ),
     );

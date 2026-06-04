@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..models.auth import BlacklistedToken
+from ..models.notification import AdminNotification
 from ..models.user import User, UserRole
 from ..schemas.auth import RegisterRequest
 
@@ -110,10 +111,24 @@ def register_user(db: Session, data: RegisterRequest) -> User:
         email=data.email,
         hashed_password=hash_password(data.password),
         age=data.age,
-        role=data.role,
+        role=UserRole.student,
+        access_status="pending_verification",
         parent_email=data.parent_email,
+        class_name=data.class_name,
+        school_name=data.school_name,
+        location=data.location,
+        phone=data.phone,
+        requested_role=data.requested_role,
     )
     db.add(user)
+    db.flush()
+    role_label = data.requested_role or "student"
+    db.add(AdminNotification(
+        title="New User Registration",
+        message=f"{user.name} registered and awaits approval. Requested role: {role_label}.",
+        type="registration",
+        user_id=user.id,
+    ))
     db.commit()
     db.refresh(user)
     return user

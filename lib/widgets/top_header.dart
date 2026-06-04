@@ -6,12 +6,18 @@ class TopHeader extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.actionIcon,
+    this.onActionTap,
+    this.badgeCount,
     super.key,
   });
 
   final String title;
   final String subtitle;
   final IconData actionIcon;
+  final VoidCallback? onActionTap;
+
+  /// When non-null and > 0, a red badge is shown on the action icon.
+  final int? badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -55,10 +61,43 @@ class TopHeader extends StatelessWidget {
             ],
           ),
         ),
-        IconButton.filledTonal(
-          onPressed: () {},
-          icon: Icon(actionIcon),
-          tooltip: 'Open action',
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton.filledTonal(
+              onPressed: onActionTap,
+              icon: Icon(actionIcon),
+              tooltip: 'Open action',
+            ),
+            if (badgeCount != null && badgeCount! > 0)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: IgnorePointer(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.softRed,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16),
+                    child: Text(
+                      badgeCount! > 99 ? '99+' : '$badgeCount',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ],
     );

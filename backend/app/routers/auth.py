@@ -33,12 +33,23 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 _bearer = HTTPBearer()
 
 
-@router.post("/register", response_model=UserResponse, status_code=201,
+@router.post("/register", status_code=201,
              summary="Register a new user account")
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if get_user_by_email(db, payload.email):
         raise HTTPException(status_code=409, detail="Email already registered")
-    return register_user(db, payload)
+    user = register_user(db, payload)
+    return {
+        "message": "Registration successful. Awaiting admin approval.",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role.value,
+            "access_status": user.access_status,
+            "requested_role": user.requested_role,
+        },
+    }
 
 
 @router.post("/login", response_model=TokenResponse,
@@ -51,12 +62,14 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is inactive")
+    access_status = getattr(user, "access_status", "approved") or "approved"
     token = create_access_token(user)
     return TokenResponse(
         access_token=token,
         role=user.role.value,
         user_id=user.id,
         name=user.name,
+        access_status=access_status,
     )
 
 
