@@ -2,17 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../core/colors.dart';
 import '../../models/course.dart';
+import '../../models/creator_content.dart';
 import '../../models/event_models.dart';
-import '../../models/lesson.dart';
 import '../../models/quiz_models.dart';
 import '../../models/skill_category.dart';
 import '../../repositories/course_repository.dart';
+import '../../repositories/creator_repository.dart';
 import '../../repositories/event_repository.dart';
 import '../../repositories/quiz_repository.dart';
+import 'create_post_screen.dart';
 import '../events/admin/create_event/create_event_view.dart';
 import '../events/admin/create_event/quiz/create_quiz_screen.dart';
+import '../learn/learn_view.dart';
 import '../learn/admin/create_course_screen.dart';
-import '../learn/admin/create_lesson_screen.dart';
 import '../learn/admin/manage_skill_categories_screen.dart';
 
 class ContentCreatorUploadView extends StatefulWidget {
@@ -28,7 +30,9 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
   List<Course> _courses = [];
   List<EventModel> _events = [];
   List<QuizSummary> _quizzes = [];
+  List<CreatorContentItem> _content = [];
   int? _selectedCategoryId;
+  String? _selectedStaticFilter;
   bool _loading = true;
   String? _error;
 
@@ -49,6 +53,7 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
         CourseRepository.getCourses(),
         EventRepository.getEvents(),
         QuizRepository.getQuizzes(includeInactive: true),
+        CreatorRepository.getContent(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -56,6 +61,7 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
         _courses = results[1] as List<Course>;
         _events = results[2] as List<EventModel>;
         _quizzes = results[3] as List<QuizSummary>;
+        _content = results[4] as List<CreatorContentItem>;
         _loading = false;
       });
     } catch (_) {
@@ -82,18 +88,29 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
             onAddCourse: _openCreateCourse,
             onAddLesson: _openCreateLesson,
             onCreateQuiz: _openCreateQuiz,
+            onCreatePost: _openCreatePost,
+            onUploadPdfNotes: _openCreateLesson,
           ),
           const SizedBox(height: 18),
           _CategoryFilters(
             categories: _categories,
             selectedCategoryId: _selectedCategoryId,
-            onSelected: (id) => setState(() => _selectedCategoryId = id),
+            selectedStaticFilter: _selectedStaticFilter,
+            onSelected: (id) => setState(() {
+              _selectedCategoryId = id;
+              _selectedStaticFilter = null;
+            }),
+            onStaticSelected: (filter) => setState(() {
+              _selectedStaticFilter = filter;
+              _selectedCategoryId = null;
+            }),
           ),
           const SizedBox(height: 16),
           _UploadStats(
             drafts: _draftCount,
             pending: _pendingCount,
             published: _publishedCount,
+            posts: _postCount,
           ),
           const SizedBox(height: 18),
           if (_loading)
@@ -106,6 +123,7 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
           _QuickActionsCard(
             onManageSkills: _openManageSkills,
             onAddCourse: _openCreateCourse,
+            onCreatePost: _openCreatePost,
             onViewDrafts: () => _showDrafts(recentUploads),
           ),
         ],
@@ -114,51 +132,51 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
   }
 
   int get _draftCount =>
-      _events.where((event) => event.status == EventStatus.draft).length;
+      _filteredContent.where((item) => item.status == 'draft').length;
 
-  int get _pendingCount => _events
-      .where((event) => event.status == EventStatus.pendingReview)
-      .length;
+  int get _pendingCount =>
+      _filteredContent.where((item) => item.status == 'pending_review').length;
 
-  int get _publishedCount {
-    final publishedEvents = _events
-        .where(
-          (event) =>
-              event.status == EventStatus.published ||
-              event.status == EventStatus.registrationOpen ||
-              event.status == EventStatus.live,
-        )
-        .length;
-    final activeQuizzes = _quizzes.where((quiz) => quiz.isActive).length;
-    return _courses.length + publishedEvents + activeQuizzes;
-  }
+  int get _publishedCount =>
+      _filteredContent.where((item) => item.status == 'published').length;
+
+  int get _postCount =>
+      _filteredContent.where((item) => item.type == 'post').length;
 
   List<_RecentUpload> _recentUploads() {
-    final uploads = <_RecentUpload>[
-      for (final event in _events) _RecentUpload.event(event),
-      for (final course in _filteredCourses) _RecentUpload.course(course),
-      for (final quiz in _filteredQuizzes) _RecentUpload.quiz(quiz),
-    ];
+    final uploads = _filteredContent.map(_RecentUpload.content).toList();
     uploads.sort((a, b) => b.sortDate.compareTo(a.sortDate));
     return uploads.take(8).toList();
   }
 
-  List<Course> get _filteredCourses {
-    if (_selectedCategoryId == null) return _courses;
-    return _courses
-        .where((course) => course.categoryId == _selectedCategoryId)
-        .toList();
-  }
-
-  List<QuizSummary> get _filteredQuizzes {
-    if (_selectedCategoryId == null) return _quizzes;
+  List<CreatorContentItem> get _filteredContent {
+    var items = _content;
+    if (_selectedStaticFilter == 'learning_posts') {
+      items = items
+          .where(
+            (item) =>
+                item.type == 'post' &&
+                item.meta['post_type'] != 'ngo_event_post',
+          )
+          .toList();
+    } else if (_selectedStaticFilter == 'ngo_events') {
+      items = items
+          .where(
+            (item) =>
+                item.type == 'event' ||
+                (item.type == 'post' &&
+                    item.meta['post_type'] == 'ngo_event_post'),
+          )
+          .toList();
+    }
+    if (_selectedCategoryId == null) return items;
     final selectedTitle = _categories
         .where((category) => category.id == _selectedCategoryId)
         .map((category) => category.title.toLowerCase())
         .firstOrNull;
     if (selectedTitle == null) return const [];
-    return _quizzes
-        .where((quiz) => (quiz.category ?? '').toLowerCase() == selectedTitle)
+    return items
+        .where((item) => (item.category ?? '').toLowerCase() == selectedTitle)
         .toList();
   }
 
@@ -177,67 +195,28 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
   }
 
   Future<void> _openCreateLesson() async {
-    if (_courses.isEmpty) {
-      final createCourse = await _confirmCreateCourseFirst();
-      if (createCourse == true) await _openCreateCourse();
-      return;
-    }
-
-    final course = await showModalBottomSheet<Course>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _CoursePickerSheet(courses: _courses),
-    );
-    if (course == null || !mounted) return;
-
-    try {
-      final lessons = await CourseRepository.getLessons(course.id);
-      if (!mounted) return;
-      final created = await Navigator.of(context).push<Lesson>(
-        MaterialPageRoute(
-          builder: (_) => CreateLessonScreen(
-            courseId: course.id,
-            nextOrder: lessons.length,
-          ),
-        ),
-      );
-      if (created != null) await _load();
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not prepare lesson upload.'),
-          backgroundColor: AppColors.softRed,
-        ),
-      );
-    }
-  }
-
-  Future<bool?> _confirmCreateCourseFirst() {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add a course first'),
-        content: const Text(
-          'Lessons need to belong to a course before they can be uploaded.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Add Course'),
-          ),
-        ],
-      ),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const LearnView()));
+    await _load();
   }
 
   Future<void> _openCreateQuiz() async {
     final created = await Navigator.of(context).push<QuizSummary>(
       MaterialPageRoute(builder: (_) => const CreateQuizScreen()),
+    );
+    if (created != null) await _load();
+  }
+
+  Future<void> _openCreatePost() async {
+    final created = await Navigator.of(context).push<CreatorContentItem>(
+      MaterialPageRoute(
+        builder: (_) => CreatePostScreen(
+          courses: _courses,
+          events: _events,
+          quizzes: _quizzes,
+        ),
+      ),
     );
     if (created != null) await _load();
   }
@@ -314,12 +293,16 @@ class _CreateActionGrid extends StatelessWidget {
     required this.onAddCourse,
     required this.onAddLesson,
     required this.onCreateQuiz,
+    required this.onCreatePost,
+    required this.onUploadPdfNotes,
   });
 
   final VoidCallback onCreateEvent;
   final VoidCallback onAddCourse;
   final VoidCallback onAddLesson;
   final VoidCallback onCreateQuiz;
+  final VoidCallback onCreatePost;
+  final VoidCallback onUploadPdfNotes;
 
   @override
   Widget build(BuildContext context) {
@@ -352,11 +335,25 @@ class _CreateActionGrid extends StatelessWidget {
         color: AppColors.accent,
         onTap: onCreateQuiz,
       ),
+      _CreateActionData(
+        icon: Icons.campaign_rounded,
+        title: 'Create Post',
+        subtitle: 'Learning post or NGO event post',
+        color: const Color(0xFF2F8BFF),
+        onTap: onCreatePost,
+      ),
+      _CreateActionData(
+        icon: Icons.description_rounded,
+        title: 'Upload PDF/Notes',
+        subtitle: 'Resources and study material',
+        color: const Color(0xFF13B8B2),
+        onTap: onUploadPdfNotes,
+      ),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth > 620 ? 2 : 1;
+        final columns = 2;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -365,7 +362,7 @@ class _CreateActionGrid extends StatelessWidget {
             crossAxisCount: columns,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: columns == 2 ? 2.65 : 3.2,
+            childAspectRatio: constraints.maxWidth > 620 ? 2.65 : 1.55,
           ),
           itemBuilder: (context, index) =>
               _CreateActionCard(data: actions[index]),
@@ -382,63 +379,75 @@ class _CreateActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: data.onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: _SoftCard(
-          child: Row(
-            children: [
-              Container(
-                width: 66,
-                height: 66,
-                decoration: BoxDecoration(
-                  color: data.color.withValues(alpha: 0.13),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(data.icon, color: data.color, size: 34),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 220;
+        return Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            onTap: data.onTap,
+            borderRadius: BorderRadius.circular(20),
+            child: _SoftCard(
+              padding: EdgeInsets.all(compact ? 12 : 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: compact ? 42 : 66,
+                    height: compact ? 42 : 66,
+                    decoration: BoxDecoration(
+                      color: data.color.withValues(alpha: 0.13),
+                      borderRadius: BorderRadius.circular(compact ? 13 : 18),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      data.subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Icon(
+                      data.icon,
+                      color: data.color,
+                      size: compact ? 24 : 34,
                     ),
-                  ],
-                ),
+                  ),
+                  SizedBox(width: compact ? 9 : 16),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data.title,
+                          maxLines: compact ? 2 : 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: compact ? 13 : 17,
+                            fontWeight: FontWeight.w900,
+                            height: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          data.subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: compact ? 11 : 14,
+                            fontWeight: FontWeight.w700,
+                            height: 1.15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.muted,
+                    size: compact ? 20 : 28,
+                  ),
+                ],
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.muted,
-                size: 28,
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -447,19 +456,23 @@ class _CategoryFilters extends StatelessWidget {
   const _CategoryFilters({
     required this.categories,
     required this.selectedCategoryId,
+    required this.selectedStaticFilter,
     required this.onSelected,
+    required this.onStaticSelected,
   });
 
   final List<SkillCategory> categories;
   final int? selectedCategoryId;
+  final String? selectedStaticFilter;
   final ValueChanged<int?> onSelected;
+  final ValueChanged<String?> onStaticSelected;
 
   @override
   Widget build(BuildContext context) {
     final chips = [
       (null, 'All', Icons.check_rounded),
       ...categories
-          .take(6)
+          .take(4)
           .map((category) => (category.id, category.title, null)),
     ];
 
@@ -471,11 +484,23 @@ class _CategoryFilters extends StatelessWidget {
             _CategoryChip(
               label: chip.$2,
               icon: chip.$3,
-              selected: selectedCategoryId == chip.$1,
+              selected:
+                  selectedCategoryId == chip.$1 && selectedStaticFilter == null,
               onTap: () => onSelected(chip.$1),
             ),
             const SizedBox(width: 10),
           ],
+          _CategoryChip(
+            label: 'NGO Events',
+            selected: selectedStaticFilter == 'ngo_events',
+            onTap: () => onStaticSelected('ngo_events'),
+          ),
+          const SizedBox(width: 10),
+          _CategoryChip(
+            label: 'Learning Posts',
+            selected: selectedStaticFilter == 'learning_posts',
+            onTap: () => onStaticSelected('learning_posts'),
+          ),
         ],
       ),
     );
@@ -526,11 +551,13 @@ class _UploadStats extends StatelessWidget {
     required this.drafts,
     required this.pending,
     required this.published,
+    required this.posts,
   });
 
   final int drafts;
   final int pending;
   final int published;
+  final int posts;
 
   @override
   Widget build(BuildContext context) {
@@ -557,11 +584,18 @@ class _UploadStats extends StatelessWidget {
         helper: '${_percent(published, total)}% of total',
         color: AppColors.secondary,
       ),
+      _StatData(
+        icon: Icons.campaign_rounded,
+        label: 'Posts',
+        value: '$posts',
+        helper: 'Learning + NGO posts',
+        color: const Color(0xFF2F8BFF),
+      ),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth > 620 ? 3 : 1;
+        final columns = constraints.maxWidth > 620 ? 4 : 2;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -570,7 +604,7 @@ class _UploadStats extends StatelessWidget {
             crossAxisCount: columns,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: columns == 3 ? 1.75 : 3.7,
+            childAspectRatio: columns == 4 ? 1.55 : 1.7,
           ),
           itemBuilder: (context, index) => _StatCard(data: stats[index]),
         );
@@ -664,7 +698,7 @@ class _RecentUploadsCard extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  'Recent Uploads',
+                  'Recent Content',
                   style: TextStyle(
                     color: AppColors.ink,
                     fontSize: 18,
@@ -681,7 +715,7 @@ class _RecentUploadsCard extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
-                  'No uploads found',
+                  'No content found',
                   style: TextStyle(
                     color: AppColors.muted,
                     fontWeight: FontWeight.w800,
@@ -810,11 +844,13 @@ class _QuickActionsCard extends StatelessWidget {
   const _QuickActionsCard({
     required this.onManageSkills,
     required this.onAddCourse,
+    required this.onCreatePost,
     required this.onViewDrafts,
   });
 
   final VoidCallback onManageSkills;
   final VoidCallback onAddCourse;
+  final VoidCallback onCreatePost;
   final VoidCallback onViewDrafts;
 
   @override
@@ -831,6 +867,12 @@ class _QuickActionsCard extends StatelessWidget {
         label: 'Add Course',
         color: AppColors.secondary,
         onTap: onAddCourse,
+      ),
+      _QuickActionData(
+        icon: Icons.campaign_rounded,
+        label: 'Create Post',
+        color: const Color(0xFF2F8BFF),
+        onTap: onCreatePost,
       ),
       _QuickActionData(
         icon: Icons.description_outlined,
@@ -900,69 +942,6 @@ class _QuickActionButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-    );
-  }
-}
-
-class _CoursePickerSheet extends StatelessWidget {
-  const _CoursePickerSheet({required this.courses});
-
-  final List<Course> courses;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Choose Course',
-              style: TextStyle(
-                color: AppColors.ink,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: courses.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final course = courses[index];
-                  return ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(
-                        color: AppColors.ink.withValues(alpha: 0.08),
-                      ),
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: course.color.withValues(alpha: 0.20),
-                      child: Icon(course.icon, color: AppColors.ink),
-                    ),
-                    title: Text(
-                      course.title,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                    subtitle: Text('${course.lessonCount} lessons'),
-                    onTap: () => Navigator.of(context).pop(course),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1149,43 +1128,20 @@ class _RecentUpload {
     required this.sortDate,
   });
 
-  factory _RecentUpload.course(Course course) => _RecentUpload(
-    title: course.title,
-    typeLabel: 'Course',
-    subtitle: '${course.lessonCount} lessons added',
-    status: 'Published',
-    statusColor: AppColors.secondary,
-    icon: Icons.school_rounded,
-    color: AppColors.secondary,
-    sortDate: DateTime.now().subtract(const Duration(hours: 4)),
-  );
-
-  factory _RecentUpload.event(EventModel event) {
-    final status = _statusForEvent(event.status);
+  factory _RecentUpload.content(CreatorContentItem item) {
+    final colors = _visualForContent(item);
+    final status = _statusForContent(item.status);
     return _RecentUpload(
-      title: event.title,
-      typeLabel: 'Event',
-      subtitle: event.subtitle?.trim().isNotEmpty == true
-          ? event.subtitle!.trim()
-          : event.eventType.displayName,
+      title: item.title,
+      typeLabel: item.typeLabel,
+      subtitle: item.subtitle ?? item.metricLabel,
       status: status.$1,
       statusColor: status.$2,
-      icon: Icons.calendar_month_rounded,
-      color: AppColors.primary,
-      sortDate: event.updatedAt ?? event.createdAt ?? DateTime.now(),
+      icon: colors.$1,
+      color: colors.$2,
+      sortDate: item.updatedAt ?? item.createdAt ?? DateTime.now(),
     );
   }
-
-  factory _RecentUpload.quiz(QuizSummary quiz) => _RecentUpload(
-    title: quiz.title,
-    typeLabel: 'Quiz',
-    subtitle: '${quiz.questionCount} questions',
-    status: quiz.isActive ? 'Published' : 'Draft',
-    statusColor: quiz.isActive ? AppColors.secondary : AppColors.muted,
-    icon: Icons.help_rounded,
-    color: AppColors.accent,
-    sortDate: DateTime.now().subtract(const Duration(hours: 8)),
-  );
 
   final String title;
   final String typeLabel;
@@ -1197,14 +1153,30 @@ class _RecentUpload {
   final DateTime sortDate;
 }
 
-(String, Color) _statusForEvent(EventStatus status) => switch (status) {
-  EventStatus.draft => ('Draft', AppColors.muted),
-  EventStatus.pendingReview => ('Pending Review', AppColors.accent),
-  EventStatus.published ||
-  EventStatus.registrationOpen ||
-  EventStatus.live => ('Published', AppColors.secondary),
-  EventStatus.completed => ('Published', AppColors.secondary),
-  EventStatus.evaluation ||
-  EventStatus.selection ||
-  EventStatus.archived => (status.displayName, AppColors.muted),
+(String, Color) _statusForContent(String status) => switch (status) {
+  'published' => ('Published', AppColors.secondary),
+  'pending_review' => ('Pending Review', AppColors.accent),
+  'completed' => ('Published', AppColors.secondary),
+  'archived' => ('Archived', AppColors.muted),
+  'rejected' => ('Rejected', AppColors.softRed),
+  _ => ('Draft', AppColors.muted),
 };
+
+(IconData, Color) _visualForContent(CreatorContentItem item) {
+  if (item.type == 'post') {
+    final postType = item.meta['post_type'] as String?;
+    return (
+      postType == 'ngo_event_post'
+          ? Icons.record_voice_over_rounded
+          : Icons.campaign_rounded,
+      const Color(0xFF2F8BFF),
+    );
+  }
+  return switch (item.type) {
+    'course' => (Icons.school_rounded, AppColors.secondary),
+    'lesson' => (Icons.video_file_rounded, const Color(0xFF7F5AF0)),
+    'quiz' => (Icons.help_rounded, AppColors.accent),
+    'event' => (Icons.calendar_month_rounded, AppColors.primary),
+    _ => (Icons.article_rounded, AppColors.primary),
+  };
+}

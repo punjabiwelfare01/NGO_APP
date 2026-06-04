@@ -8,7 +8,9 @@ class AppUser {
     required this.level,
     required this.xp,
     this.age,
+    this.email,
     this.dateOfBirth,
+    this.createdAt,
     this.parentEmail,
     this.className,
     this.schoolName,
@@ -22,8 +24,10 @@ class AppUser {
 
   final int id;
   final String name;
+  final String? email;
   final int? age;
   final DateTime? dateOfBirth;
+  final DateTime? createdAt;
   final int level;
   final int xp;
   final String? parentEmail;
@@ -38,8 +42,10 @@ class AppUser {
 
   AppUser copyWith({
     String? name,
+    String? email,
     int? age,
     DateTime? dateOfBirth,
+    DateTime? createdAt,
     String? parentEmail,
     String? className,
     String? schoolName,
@@ -52,10 +58,12 @@ class AppUser {
   }) => AppUser(
     id: id,
     name: name ?? this.name,
+    email: email ?? this.email,
     level: level,
     xp: xp,
     age: age ?? this.age,
     dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+    createdAt: createdAt ?? this.createdAt,
     parentEmail: parentEmail ?? this.parentEmail,
     className: className ?? this.className,
     schoolName: schoolName ?? this.schoolName,
@@ -70,10 +78,14 @@ class AppUser {
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
     id: j['id'] as int,
     name: j['name'] as String,
+    email: j['email'] as String?,
     age: j['age'] as int?,
     dateOfBirth: j['date_of_birth'] == null
         ? null
         : DateTime.parse(j['date_of_birth'] as String),
+    createdAt: j['created_at'] == null
+        ? null
+        : DateTime.parse(j['created_at'] as String),
     level: (j['level'] as int?) ?? 1,
     xp: (j['xp'] as int?) ?? 0,
     parentEmail: j['parent_email'] as String?,

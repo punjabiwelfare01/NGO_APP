@@ -12,3 +12,4 @@ from .emergency import EmergencyContact
 from .chat import ChatMessage
 from .notification import AdminNotification
 from .calendar import StudentReminder
+from .creator_post import CreatorPost

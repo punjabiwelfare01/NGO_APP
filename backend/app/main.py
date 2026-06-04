@@ -22,6 +22,7 @@ from .models import (  # noqa: F401 — registers all ORM models before create_a
     ChatMessage,
     AdminNotification,
     StudentReminder,
+    CreatorPost,
 )
 from .database import Base
 from .dev_migrations import ensure_sqlite_schema

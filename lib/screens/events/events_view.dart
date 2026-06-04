@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app_state.dart';
 import '../../models/auth_models.dart';
+import '../calendar/student_calendar_view.dart';
 import 'admin/event_manager_screen.dart';
-import 'student/event_list_screen.dart';
 
 class EventsView extends StatelessWidget {
   const EventsView({super.key});
@@ -17,6 +17,6 @@ class EventsView extends StatelessWidget {
         role.isContentCreator) {
       return const EventManagerScreen();
     }
-    return const EventListScreen();
+    return const StudentCalendarView();
   }
 }

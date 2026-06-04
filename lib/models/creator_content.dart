@@ -75,6 +75,10 @@ class CreatorContentItem {
           : 'Lesson',
     'quiz' => 'Quiz',
     'event' => 'Event Content',
+    'post' =>
+      (meta['post_type'] as String?)?.trim().isNotEmpty == true
+          ? _titleCase(meta['post_type'] as String)
+          : 'Post',
     _ => _titleCase(type),
   };
 

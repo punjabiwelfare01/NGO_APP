@@ -3,33 +3,145 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/colors.dart';
+import '../../models/api_models.dart';
+import '../../models/creator_content.dart';
+import '../../repositories/creator_repository.dart';
+import '../../viewmodels/auth_viewmodel.dart';
+import '../../viewmodels/profile_viewmodel.dart';
+import '../../viewmodels/view_state.dart';
 
-class ContentCreatorProfileView extends StatelessWidget {
+class ContentCreatorProfileView extends StatefulWidget {
   const ContentCreatorProfileView({super.key});
 
   @override
+  State<ContentCreatorProfileView> createState() =>
+      _ContentCreatorProfileViewState();
+}
+
+class _ContentCreatorProfileViewState extends State<ContentCreatorProfileView> {
+  late final ProfileViewModel _vm;
+  late final AuthViewModel _authVm;
+  List<CreatorContentItem> _content = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _vm = ProfileViewModel()..load();
+    _authVm = AuthViewModel();
+    _loadContentStats();
+  }
+
+  @override
+  void dispose() {
+    _vm.dispose();
+    _authVm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadContentStats() async {
+    try {
+      final items = await CreatorRepository.getContent();
+      if (mounted) setState(() => _content = items);
+    } catch (_) {
+      if (mounted) setState(() => _content = const []);
+    }
+  }
+
+  Future<void> _logout() async {
+    await _authVm.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed('/login');
+  }
+
+  void _showComingSoon(String label) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$label will be available soon.')));
+  }
+
+  Future<void> _openEditProfile() async {
+    final user = _vm.user;
+    if (user == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditCreatorProfileSheet(
+        user: user,
+        onSave: (name, phone, location, organization) async {
+          final ok = await _vm.updateProfile(
+            name: name,
+            phone: phone,
+            location: location,
+            schoolName: organization,
+          );
+          if (!mounted) return;
+          if (ok) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile updated successfully.')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(_vm.updateError ?? 'Failed to update profile.'),
+                backgroundColor: AppColors.softRed,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-      children: const [
-        _ProfileHeader(),
-        SizedBox(height: 18),
-        _CreatorHeroCard(),
-        SizedBox(height: 16),
-        _ProfileStats(),
-        SizedBox(height: 16),
-        _InfoSection(),
-        SizedBox(height: 16),
-        _ActivitySection(),
-        SizedBox(height: 16),
-        _SupportSection(),
-      ],
+    return ListenableBuilder(
+      listenable: _vm,
+      builder: (context, _) {
+        if (_vm.state == ViewState.loading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (_vm.state == ViewState.error) {
+          return _ErrorView(message: _vm.errorMessage, onRetry: _vm.load);
+        }
+
+        final user = _vm.user;
+        return RefreshIndicator(
+          onRefresh: () async {
+            await _vm.load();
+            await _loadContentStats();
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+            children: [
+              _ProfileHeader(onSettingsTap: () => _showComingSoon('Settings')),
+              const SizedBox(height: 18),
+              _CreatorHeroCard(
+                user: user,
+                completion: _profileCompletion(user),
+                onEditProfile: _openEditProfile,
+              ),
+              const SizedBox(height: 16),
+              _ProfileStats(content: _content),
+              const SizedBox(height: 16),
+              _InfoSection(user: user),
+              const SizedBox(height: 16),
+              _ActivitySection(onTap: _showComingSoon),
+              const SizedBox(height: 16),
+              _SupportSection(onTap: _showComingSoon, onLogout: _logout),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader();
+  const _ProfileHeader({required this.onSettingsTap});
+
+  final VoidCallback onSettingsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +159,7 @@ class _ProfileHeader extends StatelessWidget {
           ),
         ),
         IconButton.filledTonal(
-          onPressed: () {},
+          onPressed: onSettingsTap,
           tooltip: 'Settings',
           icon: const Icon(Icons.settings_outlined),
         ),
@@ -57,10 +169,20 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _CreatorHeroCard extends StatelessWidget {
-  const _CreatorHeroCard();
+  const _CreatorHeroCard({
+    required this.user,
+    required this.completion,
+    required this.onEditProfile,
+  });
+
+  final AppUser? user;
+  final int completion;
+  final VoidCallback onEditProfile;
 
   @override
   Widget build(BuildContext context) {
+    final name = _value(user?.name, fallback: 'Content Creator');
+    final email = _value(user?.email, fallback: 'Email not added');
     return _SoftCard(
       padding: const EdgeInsets.all(18),
       child: LayoutBuilder(
@@ -69,11 +191,11 @@ class _CreatorHeroCard extends StatelessWidget {
           final details = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Aarav Sharma',
+              Text(
+                name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   color: AppColors.ink,
                   fontSize: 23,
                   fontWeight: FontWeight.w900,
@@ -81,23 +203,23 @@ class _CreatorHeroCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 9),
-              const _RoleBadge(),
+              _RoleBadge(role: user?.role),
               const SizedBox(height: 12),
-              const Row(
+              Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.mail_outline_rounded,
                     color: AppColors.muted,
                     size: 18,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      'aarav@careskill.org',
+                      email,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -108,7 +230,7 @@ class _CreatorHeroCard extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: onEditProfile,
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: const Text('Edit Profile'),
                 style: OutlinedButton.styleFrom(
@@ -129,13 +251,13 @@ class _CreatorHeroCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _CreatorAvatar(size: 92),
+                    _CreatorAvatar(size: 92, name: name),
                     const SizedBox(width: 14),
                     Expanded(child: details),
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Center(child: _ProfileCompletion()),
+                Center(child: _ProfileCompletion(percent: completion)),
               ],
             );
           }
@@ -143,11 +265,11 @@ class _CreatorHeroCard extends StatelessWidget {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const _CreatorAvatar(size: 116),
+              _CreatorAvatar(size: 116, name: name),
               const SizedBox(width: 18),
               Expanded(child: details),
               const SizedBox(width: 12),
-              const _ProfileCompletion(),
+              _ProfileCompletion(percent: completion),
             ],
           );
         },
@@ -157,12 +279,14 @@ class _CreatorHeroCard extends StatelessWidget {
 }
 
 class _CreatorAvatar extends StatelessWidget {
-  const _CreatorAvatar({required this.size});
+  const _CreatorAvatar({required this.size, required this.name});
 
   final double size;
+  final String name;
 
   @override
   Widget build(BuildContext context) {
+    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     return Container(
       width: size,
       height: size,
@@ -177,33 +301,24 @@ class _CreatorAvatar extends StatelessWidget {
           ],
         ),
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Icon(
-            Icons.person_rounded,
-            color: AppColors.ink.withValues(alpha: 0.70),
-            size: size * 0.52,
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: AppColors.primary,
+            fontSize: size * 0.42,
+            fontWeight: FontWeight.w900,
           ),
-          Positioned(
-            bottom: size * 0.12,
-            child: Container(
-              width: size * 0.46,
-              height: size * 0.18,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.70),
-                borderRadius: BorderRadius.circular(size * 0.10),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _ProfileCompletion extends StatelessWidget {
-  const _ProfileCompletion();
+  const _ProfileCompletion({required this.percent});
+
+  final int percent;
 
   @override
   Widget build(BuildContext context) {
@@ -214,7 +329,7 @@ class _ProfileCompletion extends StatelessWidget {
           width: 84,
           height: 84,
           child: CustomPaint(
-            painter: _ProgressRingPainter(progress: 0.85),
+            painter: _ProgressRingPainter(progress: percent / 100),
             child: const Icon(
               Icons.person_rounded,
               color: AppColors.muted,
@@ -229,9 +344,9 @@ class _ProfileCompletion extends StatelessWidget {
             color: AppColors.secondary.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Text(
-            'Profile 85% complete',
-            style: TextStyle(
+          child: Text(
+            'Profile $percent% complete',
+            style: const TextStyle(
               color: Color(0xFF17A34A),
               fontSize: 12,
               fontWeight: FontWeight.w900,
@@ -244,7 +359,9 @@ class _ProfileCompletion extends StatelessWidget {
 }
 
 class _RoleBadge extends StatelessWidget {
-  const _RoleBadge();
+  const _RoleBadge({required this.role});
+
+  final String? role;
 
   @override
   Widget build(BuildContext context) {
@@ -254,9 +371,9 @@ class _RoleBadge extends StatelessWidget {
         color: AppColors.primary.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Text(
-        'Content Creator',
-        style: TextStyle(
+      child: Text(
+        _roleLabel(role),
+        style: const TextStyle(
           color: Color(0xFF0966D8),
           fontSize: 13,
           fontWeight: FontWeight.w900,
@@ -268,37 +385,43 @@ class _RoleBadge extends StatelessWidget {
 }
 
 class _ProfileStats extends StatelessWidget {
-  const _ProfileStats();
+  const _ProfileStats({required this.content});
+
+  final List<CreatorContentItem> content;
 
   @override
   Widget build(BuildContext context) {
+    final published = content
+        .where((item) => item.status == 'published')
+        .length;
+    final totalViews = content.fold<int>(0, (sum, item) => sum + item.views);
+    final stats = [
+      _StatData(
+        icon: Icons.description_rounded,
+        label: 'Total Content',
+        value: '${content.length}',
+        helper: 'All time',
+        color: AppColors.primary,
+      ),
+      _StatData(
+        icon: Icons.task_alt_rounded,
+        label: 'Published',
+        value: '$published',
+        helper: '${_percent(published, content.length)}% of total',
+        color: AppColors.secondary,
+      ),
+      _StatData(
+        icon: Icons.visibility_rounded,
+        label: 'Total Views',
+        value: _shortNumber(totalViews),
+        helper: 'All time',
+        color: const Color(0xFF2E7CF6),
+      ),
+    ];
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = constraints.maxWidth > 620 ? 3 : 1;
-        final stats = const [
-          _StatData(
-            icon: Icons.description_rounded,
-            label: 'Total Content',
-            value: '24',
-            helper: 'All time',
-            color: AppColors.primary,
-          ),
-          _StatData(
-            icon: Icons.task_alt_rounded,
-            label: 'Published',
-            value: '16',
-            helper: '67% of total',
-            color: AppColors.secondary,
-          ),
-          _StatData(
-            icon: Icons.visibility_rounded,
-            label: 'Total Views',
-            value: '12.4K',
-            helper: 'All time',
-            color: Color(0xFF2E7CF6),
-          ),
-        ];
-
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -381,35 +504,43 @@ class _ProfileStatCard extends StatelessWidget {
 }
 
 class _InfoSection extends StatelessWidget {
-  const _InfoSection();
+  const _InfoSection({required this.user});
+
+  final AppUser? user;
 
   @override
   Widget build(BuildContext context) {
-    return const _SectionCard(
+    return _SectionCard(
       title: 'Personal Information',
       rows: [
         _ProfileRow(
           icon: Icons.phone_outlined,
           label: 'Phone',
-          value: '+91 98765 43210',
+          value: _value(user?.phone),
           color: AppColors.primary,
         ),
         _ProfileRow(
           icon: Icons.location_on_outlined,
           label: 'Location',
-          value: 'Jaipur, India',
+          value: _value(user?.location),
           color: AppColors.primary,
         ),
         _ProfileRow(
           icon: Icons.apartment_rounded,
           label: 'Organization',
-          value: 'CareSkill NGO',
+          value: _value(user?.schoolName, fallback: 'CareSkill NGO'),
           color: AppColors.primary,
+        ),
+        _ProfileRow(
+          icon: Icons.verified_user_outlined,
+          label: 'Status',
+          value: _statusLabel(user?.accessStatus),
+          color: AppColors.secondary,
         ),
         _ProfileRow(
           icon: Icons.calendar_month_outlined,
           label: 'Joined',
-          value: 'May 2026',
+          value: _formatMonth(user?.createdAt),
           color: AppColors.primary,
           showDivider: false,
         ),
@@ -419,11 +550,13 @@ class _InfoSection extends StatelessWidget {
 }
 
 class _ActivitySection extends StatelessWidget {
-  const _ActivitySection();
+  const _ActivitySection({required this.onTap});
+
+  final ValueChanged<String> onTap;
 
   @override
   Widget build(BuildContext context) {
-    return const _SectionCard(
+    return _SectionCard(
       title: 'My Activity',
       rows: [
         _ProfileRow(
@@ -431,19 +564,22 @@ class _ActivitySection extends StatelessWidget {
           label: 'My Content',
           color: AppColors.primary,
           trailing: Icons.chevron_right_rounded,
+          onTap: () => onTap('My Content'),
         ),
         _ProfileRow(
           icon: Icons.schedule_rounded,
           label: 'Drafts & Pending Review',
           color: AppColors.accent,
           trailing: Icons.chevron_right_rounded,
+          onTap: () => onTap('Drafts & Pending Review'),
         ),
         _ProfileRow(
           icon: Icons.bar_chart_rounded,
           label: 'Performance Reports',
-          color: Color(0xFF7F5AF0),
+          color: const Color(0xFF7F5AF0),
           trailing: Icons.chevron_right_rounded,
           showDivider: false,
+          onTap: () => onTap('Performance Reports'),
         ),
       ],
     );
@@ -451,11 +587,14 @@ class _ActivitySection extends StatelessWidget {
 }
 
 class _SupportSection extends StatelessWidget {
-  const _SupportSection();
+  const _SupportSection({required this.onTap, required this.onLogout});
+
+  final ValueChanged<String> onTap;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
-    return const _SectionCard(
+    return _SectionCard(
       title: 'Account & Support',
       rows: [
         _ProfileRow(
@@ -463,18 +602,21 @@ class _SupportSection extends StatelessWidget {
           label: 'Notifications',
           color: AppColors.primary,
           trailing: Icons.chevron_right_rounded,
+          onTap: () => onTap('Notifications'),
         ),
         _ProfileRow(
           icon: Icons.shield_outlined,
           label: 'Privacy & Security',
           color: AppColors.secondary,
           trailing: Icons.chevron_right_rounded,
+          onTap: () => onTap('Privacy & Security'),
         ),
         _ProfileRow(
           icon: Icons.help_outline_rounded,
           label: 'Help & Support',
-          color: Color(0xFF7F5AF0),
+          color: const Color(0xFF7F5AF0),
           trailing: Icons.chevron_right_rounded,
+          onTap: () => onTap('Help & Support'),
         ),
         _ProfileRow(
           icon: Icons.logout_rounded,
@@ -483,6 +625,7 @@ class _SupportSection extends StatelessWidget {
           labelColor: Colors.red,
           trailing: Icons.chevron_right_rounded,
           showDivider: false,
+          onTap: onLogout,
         ),
       ],
     );
@@ -527,6 +670,7 @@ class _ProfileRow extends StatelessWidget {
     this.trailing,
     this.labelColor,
     this.showDivider = true,
+    this.onTap,
   });
 
   final IconData icon;
@@ -536,10 +680,11 @@ class _ProfileRow extends StatelessWidget {
   final Color color;
   final Color? labelColor;
   final bool showDivider;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final row = Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -589,6 +734,184 @@ class _ProfileRow extends StatelessWidget {
         if (showDivider)
           Divider(height: 1, color: AppColors.ink.withValues(alpha: 0.08)),
       ],
+    );
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
+  }
+}
+
+class _EditCreatorProfileSheet extends StatefulWidget {
+  const _EditCreatorProfileSheet({required this.user, required this.onSave});
+
+  final AppUser user;
+  final Future<void> Function(
+    String name,
+    String phone,
+    String location,
+    String organization,
+  )
+  onSave;
+
+  @override
+  State<_EditCreatorProfileSheet> createState() =>
+      _EditCreatorProfileSheetState();
+}
+
+class _EditCreatorProfileSheetState extends State<_EditCreatorProfileSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _phoneCtrl;
+  late final TextEditingController _locationCtrl;
+  late final TextEditingController _orgCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.user.name);
+    _phoneCtrl = TextEditingController(text: widget.user.phone ?? '');
+    _locationCtrl = TextEditingController(text: widget.user.location ?? '');
+    _orgCtrl = TextEditingController(text: widget.user.schoolName ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _locationCtrl.dispose();
+    _orgCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        18,
+        18,
+        18,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Edit Profile',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _EditField(controller: _nameCtrl, label: 'Name'),
+            const SizedBox(height: 12),
+            _EditField(controller: _phoneCtrl, label: 'Phone'),
+            const SizedBox(height: 12),
+            _EditField(controller: _locationCtrl, label: 'Location'),
+            const SizedBox(height: 12),
+            _EditField(controller: _orgCtrl, label: 'Organization'),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving
+                    ? null
+                    : () async {
+                        setState(() => _saving = true);
+                        await widget.onSave(
+                          _nameCtrl.text.trim(),
+                          _phoneCtrl.text.trim(),
+                          _locationCtrl.text.trim(),
+                          _orgCtrl.text.trim(),
+                        );
+                        if (mounted) setState(() => _saving = false);
+                      },
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Save Profile'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditField extends StatelessWidget {
+  const _EditField({required this.controller, required this.label});
+
+  final TextEditingController controller;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: AppColors.background,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+
+  final String? message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              color: AppColors.muted,
+              size: 42,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message ?? 'Failed to load profile.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 14),
+            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -648,7 +971,7 @@ class _ProgressRingPainter extends CustomPainter {
     canvas.drawArc(
       ringRect,
       -math.pi / 2,
-      math.pi * 2 * progress,
+      math.pi * 2 * progress.clamp(0, 1),
       false,
       progressPaint,
     );
@@ -674,4 +997,74 @@ class _StatData {
   final String value;
   final String helper;
   final Color color;
+}
+
+int _profileCompletion(AppUser? user) {
+  if (user == null) return 0;
+  final fields = [
+    user.name,
+    user.email,
+    user.phone,
+    user.location,
+    user.schoolName,
+    user.role,
+    user.accessStatus,
+  ];
+  final filled = fields
+      .where((value) => value?.trim().isNotEmpty ?? false)
+      .length;
+  return ((filled / fields.length) * 100).round();
+}
+
+int _percent(int value, int total) {
+  if (total == 0) return 0;
+  return ((value / total) * 100).round();
+}
+
+String _value(String? value, {String fallback = 'Not added'}) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? fallback : trimmed;
+}
+
+String _roleLabel(String? role) => switch (role) {
+  'content_creator' => 'Content Creator',
+  'mentor' => 'Counsellor',
+  'admin' => 'Admin',
+  'super_admin' => 'Super Admin',
+  'event_manager' => 'Event Manager',
+  'support_staff' => 'Support Staff',
+  'student' => 'Student',
+  _ => 'Content Creator',
+};
+
+String _statusLabel(String? status) => switch (status) {
+  'approved' => 'Approved',
+  'pending_verification' => 'Pending Verification',
+  'rejected' => 'Rejected',
+  'deactivated' => 'Deactivated',
+  _ => 'Unknown',
+};
+
+String _formatMonth(DateTime? date) {
+  if (date == null) return 'Not available';
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${months[date.month - 1]} ${date.year}';
+}
+
+String _shortNumber(int value) {
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
+  return '$value';
 }

@@ -10,11 +10,38 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..dependencies import content_creator_or_above
 from ..models.course import Course, Lesson
+from ..models.creator_post import CreatorPost
 from ..models.event import Event, EventStatus
 from ..models.quiz import Quiz, QuizAttempt
 from ..models.user import User, UserRole
 
 router = APIRouter(prefix="/creator", tags=["Creator Content"])
+
+POST_TYPES = {
+    "learning_post",
+    "ngo_event_post",
+    "announcement",
+    "awareness_post",
+    "motivation_post",
+}
+POST_CATEGORIES = {
+    "Communication Skill",
+    "Digital Literacy",
+    "Career Guidance",
+    "Safety Awareness",
+    "Financial Literacy",
+    "Counselling",
+    "NGO Activity",
+    "Event Update",
+}
+POST_VISIBILITIES = {
+    "all_students",
+    "specific_course_students",
+    "event_registered_students",
+    "mentors_only",
+    "public_feed",
+}
+POST_STATUSES = {"draft", "pending_review", "published"}
 
 
 def _is_admin(user: User) -> bool:
@@ -138,6 +165,36 @@ def _event_item(event: Event) -> dict[str, Any]:
     }
 
 
+def _post_item(post: CreatorPost) -> dict[str, Any]:
+    attached = None
+    if post.attached_course:
+        attached = {"type": "course", "id": post.attached_course.id, "title": post.attached_course.title}
+    elif post.attached_event:
+        attached = {"type": "event", "id": post.attached_event.id, "title": post.attached_event.title}
+    elif post.attached_quiz:
+        attached = {"type": "quiz", "id": post.attached_quiz.id, "title": post.attached_quiz.title}
+
+    return {
+        "id": post.id,
+        "title": post.title,
+        "type": "post",
+        "status": post.status,
+        "views": 0,
+        "completion_rate": None,
+        "created_at": _dt(post.created_at),
+        "updated_at": _dt(post.updated_at),
+        "category": post.category,
+        "subtitle": post.post_type.replace("_", " ").title(),
+        "meta": {
+            "post_type": post.post_type,
+            "description": post.description,
+            "image_url": post.image_url,
+            "visibility": post.visibility,
+            "attached": attached,
+        },
+    }
+
+
 def _matches(item: dict[str, Any], status: str | None, type_: str | None, search: str | None) -> bool:
     if status and item["status"] != status:
         return False
@@ -155,6 +212,10 @@ def _all_items(db: Session, user: User) -> list[dict[str, Any]]:
     if not _is_admin(user):
         event_query = event_query.filter(Event.created_by == user.id)
 
+    post_query = db.query(CreatorPost)
+    if not _is_admin(user):
+        post_query = post_query.filter(CreatorPost.created_by == user.id)
+
     items = [
         *[_course_item(course) for course in db.query(Course).all()],
         *[_lesson_item(lesson) for lesson in db.query(Lesson).all()],
@@ -163,6 +224,7 @@ def _all_items(db: Session, user: User) -> list[dict[str, Any]]:
             for quiz in db.query(Quiz).filter(or_(Quiz.created_by == user.id, Quiz.created_by.is_(None))).all()
         ],
         *[_event_item(event) for event in event_query.all()],
+        *[_post_item(post) for post in post_query.all()],
     ]
     items.sort(key=lambda item: item.get("updated_at") or item.get("created_at") or "", reverse=True)
     return items
@@ -186,6 +248,77 @@ def list_creator_content(
     return {"items": items}
 
 
+def _clean_optional_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    return int(value)
+
+
+def _validate_post_payload(data: dict[str, Any], partial: bool = False) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+    required = {"post_type", "title", "description", "category", "visibility", "status"}
+    missing = [
+        field
+        for field in required
+        if not partial and (data.get(field) is None or str(data.get(field)).strip() == "")
+    ]
+    if missing:
+        raise HTTPException(status_code=422, detail=f"Missing fields: {', '.join(missing)}")
+
+    text_fields = {"post_type", "title", "description", "category", "image_url", "visibility", "status"}
+    for field in text_fields:
+        if field in data:
+            value = data.get(field)
+            cleaned[field] = value.strip() if isinstance(value, str) else value
+
+    for field in ("attached_course_id", "attached_event_id", "attached_quiz_id"):
+        if field in data:
+            cleaned[field] = _clean_optional_int(data.get(field))
+
+    post_type = cleaned.get("post_type")
+    if post_type is not None and post_type not in POST_TYPES:
+        raise HTTPException(status_code=422, detail="Unsupported post type")
+    category = cleaned.get("category")
+    if category is not None and category not in POST_CATEGORIES:
+        raise HTTPException(status_code=422, detail="Unsupported category")
+    visibility = cleaned.get("visibility")
+    if visibility is not None and visibility not in POST_VISIBILITIES:
+        raise HTTPException(status_code=422, detail="Unsupported visibility")
+    status = cleaned.get("status")
+    if status is not None and status not in POST_STATUSES:
+        raise HTTPException(status_code=422, detail="Unsupported status")
+    return cleaned
+
+
+@router.get("/posts")
+def list_creator_posts(
+    status: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(content_creator_or_above),
+):
+    query = db.query(CreatorPost)
+    if not _is_admin(current_user):
+        query = query.filter(CreatorPost.created_by == current_user.id)
+    if status:
+        query = query.filter(CreatorPost.status == status.lower())
+    posts = query.order_by(CreatorPost.updated_at.desc()).all()
+    return {"items": [_post_item(post) for post in posts]}
+
+
+@router.post("/posts")
+def create_creator_post(
+    data: dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(content_creator_or_above),
+):
+    cleaned = _validate_post_payload(data)
+    post = CreatorPost(**cleaned, created_by=current_user.id)
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+    return _post_item(post)
+
+
 def _object_or_404(db: Session, user: User, type_: str, id_: int):
     if type_ == "course":
         obj = db.query(Course).filter(Course.id == id_).first()
@@ -198,6 +331,10 @@ def _object_or_404(db: Session, user: User, type_: str, id_: int):
     elif type_ == "event":
         obj = db.query(Event).filter(Event.id == id_).first()
         if obj and not _can_access_event(obj, user):
+            raise HTTPException(status_code=403, detail="Access denied")
+    elif type_ == "post":
+        obj = db.query(CreatorPost).filter(CreatorPost.id == id_).first()
+        if obj and not _is_admin(user) and obj.created_by != user.id:
             raise HTTPException(status_code=403, detail="Access denied")
     else:
         raise HTTPException(status_code=400, detail="Unsupported content type")
@@ -213,7 +350,9 @@ def _item_for_object(obj) -> dict[str, Any]:
         return _lesson_item(obj)
     if isinstance(obj, Quiz):
         return _quiz_item(obj)
-    return _event_item(obj)
+    if isinstance(obj, Event):
+        return _event_item(obj)
+    return _post_item(obj)
 
 
 @router.get("/content/{type}/{id}")
@@ -236,6 +375,15 @@ def update_creator_content(
     current_user: User = Depends(content_creator_or_above),
 ):
     obj = _object_or_404(db, current_user, type.lower(), id)
+    if isinstance(obj, CreatorPost):
+        cleaned = _validate_post_payload(data, partial=True)
+        for field, value in cleaned.items():
+            if hasattr(obj, field):
+                setattr(obj, field, value)
+        db.commit()
+        db.refresh(obj)
+        return _item_for_object(obj)
+
     allowed_fields = {"title", "description", "subtitle", "course_description"}
     for field, value in data.items():
         if field in allowed_fields and hasattr(obj, field):
@@ -267,6 +415,8 @@ def submit_creator_content_review(
     obj = _object_or_404(db, current_user, type.lower(), id)
     if isinstance(obj, Event):
         obj.status = EventStatus.pending_review
+    elif isinstance(obj, CreatorPost):
+        obj.status = "pending_review"
     elif isinstance(obj, Lesson):
         obj.is_published = False
     elif isinstance(obj, Quiz):
@@ -286,6 +436,8 @@ def publish_creator_content(
     obj = _object_or_404(db, current_user, type.lower(), id)
     if isinstance(obj, Event):
         obj.status = EventStatus.published
+    elif isinstance(obj, CreatorPost):
+        obj.status = "published"
     elif isinstance(obj, Lesson):
         obj.is_published = True
     elif isinstance(obj, Quiz):
@@ -305,6 +457,8 @@ def unpublish_creator_content(
     obj = _object_or_404(db, current_user, type.lower(), id)
     if isinstance(obj, Event):
         obj.status = EventStatus.draft
+    elif isinstance(obj, CreatorPost):
+        obj.status = "draft"
     elif isinstance(obj, Lesson):
         obj.is_published = False
     elif isinstance(obj, Quiz):

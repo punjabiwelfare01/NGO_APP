@@ -1,4 +1,5 @@
 import '../models/creator_content.dart';
+import '../models/creator_post.dart';
 import 'api_client.dart';
 
 class CreatorRepository {
@@ -31,6 +32,21 @@ class CreatorRepository {
   }) async {
     final json =
         await ApiClient.get('/creator/content/$type/$id')
+            as Map<String, dynamic>;
+    return CreatorContentItem.fromJson(json);
+  }
+
+  static Future<List<CreatorPostItem>> getPosts({String? status}) async {
+    final path = status == null || status.isEmpty
+        ? '/creator/posts'
+        : '/creator/posts?status=${Uri.encodeQueryComponent(status)}';
+    final json = await ApiClient.get(path) as Map<String, dynamic>;
+    return CreatorContentResponse.fromJson(json).items;
+  }
+
+  static Future<CreatorPostItem> createPost(CreatorPostDraft draft) async {
+    final json =
+        await ApiClient.post('/creator/posts', draft.toJson())
             as Map<String, dynamic>;
     return CreatorContentItem.fromJson(json);
   }

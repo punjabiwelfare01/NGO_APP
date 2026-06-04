@@ -7,7 +7,6 @@ import 'models/auth_models.dart';
 import 'models/skill_category.dart';
 import 'repositories/auth0_strategy.dart';
 import 'repositories/auth_repository.dart';
-import 'screens/admin/admin_dashboard_view.dart';
 import 'screens/admin/pending_approvals_screen.dart';
 import 'screens/auth/auth_page.dart';
 import 'screens/auth/pending_approval_screen.dart';
@@ -153,11 +152,7 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      // Admin/super-admin see the dedicated management dashboard on Home tab.
-      if (AppState.role.isAdmin)
-        const AdminDashboardView()
-      else
-        HomeView(onOpenLearn: _openLearn),
+      HomeView(onOpenLearn: _openLearn),
       LearnView(
         key: ValueKey('learn-$_learnOpenVersion'),
         initialCategory: _selectedLearnCategory,
@@ -189,9 +184,9 @@ class _AppShellState extends State<AppShell> {
             label: 'Learn',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.event_outlined),
-            selectedIcon: Icon(Icons.event_rounded),
-            label: 'Events',
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month_rounded),
+            label: 'Calendar',
           ),
           const NavigationDestination(
             icon: Icon(Icons.support_agent_outlined),

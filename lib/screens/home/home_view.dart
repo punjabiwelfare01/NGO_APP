@@ -17,7 +17,12 @@ import '../../widgets/app_scroll_view.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/top_header.dart';
 import '../admin/pending_approvals_screen.dart';
+import '../admin/user_management_screen.dart';
+import '../events/admin/event_manager_screen.dart';
+import '../helping_support/admin/counselling_admin_screen.dart';
+import '../helping_support/admin/emergency_contacts_admin_screen.dart';
 import '../helping_support/student/all_slots_screen.dart';
+import '../home/admin/safety_awareness_manager_screen.dart';
 import 'widgets/counselling_session_card.dart';
 import 'widgets/daily_challenge_card.dart';
 import 'widgets/daily_motivation_card.dart';
@@ -224,19 +229,43 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
               ),
             ),
 
-            // ── Admin: pending approvals card ──────────────────────────
+            // ── Admin: analytics + management tools ───────────────────
             if (AppState.role.isAdmin && _adminVm != null)
               ListenableBuilder(
                 listenable: _adminVm!,
-                builder: (_, _) => _AdminDashboardCard(
-                  pendingCount: _adminVm!.pendingCount,
-                  unreadCount: _adminVm!.unreadCount,
+                builder: (_, _) => _AdminAnalyticsSection(
+                  vm: _adminVm!,
                   onViewPending: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const PendingApprovalsScreen(),
                     ),
                   ),
                   onViewNotifications: _openAdminNotifications,
+                  onOpenUsers: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => UserManagementScreen(vm: _adminVm!),
+                    ),
+                  ),
+                  onOpenEvents: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const EventManagerScreen(),
+                    ),
+                  ),
+                  onOpenCounselling: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CounsellingAdminScreen(),
+                    ),
+                  ),
+                  onOpenSafety: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SafetyAwarenessManagerScreen(),
+                    ),
+                  ),
+                  onOpenEmergency: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const EmergencyContactsAdminScreen(),
+                    ),
+                  ),
                 ),
               ),
 
@@ -1044,28 +1073,37 @@ class _HelpChip extends StatelessWidget {
   }
 }
 
-// ── Admin dashboard card ──────────────────────────────────────────────────────
+// ── Admin analytics section ───────────────────────────────────────────────────
 
-class _AdminDashboardCard extends StatelessWidget {
-  const _AdminDashboardCard({
-    required this.pendingCount,
-    required this.unreadCount,
+class _AdminAnalyticsSection extends StatelessWidget {
+  const _AdminAnalyticsSection({
+    required this.vm,
     required this.onViewPending,
     required this.onViewNotifications,
+    required this.onOpenUsers,
+    required this.onOpenEvents,
+    required this.onOpenCounselling,
+    required this.onOpenSafety,
+    required this.onOpenEmergency,
   });
 
-  final int pendingCount;
-  final int unreadCount;
+  final AdminViewModel vm;
   final VoidCallback onViewPending;
   final VoidCallback onViewNotifications;
+  final VoidCallback onOpenUsers;
+  final VoidCallback onOpenEvents;
+  final VoidCallback onOpenCounselling;
+  final VoidCallback onOpenSafety;
+  final VoidCallback onOpenEmergency;
 
   @override
   Widget build(BuildContext context) {
+    final stats = vm.stats;
     return AppCard(
-      color: AppColors.primary.withValues(alpha: 0.05),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header row
           Row(
             children: [
               Container(
@@ -1082,49 +1120,117 @@ class _AdminDashboardCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               const Expanded(
-                child: Text(
-                  'Admin Overview',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.ink,
-                    fontSize: 15,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Admin Analytics',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.ink,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      'Platform overview & management',
+                      style: TextStyle(color: AppColors.muted, fontSize: 12),
+                    ),
+                  ],
                 ),
+              ),
+              // Notification bell with badge
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton.filledTonal(
+                    onPressed: onViewNotifications,
+                    tooltip: 'Notifications',
+                    icon: const Icon(Icons.notifications_rounded),
+                  ),
+                  if (vm.unreadCount > 0)
+                    Positioned(
+                      top: 3,
+                      right: 3,
+                      child: IgnorePointer(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.softRed,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 17),
+                          child: Text(
+                            vm.unreadCount > 99 ? '99+' : '${vm.unreadCount}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 14),
-          Row(
+
+          // Stats grid: 2×2
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 2.6,
             children: [
-              Expanded(
-                child: _AdminStatTile(
-                  icon: Icons.pending_actions_rounded,
-                  label: 'Pending\nApprovals',
-                  count: pendingCount,
-                  color: const Color(0xFFFF8C00),
-                  onTap: onViewPending,
-                ),
+              _StatTile(
+                icon: Icons.people_alt_rounded,
+                label: 'Total Users',
+                value: stats.totalUsers,
+                color: AppColors.ink,
+                onTap: onOpenUsers,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _AdminStatTile(
-                  icon: Icons.notifications_active_rounded,
-                  label: 'Unread\nNotifications',
-                  count: unreadCount,
-                  color: AppColors.secondary,
-                  onTap: onViewNotifications,
-                ),
+              _StatTile(
+                icon: Icons.verified_user_rounded,
+                label: 'Active Users',
+                value: stats.activeUsers,
+                color: AppColors.secondary,
+                onTap: onOpenUsers,
+              ),
+              _StatTile(
+                icon: Icons.schedule_rounded,
+                label: 'Pending Approvals',
+                value: vm.pendingCount,
+                color: const Color(0xFFFF8C00),
+                onTap: onViewPending,
+              ),
+              _StatTile(
+                icon: Icons.block_rounded,
+                label: 'Blocked Users',
+                value: stats.blockedUsers,
+                color: AppColors.softRed,
+                onTap: onOpenUsers,
               ),
             ],
           ),
-          if (pendingCount > 0) ...[
+
+          if (vm.pendingCount > 0) ...[
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: onViewPending,
               icon: const Icon(Icons.fact_check_outlined, size: 16),
-              label: Text('Review $pendingCount pending ${pendingCount == 1 ? "request" : "requests"}'),
+              label: Text(
+                'Review ${vm.pendingCount} pending ${vm.pendingCount == 1 ? "request" : "requests"}',
+              ),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: const Color(0xFFFF8C00),
                 minimumSize: const Size(double.infinity, 40),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -1132,24 +1238,89 @@ class _AdminDashboardCard extends StatelessWidget {
               ),
             ),
           ],
+
+          const SizedBox(height: 16),
+          const Text(
+            'Management Tools',
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Tools grid: 2×3
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 3.2,
+            children: [
+              _ToolTileHome(
+                icon: Icons.pending_actions_rounded,
+                label: 'Approvals',
+                subtitle: '${vm.pendingCount} waiting',
+                color: AppColors.accent,
+                onTap: onViewPending,
+              ),
+              _ToolTileHome(
+                icon: Icons.manage_accounts_rounded,
+                label: 'Users',
+                subtitle: '${stats.totalUsers} records',
+                color: AppColors.primary,
+                onTap: onOpenUsers,
+              ),
+              _ToolTileHome(
+                icon: Icons.event_rounded,
+                label: 'Events',
+                subtitle: 'Create & manage',
+                color: const Color(0xFF6B48FF),
+                onTap: onOpenEvents,
+              ),
+              _ToolTileHome(
+                icon: Icons.psychology_outlined,
+                label: 'Counselling',
+                subtitle: 'Sessions',
+                color: const Color(0xFF009688),
+                onTap: onOpenCounselling,
+              ),
+              _ToolTileHome(
+                icon: Icons.shield_rounded,
+                label: 'Safety',
+                subtitle: 'Stories & questions',
+                color: AppColors.softRed,
+                onTap: onOpenSafety,
+              ),
+              _ToolTileHome(
+                icon: Icons.contact_phone_rounded,
+                label: 'Emergency',
+                subtitle: 'Helplines',
+                color: AppColors.ink,
+                onTap: onOpenEmergency,
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _AdminStatTile extends StatelessWidget {
-  const _AdminStatTile({
+class _StatTile extends StatelessWidget {
+  const _StatTile({
     required this.icon,
     required this.label,
-    required this.count,
+    required this.value,
     required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final int count;
+  final int value;
   final Color color;
   final VoidCallback onTap;
 
@@ -1158,7 +1329,7 @@ class _AdminStatTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
@@ -1166,31 +1337,114 @@ class _AdminStatTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: 10),
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '$count',
+                    '$value',
                     style: TextStyle(
                       color: color,
                       fontWeight: FontWeight.w900,
-                      fontSize: 20,
+                      fontSize: 18,
+                      height: 1,
                     ),
                   ),
                   Text(
                     label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.muted,
-                      fontSize: 11,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolTileHome extends StatelessWidget {
+  const _ToolTileHome({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.background,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.11),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.muted,
+                size: 16,
+              ),
+            ],
+          ),
         ),
       ),
     );
