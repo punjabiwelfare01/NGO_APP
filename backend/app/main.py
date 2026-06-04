@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .logging_config import setup_logging
@@ -29,6 +30,7 @@ from .routers import quiz
 from .routers import safety
 from .routers import emergency
 from .routers import chat
+from .routers import upload
 
 Base.metadata.create_all(bind=engine)
 ensure_sqlite_schema(engine)
@@ -72,12 +74,18 @@ app.include_router(quiz.router)
 app.include_router(safety.router)
 app.include_router(emergency.router)
 app.include_router(chat.router)
+app.include_router(upload.router)
 
 
 @app.get("/health", tags=["Health"])
 def health():
     return {"status": "ok", "app": settings.app_name, "version": settings.version}
 
+
+# ── Uploaded files static serving ─────────────────────────────────────────────
+_uploads_dir = Path(__file__).parent.parent.parent / "uploads"
+_uploads_dir.mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
 
 # ── Flutter Web static file serving ───────────────────────────────────────────
 # Serves the Flutter Web build from build/web/ at the root.

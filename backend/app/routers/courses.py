@@ -3,11 +3,16 @@ from sqlalchemy.orm import Session
 
 from ..crud import course_crud
 from ..database import get_db
-from ..dependencies import content_creator_or_above, get_current_user
+from ..dependencies import content_creator_or_above, get_current_user, non_student
 from ..models.user import User, UserRole
 from ..schemas.course import (
     CategoryResponse,
+    CourseCreate,
+    CourseDetailResponse,
     CourseResponse,
+    LearningResourceCreate,
+    LearningResourceResponse,
+    LearningResourceUpdate,
     LessonCreate,
     LessonResponse,
     LessonUpdate,
@@ -30,12 +35,43 @@ def list_courses(skip: int = 0, limit: int = 100, db: Session = Depends(get_db))
     return course_crud.get_courses(db, skip=skip, limit=limit)
 
 
+@router.post("/courses", response_model=CourseResponse, status_code=201,
+             summary="Create a course [all roles except student]")
+def create_course(
+    data: CourseCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(non_student),
+):
+    return course_crud.create_course(db, data)
+
+
 @router.get("/courses/{course_id}", response_model=CourseResponse)
 def get_course(course_id: int, db: Session = Depends(get_db)):
     course = course_crud.get_course(db, course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     return course
+
+
+@router.get("/courses/{course_id}/detail", response_model=CourseDetailResponse,
+            summary="Get course detail with lessons and resources")
+def get_course_detail(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    include_unpublished = current_user.role in (
+        UserRole.admin, UserRole.super_admin, UserRole.mentor, UserRole.content_creator
+    )
+    detail = course_crud.get_course_detail(
+        db,
+        course_id,
+        user_id=current_user.id,
+        include_unpublished=include_unpublished,
+    )
+    if not detail:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return detail
 
 
 # ── user course progress ───────────────────────────────────────────────────────
@@ -149,3 +185,72 @@ def complete_lesson(
     current_user: User = Depends(get_current_user),
 ):
     course_crud.mark_lesson_complete(db, current_user.id, lesson_id)
+
+
+@router.patch("/lessons/{lesson_id}/complete", status_code=204,
+              summary="Mark a lesson as complete [any authenticated student]")
+def complete_lesson_by_id(
+    lesson_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    course_crud.mark_lesson_complete(db, current_user.id, lesson_id)
+
+
+# ── learning resources ─────────────────────────────────────────────────────────
+
+@router.get("/courses/{course_id}/lessons/{lesson_id}/resources",
+            response_model=list[LearningResourceResponse],
+            summary="List resources for a lesson [any authenticated]")
+def list_resources(
+    course_id: int,
+    lesson_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    return course_crud.get_resources(db, lesson_id)
+
+
+@router.post("/courses/{course_id}/lessons/{lesson_id}/resources",
+             response_model=LearningResourceResponse, status_code=201,
+             summary="Add a resource to a lesson [all roles except student]")
+def create_resource(
+    course_id: int,
+    lesson_id: int,
+    data: LearningResourceCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(non_student),
+):
+    return course_crud.create_resource(db, lesson_id, data, uploaded_by=current_user.id)
+
+
+@router.patch("/courses/{course_id}/lessons/{lesson_id}/resources/{resource_id}",
+              response_model=LearningResourceResponse,
+              summary="Update a resource [all roles except student]")
+def update_resource(
+    course_id: int,
+    lesson_id: int,
+    resource_id: int,
+    data: LearningResourceUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(non_student),
+):
+    resource = course_crud.update_resource(db, resource_id, data)
+    if not resource or resource.lesson_id != lesson_id:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    return resource
+
+
+@router.delete("/courses/{course_id}/lessons/{lesson_id}/resources/{resource_id}",
+               status_code=204,
+               summary="Delete a resource [all roles except student]")
+def delete_resource(
+    course_id: int,
+    lesson_id: int,
+    resource_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(non_student),
+):
+    deleted = course_crud.delete_resource(db, resource_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Resource not found")

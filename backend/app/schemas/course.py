@@ -12,6 +12,15 @@ class CategoryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CourseCreate(BaseModel):
+    title: str
+    duration: str
+    level: str
+    icon_name: str
+    color_hex: str
+    category_id: Optional[int] = None
+
+
 class CourseResponse(BaseModel):
     id: int
     title: str
@@ -23,6 +32,39 @@ class CourseResponse(BaseModel):
     lesson_count: int = 0
 
     model_config = {"from_attributes": True}
+
+
+class LearningResourceDetailResponse(BaseModel):
+    id: int
+    name: str
+    type: str
+    url: Optional[str]
+    size: Optional[str] = None
+
+
+class LessonDetailResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    content_type: str
+    content: Optional[str]
+    video_url: Optional[str]
+    duration_minutes: Optional[int]
+    is_completed: bool = False
+    is_published: bool = True
+    resources: list[LearningResourceDetailResponse] = []
+
+
+class CourseDetailResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    difficulty: str
+    duration_minutes: Optional[int]
+    duration: str
+    progress: int
+    preview_video_url: Optional[str]
+    lessons: list[LessonDetailResponse] = []
 
 
 class ProgressUpdate(BaseModel):
@@ -80,5 +122,51 @@ class LessonResponse(BaseModel):
     duration_minutes: Optional[int]
     is_published: bool
     completed: bool = False   # injected per-user — not stored on Lesson model
+
+    model_config = {"from_attributes": True}
+
+
+# ── LearningResource schemas ────────────────────────────────────────────────────
+
+RESOURCE_TYPES = {"video", "pdf", "image", "note", "link"}
+
+
+class LearningResourceCreate(BaseModel):
+    type: str
+    title: str
+    file_url: Optional[str] = None
+    text_content: Optional[str] = None
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        if v not in RESOURCE_TYPES:
+            raise ValueError(f"type must be one of {sorted(RESOURCE_TYPES)}")
+        return v
+
+
+class LearningResourceUpdate(BaseModel):
+    type: Optional[str] = None
+    title: Optional[str] = None
+    file_url: Optional[str] = None
+    text_content: Optional[str] = None
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in RESOURCE_TYPES:
+            raise ValueError(f"type must be one of {sorted(RESOURCE_TYPES)}")
+        return v
+
+
+class LearningResourceResponse(BaseModel):
+    id: int
+    lesson_id: int
+    type: str
+    title: str
+    file_url: Optional[str]
+    text_content: Optional[str]
+    uploaded_by: Optional[int]
+    created_at: datetime
 
     model_config = {"from_attributes": True}

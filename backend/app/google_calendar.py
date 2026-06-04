@@ -17,18 +17,42 @@ logger = logging.getLogger(__name__)
 # Calendar scope — creates events (and Meet links) in the authorised account's calendar.
 _SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
-# Tokens are stored next to this file's parent directory (i.e. backend/google_token.json).
-_TOKEN_FILE = Path(__file__).parent.parent / "google_token.json"
+_BACKEND_DIR = Path(__file__).parent.parent
+# Tokens are stored in backend/google_token.json
+_TOKEN_FILE = _BACKEND_DIR / "google_token.json"
+
+
+def _find_client_secret_file() -> Path | None:
+    """Return the first client_secret_*.json found in the backend directory."""
+    matches = list(_BACKEND_DIR.glob("client_secret_*.json"))
+    return matches[0] if matches else None
 
 
 def _client_config() -> dict:
+    # Prefer the downloaded client_secret JSON file if present.
+    secret_file = _find_client_secret_file()
+    if secret_file:
+        import json
+        raw = json.loads(secret_file.read_text())
+        key = list(raw.keys())[0]          # "web" or "installed"
+        data = raw[key]
+        return {
+            key: {
+                "client_id":     data["client_id"],
+                "client_secret": data["client_secret"],
+                "redirect_uris": data.get("redirect_uris") or [settings.google_redirect_uri],
+                "auth_uri":      data.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
+                "token_uri":     data.get("token_uri", "https://oauth2.googleapis.com/token"),
+            }
+        }
+    # Fallback: build config from .env variables.
     return {
         "web": {
-            "client_id": settings.google_client_id,
+            "client_id":     settings.google_client_id,
             "client_secret": settings.google_client_secret,
             "redirect_uris": [settings.google_redirect_uri],
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_uri":      "https://accounts.google.com/o/oauth2/auth",
+            "token_uri":     "https://oauth2.googleapis.com/token",
         }
     }
 

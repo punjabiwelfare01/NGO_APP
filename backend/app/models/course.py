@@ -65,6 +65,7 @@ class Lesson(Base):
 
     course = relationship("Course", back_populates="lessons")
     user_progress = relationship("UserLessonProgress", back_populates="lesson", cascade="all, delete-orphan")
+    resources = relationship("LearningResource", back_populates="lesson", cascade="all, delete-orphan", order_by="LearningResource.id")
 
 
 class UserLessonProgress(Base):
@@ -77,3 +78,19 @@ class UserLessonProgress(Base):
     completed_at = Column(DateTime, nullable=True)
 
     lesson = relationship("Lesson", back_populates="user_progress")
+
+
+class LearningResource(Base):
+    __tablename__ = "learning_resources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False)
+    type = Column(String, nullable=False)          # video | pdf | image | note | link
+    title = Column(String, nullable=False)
+    file_url = Column(String, nullable=True)
+    text_content = Column(Text, nullable=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    lesson = relationship("Lesson", back_populates="resources")
+    uploader = relationship("User", foreign_keys=[uploaded_by])

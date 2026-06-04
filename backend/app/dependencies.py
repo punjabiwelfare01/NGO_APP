@@ -72,6 +72,19 @@ def require_role(*allowed: UserRole):
     Returns a dependency that raises HTTP 403 when the caller's role is not in `allowed`.
     """
     def _guard(current_user: User = Depends(get_current_user)) -> User:
+        management_roles = {
+            UserRole.admin,
+            UserRole.super_admin,
+            UserRole.mentor,
+            UserRole.content_creator,
+        }
+        if current_user.role == UserRole.super_admin:
+            return current_user
+        if (
+            current_user.role == UserRole.admin
+            and any(role in management_roles for role in allowed)
+        ):
+            return current_user
         if current_user.role not in allowed:
             raise HTTPException(
                 status_code=403,
@@ -92,6 +105,11 @@ def mentor_or_above(current_user: User = Depends(
     return current_user
 
 def content_creator_or_above(current_user: User = Depends(
+    require_role(UserRole.content_creator, UserRole.mentor, UserRole.admin, UserRole.super_admin)
+)) -> User:
+    return current_user
+
+def non_student(current_user: User = Depends(
     require_role(UserRole.content_creator, UserRole.mentor, UserRole.admin, UserRole.super_admin)
 )) -> User:
     return current_user
