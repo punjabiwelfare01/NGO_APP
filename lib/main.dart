@@ -20,12 +20,16 @@ import 'screens/learn/learn_view.dart';
 import 'screens/profile/profile_view.dart';
 import 'screens/quiz/quiz_play_screen.dart';
 import 'screens/helping_support/helping_support_view.dart';
+import 'services/screen_security.dart';
+import 'widgets/secure_app_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initializes the Auth0 JS client on web (no-op on Android/iOS).
   await initAuth0(AppConfig.auth0Domain, AppConfig.auth0ClientId);
   AppState.restore();
+  // Apply FLAG_SECURE immediately for any restored session.
+  await ScreenSecurity.apply();
 
   // Web only: if Auth0 just redirected back with a code, exchange it now.
   // On Android/iOS this always returns null (login completes in loginWithAuth0).
@@ -42,7 +46,7 @@ void main() async {
     // Ignore — user will see the login screen and can retry.
   }
 
-  runApp(const CareSkillApp());
+  runApp(const SecureAppWrapper(child: CareSkillApp()));
 }
 
 String _resolveInitialRoute() {

@@ -4,6 +4,7 @@ import '../app_state.dart';
 import '../models/auth_models.dart';
 import '../repositories/api_client.dart';
 import '../repositories/auth_repository.dart';
+import '../services/screen_security.dart';
 import 'view_state.dart';
 
 class AuthViewModel extends ChangeNotifier {
@@ -234,6 +235,7 @@ class AuthViewModel extends ChangeNotifier {
     await AuthRepository.logout();
     await AuthRepository.auth0Logout();
     AppState.clear();
+    await ScreenSecurity.clear();
     if (!_disposed) notifyListeners();
   }
 }

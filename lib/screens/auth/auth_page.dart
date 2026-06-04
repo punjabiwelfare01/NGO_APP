@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/colors.dart';
 import '../../models/auth_models.dart';
+import '../../services/screen_security.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
 
@@ -36,6 +37,7 @@ class _AuthPageState extends State<AuthPage>
       _ => null, // handled inline
     };
     if (route != null && ctx.mounted) {
+      ScreenSecurity.apply(); // fire-and-forget; role is set by now
       Navigator.of(ctx).pushReplacementNamed(route);
     }
   }
