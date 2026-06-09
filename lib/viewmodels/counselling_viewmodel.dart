@@ -79,17 +79,33 @@ class CounsellingViewModel extends ChangeNotifier {
     load();
   }
 
-  Future<bool> bookSlot(int slotId, String topic) async {
+  Future<ApiCounsellingSession?> bookSlot(int slotId, String topic) async {
+    // Optimistic: remove the slot from the available list immediately.
+    final idx = _slots.indexWhere((s) => s.id == slotId);
+    ApiCounsellingSlot? removed;
+    if (idx != -1) {
+      removed = _slots[idx];
+      _slots = List<ApiCounsellingSlot>.from(_slots)..removeAt(idx);
+      if (!_disposed) notifyListeners();
+    }
+
     try {
-      await WellnessRepository.bookAvailabilitySlot(
+      final session = await WellnessRepository.bookAvailabilitySlot(
         AppState.userId,
         slotId: slotId,
         topic: topic,
       );
-      await load();
-      return true;
+      _mySessions = [session, ..._mySessions];
+      if (!_disposed) notifyListeners();
+      return session;
     } catch (_) {
-      return false;
+      // Revert optimistic removal.
+      if (removed != null) {
+        _slots = [..._slots, removed]
+          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+      }
+      if (!_disposed) notifyListeners();
+      return null;
     }
   }
 

@@ -7,6 +7,7 @@ class TopHeader extends StatelessWidget {
     required this.subtitle,
     required this.actionIcon,
     this.onActionTap,
+    this.actionTooltip = 'Open action',
     this.badgeCount,
     super.key,
   });
@@ -15,6 +16,7 @@ class TopHeader extends StatelessWidget {
   final String subtitle;
   final IconData actionIcon;
   final VoidCallback? onActionTap;
+  final String actionTooltip;
 
   /// When non-null and > 0, a red badge is shown on the action icon.
   final int? badgeCount;
@@ -67,7 +69,7 @@ class TopHeader extends StatelessWidget {
             IconButton.filledTonal(
               onPressed: onActionTap,
               icon: Icon(actionIcon),
-              tooltip: 'Open action',
+              tooltip: actionTooltip,
             ),
             if (badgeCount != null && badgeCount! > 0)
               Positioned(

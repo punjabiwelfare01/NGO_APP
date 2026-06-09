@@ -204,29 +204,33 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           );
         }
         final visibleSkills = _filteredSkillCategories(_vm.categories);
-        final firstName = (_vm.studentProfile?.name ??
-                AppState.studentName ??
-                'Student')
-            .split(' ')
-            .first;
-        final adminBadge = _adminVm == null
-            ? null
-            : (_adminVm!.unreadCount + _adminVm!.pendingCount);
+        final firstName =
+            (_vm.studentProfile?.name ?? AppState.studentName ?? 'Student')
+                .split(' ')
+                .first;
         return AppScrollView(
           children: [
             ListenableBuilder(
               listenable: _adminVm ?? _vm,
-              builder: (_, _) => TopHeader(
-                title: 'Hi $firstName',
-                subtitle: AppState.role.isAdmin
-                    ? 'Welcome back, ${AppState.role.displayName}'
-                    : 'Ready to learn, play, and grow today?',
-                actionIcon: Icons.notifications_none_rounded,
-                badgeCount: adminBadge == 0 ? null : adminBadge,
-                onActionTap: AppState.role.isAdmin
-                    ? () => _openAdminNotifications()
-                    : null,
-              ),
+              builder: (_, _) {
+                final adminBadge = _adminVm == null
+                    ? null
+                    : (_adminVm!.unreadCount + _adminVm!.pendingCount);
+                return TopHeader(
+                  title: 'Hi $firstName',
+                  subtitle: AppState.role.isAdmin
+                      ? 'Platform overview & management'
+                      : 'Ready to learn, play, and grow today?',
+                  actionIcon: Icons.notifications_none_rounded,
+                  actionTooltip: AppState.role.isAdmin
+                      ? 'Notifications'
+                      : 'Open action',
+                  badgeCount: adminBadge == 0 ? null : adminBadge,
+                  onActionTap: AppState.role.isAdmin
+                      ? () => _openAdminNotifications()
+                      : null,
+                );
+              },
             ),
 
             // ── Admin: analytics + management tools ───────────────────
@@ -240,7 +244,6 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                       builder: (_) => const PendingApprovalsScreen(),
                     ),
                   ),
-                  onViewNotifications: _openAdminNotifications,
                   onOpenUsers: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => UserManagementScreen(vm: _adminVm!),
@@ -734,9 +737,7 @@ class _EventNotificationToastState extends State<_EventNotificationToast>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.2),
-            ),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [
@@ -852,7 +853,10 @@ class _ContinueLearningCard extends StatelessWidget {
               onPressed: onTap,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
@@ -910,7 +914,10 @@ class _ContinueLearningCard extends StatelessWidget {
                 onPressed: onTap,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(
@@ -930,7 +937,9 @@ class _ContinueLearningCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: course!.progress.clamp(0.0, 1.0),
                     backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                     minHeight: 7,
                   ),
                 ),
@@ -1019,7 +1028,8 @@ class _EmergencyHelpCard extends StatelessWidget {
                 icon: Icons.support_agent_rounded,
                 label: 'Counselling Support',
                 color: AppColors.secondary,
-                onTap: () => Navigator.of(context).pushNamed('/helping-support'),
+                onTap: () =>
+                    Navigator.of(context).pushNamed('/helping-support'),
               ),
             ],
           ),
@@ -1079,7 +1089,6 @@ class _AdminAnalyticsSection extends StatelessWidget {
   const _AdminAnalyticsSection({
     required this.vm,
     required this.onViewPending,
-    required this.onViewNotifications,
     required this.onOpenUsers,
     required this.onOpenEvents,
     required this.onOpenCounselling,
@@ -1089,7 +1098,6 @@ class _AdminAnalyticsSection extends StatelessWidget {
 
   final AdminViewModel vm;
   final VoidCallback onViewPending;
-  final VoidCallback onViewNotifications;
   final VoidCallback onOpenUsers;
   final VoidCallback onOpenEvents;
   final VoidCallback onOpenCounselling;
@@ -1103,7 +1111,6 @@ class _AdminAnalyticsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
           Row(
             children: [
               Container(
@@ -1124,7 +1131,7 @@ class _AdminAnalyticsSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Admin Analytics',
+                      'Platform Overview',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         color: AppColors.ink,
@@ -1132,50 +1139,11 @@ class _AdminAnalyticsSection extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Platform overview & management',
+                      'Analytics and admin controls',
                       style: TextStyle(color: AppColors.muted, fontSize: 12),
                     ),
                   ],
                 ),
-              ),
-              // Notification bell with badge
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton.filledTonal(
-                    onPressed: onViewNotifications,
-                    tooltip: 'Notifications',
-                    icon: const Icon(Icons.notifications_rounded),
-                  ),
-                  if (vm.unreadCount > 0)
-                    Positioned(
-                      top: 3,
-                      right: 3,
-                      child: IgnorePointer(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.softRed,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          constraints: const BoxConstraints(minWidth: 17),
-                          child: Text(
-                            vm.unreadCount > 99 ? '99+' : '${vm.unreadCount}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              height: 1,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
               ),
             ],
           ),
@@ -1537,10 +1505,7 @@ class _AdminNotificationsSheet extends StatelessWidget {
 }
 
 class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({
-    required this.notification,
-    required this.onTap,
-  });
+  const _NotificationTile({required this.notification, required this.onTap});
 
   final dynamic notification;
   final VoidCallback onTap;
@@ -1554,7 +1519,9 @@ class _NotificationTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isRead ? Colors.white : AppColors.primary.withValues(alpha: 0.05),
+          color: isRead
+              ? Colors.white
+              : AppColors.primary.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isRead
@@ -1587,8 +1554,7 @@ class _NotificationTile extends StatelessWidget {
                   Text(
                     notification.title as String,
                     style: TextStyle(
-                      fontWeight:
-                          isRead ? FontWeight.w600 : FontWeight.w800,
+                      fontWeight: isRead ? FontWeight.w600 : FontWeight.w800,
                       color: AppColors.ink,
                       fontSize: 13,
                     ),

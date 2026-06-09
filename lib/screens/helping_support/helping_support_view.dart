@@ -16,6 +16,7 @@ import 'admin/counselling_admin_screen.dart';
 import 'admin/emergency_contacts_admin_screen.dart';
 import 'mentor/mentor_chats_screen.dart';
 import 'mentor/mentor_schedule_screen.dart';
+import 'student/mentor_detail_screen.dart';
 import 'student/mentor_list_screen.dart';
 import 'student/my_sessions_screen.dart';
 import 'widgets/live_session_banner.dart';
@@ -209,19 +210,22 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
                       style: TextStyle(color: AppColors.muted)),
                 )
               else
-                ..._vm.mentors.take(3).map(
+                ...([..._vm.mentors]
+                      ..sort((a, b) => b.rating.compareTo(a.rating)))
+                    .take(3)
+                    .map(
                       (m) => Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: MentorCard(
                           mentor: m,
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => MentorListScreen(),
+                              builder: (_) => MentorDetailScreen(mentor: m),
                             ),
                           ),
                           onBook: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => MentorListScreen(),
+                              builder: (_) => MentorDetailScreen(mentor: m),
                             ),
                           ),
                         ),
