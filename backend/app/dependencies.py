@@ -25,7 +25,7 @@ Usage in routers:
       raise HTTPException(403, "Access denied")
 """
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
@@ -79,6 +79,29 @@ def get_optional_user(
     if is_token_revoked(db, jti):
         return None
     return db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+
+
+def get_download_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> User:
+    """Authenticate file downloads via bearer header or a URL token for browser anchors."""
+    token = credentials.credentials if credentials else request.query_params.get("token")
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    try:
+        payload = decode_token(token)
+        user_id = int(payload["sub"])
+        jti = payload.get("jti", "")
+    except Exception:
+        raise HTTPException(401, "Invalid or expired token")
+    if is_token_revoked(db, jti):
+        raise HTTPException(401, "Token has been revoked")
+    user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+    if not user:
+        raise HTTPException(401, "User not found or inactive")
+    return user
 
 
 # ── role helpers ───────────────────────────────────────────────────────────────

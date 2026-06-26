@@ -15,7 +15,7 @@ class DailyMotivationCard extends StatelessWidget {
           SizedBox(width: 12),
           Expanded(
             child: Text(
-              'You are stronger than your fears.',
+              'Small efforts create big social impact.',
               style: TextStyle(
                 color: AppColors.ink,
                 fontSize: 17,

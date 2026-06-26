@@ -91,7 +91,7 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen> {
         elevation: 0,
         leading: const BackButton(color: AppColors.ink),
         title: const Text(
-          'Create Student Account',
+          'Create Volunteer Account',
           style: TextStyle(
             color: AppColors.ink,
             fontWeight: FontWeight.w800,
@@ -195,33 +195,11 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── School Details ───────────────────────────────────
+                  // ── Volunteer Details ────────────────────────────────
                   _SectionLabel(
-                    icon: Icons.school_rounded,
-                    label: 'School Details',
+                    icon: Icons.volunteer_activism_rounded,
+                    label: 'Volunteer Details',
                     color: AppColors.accent,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Class
-                  _FormField(
-                    controller: _classCtrl,
-                    label: 'Class / Grade',
-                    icon: Icons.class_outlined,
-                    enabled: !loading,
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Class is required' : null,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // School Name
-                  _FormField(
-                    controller: _schoolCtrl,
-                    label: 'School Name',
-                    icon: Icons.apartment_outlined,
-                    enabled: !loading,
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'School name is required' : null,
                   ),
                   const SizedBox(height: 12),
 
@@ -254,25 +232,9 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen> {
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) return null;
                       final age = int.tryParse(v.trim());
-                      if (age == null || age < 5 || age > 25) {
-                        return 'Enter a valid age (5–25)';
+                      if (age == null || age < 5 || age > 60) {
+                        return 'Enter a valid age (5–60)';
                       }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Parent Email
-                  _FormField(
-                    controller: _parentEmailCtrl,
-                    label: 'Parent / Guardian Email (optional)',
-                    icon: Icons.family_restroom_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    enabled: !loading,
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return null;
-                      final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                      if (!emailRegex.hasMatch(v.trim())) return 'Enter a valid email';
                       return null;
                     },
                   ),

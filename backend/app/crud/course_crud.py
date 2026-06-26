@@ -31,7 +31,7 @@ def update_course(db: Session, course_id: int, data: CourseUpdate) -> Course | N
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         return None
-    for field, value in data.model_dump(exclude_none=True).items():
+    for field, value in data.model_dump(exclude_unset=True).items():
         setattr(course, field, value)
     db.commit()
     db.refresh(course)
@@ -84,8 +84,28 @@ def delete_category(db: Session, category_id: int) -> bool:
     return True
 
 
-def get_courses(db: Session, skip: int = 0, limit: int = 100) -> list[Course]:
-    return db.query(Course).offset(skip).limit(limit).all()
+def get_courses(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    course_type: str | None = None,
+    class_level: str | None = None,
+    subject: str | None = None,
+    skill_category: str | None = None,
+    published_only: bool = False,
+) -> list[Course]:
+    query = db.query(Course)
+    if published_only:
+        query = query.filter(Course.is_published == True)
+    if course_type:
+        query = query.filter(Course.course_type == course_type)
+    if class_level:
+        query = query.filter(Course.class_level == class_level)
+    if subject:
+        query = query.filter(Course.subject == subject)
+    if skill_category:
+        query = query.filter(Course.skill_category == skill_category)
+    return query.offset(skip).limit(limit).all()
 
 
 def get_course(db: Session, course_id: int) -> Course | None:
@@ -142,6 +162,10 @@ def get_course_detail(
         title=course.title,
         description=f"Learn {course.title.lower()} step by step.",
         difficulty=course.level,
+        course_type=course.course_type,
+        class_level=course.class_level,
+        subject=course.subject,
+        skill_category=course.skill_category,
         duration_minutes=None,
         duration=course.duration,
         progress=progress,
@@ -154,6 +178,8 @@ def get_course_detail(
                 content_type=lesson.content_type,
                 content=lesson.content_text,
                 video_url=lesson.content_url,
+                class_level=lesson.class_level,
+                subject=lesson.subject,
                 duration_minutes=lesson.duration_minutes,
                 is_completed=lesson.id in completed_ids,
                 is_published=lesson.is_published,
@@ -219,6 +245,9 @@ def _build_lesson_response(lesson: Lesson, completed: bool = False) -> LessonRes
         content_type=lesson.content_type,
         content_url=lesson.content_url,
         content_text=lesson.content_text,
+        class_level=lesson.class_level,
+        subject=lesson.subject,
+        chapter=lesson.chapter,
         order=lesson.order,
         duration_minutes=lesson.duration_minutes,
         is_published=lesson.is_published,

@@ -49,9 +49,57 @@ class TestRegister:
         })
         assert resp.status_code == 201
         data = resp.json()
-        assert data["email"] == "new@test.local"
-        assert data["role"] == "student"
-        assert "hashed_password" not in data
+        assert data["user"]["email"] == "new@test.local"
+        assert data["user"]["role"] == "student"
+        assert data["user"]["access_status"] == "pending"
+        assert "hashed_password" not in data["user"]
+
+    def test_counsellor_request_stays_pending_until_admin_assigns_mentor(
+        self, client, admin_headers
+    ):
+        registered = client.post("/auth/register", json={
+            "name": "Manoj Singh",
+            "email": "manoj.counsellor@test.local",
+            "password": "secure123",
+            "role": "admin",
+            "requested_role": "mentor",
+            "class_name": "Indian army commander",
+            "school_name": "Graduate",
+            "location": "Delhi Cantt",
+        })
+        assert registered.status_code == 201, registered.text
+        user = registered.json()["user"]
+        assert user["role"] == "student"
+        assert user["requested_role"] == "mentor"
+        assert user["access_status"] == "pending"
+
+        pending = client.get("/admin/users/pending", headers=admin_headers)
+        assert pending.status_code == 200
+        assert user["id"] in [item["id"] for item in pending.json()]
+
+        summary = client.get("/admin/dashboard/summary", headers=admin_headers)
+        assert summary.status_code == 200
+        assert summary.json()["pending_counsellor_count"] == 1
+
+        approved = client.patch(
+            f"/admin/users/{user['id']}/approve",
+            headers=admin_headers,
+            json={"role": "mentor", "verification_note": "Verified counsellor"},
+        )
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["role"] == "mentor"
+        assert approved.json()["access_status"] == "approved"
+
+        signed_in = client.post("/auth/login", json={
+            "email": "manoj.counsellor@test.local",
+            "password": "secure123",
+        })
+        assert signed_in.status_code == 200
+        assert signed_in.json()["role"] == "mentor"
+        assert signed_in.json()["access_status"] == "approved"
+
+        pending_after = client.get("/admin/users/pending", headers=admin_headers)
+        assert user["id"] not in [item["id"] for item in pending_after.json()]
 
     def test_register_duplicate_email(self, client, student_user):
         resp = client.post("/auth/register", json={

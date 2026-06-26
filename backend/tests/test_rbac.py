@@ -185,6 +185,31 @@ class TestMentor:
         )
         assert resp.status_code == 200
 
+    def test_mentor_can_create_and_update_own_public_profile(
+        self, client, mentor_headers, mentor_user
+    ):
+        payload = {
+            "display_name": "Meera Kaur",
+            "bio": "Education and career counsellor.",
+            "expertise": "Career planning, Scholarships",
+            "category": "Education Counsellor",
+        }
+        updated = client.patch(
+            "/counselling/mentors/me",
+            json=payload,
+            headers=mentor_headers,
+        )
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["user_id"] == mentor_user.id
+        assert updated.json()["display_name"] == payload["display_name"]
+
+        persisted = client.get(
+            "/counselling/mentors/me",
+            headers=mentor_headers,
+        )
+        assert persisted.status_code == 200
+        assert persisted.json()["bio"] == payload["bio"]
+
     def test_mentor_cannot_create_mentor_profile_for_another_user(
         self, client, mentor_headers, student_user
     ):

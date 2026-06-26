@@ -23,7 +23,7 @@ if curl -s --max-time 1 http://localhost:8000/ > /dev/null 2>&1; then
 else
   echo -e "${CYAN}▶ Starting FastAPI backend...${NC}"
   cd "$BACKEND_DIR"
-  "$VENV/uvicorn" app.main:app --reload --port 8000 \
+  "$VENV/uvicorn" app.main:app --reload --host 0.0.0.0 --port 8000 \
     --log-level info > /tmp/careskill_backend.log 2>&1 &
   BACKEND_PID=$!
   echo "  Backend PID $BACKEND_PID  (logs → /tmp/careskill_backend.log)"

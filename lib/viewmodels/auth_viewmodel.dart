@@ -4,7 +4,6 @@ import '../app_state.dart';
 import '../models/auth_models.dart';
 import '../repositories/api_client.dart';
 import '../repositories/auth_repository.dart';
-import '../services/screen_security.dart';
 import 'view_state.dart';
 
 class AuthViewModel extends ChangeNotifier {
@@ -35,7 +34,7 @@ class AuthViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       final response = await AuthRepository.login(email.trim(), password);
-      final role   = UserRole.fromString(response.role);
+      final role = UserRole.fromString(response.role);
       final status = response.accessStatus != null
           ? AccessStatus.fromString(response.accessStatus!)
           : AccessStatus.approved;
@@ -76,7 +75,7 @@ class AuthViewModel extends ChangeNotifier {
         if (!_disposed) notifyListeners();
         return null;
       }
-      final role   = UserRole.fromString(response.role);
+      final role = UserRole.fromString(response.role);
       final status = response.accessStatus != null
           ? AccessStatus.fromString(response.accessStatus!)
           : AccessStatus.approved;
@@ -108,7 +107,7 @@ class AuthViewModel extends ChangeNotifier {
   /// Registers a new user.
   /// Returns [AccessStatus] so the caller can route to the pending / home screen.
   /// requestedRole is stored server-side for admin review; it does NOT grant
-  /// elevated access — the user always starts as student / pending_verification.
+  /// elevated access — the user remains pending until an admin assigns a role.
   Future<AccessStatus?> registerStudent({
     required String name,
     required String email,
@@ -137,10 +136,10 @@ class AuthViewModel extends ChangeNotifier {
         phone: phone,
         requestedRole: requestedRole,
       );
-      final role   = UserRole.fromString(response.role);
+      final role = UserRole.fromString(response.role);
       final status = response.accessStatus != null
           ? AccessStatus.fromString(response.accessStatus!)
-          : AccessStatus.pendingVerification;
+          : AccessStatus.approved;
       AppState.setFromLogin(
         response.userId,
         response.accessToken,
@@ -156,8 +155,8 @@ class AuthViewModel extends ChangeNotifier {
       _errorMessage = e.statusCode == 409
           ? 'An account with this email already exists.'
           : e.statusCode == 422
-              ? 'Please check your details and try again.'
-              : 'Server error (${e.statusCode}). Please try again.';
+          ? 'Please check your details and try again.'
+          : 'Server error (${e.statusCode}). Please try again.';
       if (!_disposed) notifyListeners();
       return null;
     } catch (_) {
@@ -168,20 +167,49 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  /// Returns `(otp: code, error: null)` when the OTP was generated,
-  /// `(otp: null, error: null)` when the email is not registered (backend
-  /// deliberately stays silent), or `(otp: null, error: message)` on failure.
-  Future<({String? otp, String? error})> forgotPassword(String email) async {
+  Future<String?> forgotPassword(String email) async {
     try {
-      final otp = await AuthRepository.forgotPassword(email.trim());
-      return (otp: otp, error: null);
+      await AuthRepository.forgotPassword(email.trim());
+      return null;
     } on ApiException catch (e) {
-      return (
-        otp: null,
-        error: 'Server error (${e.statusCode}). Please try again.',
-      );
+      return e.statusCode == 429
+          ? 'Too many requests. Please wait before trying again.'
+          : 'Server error (${e.statusCode}). Please try again.';
     } catch (_) {
-      return (otp: null, error: 'Connection failed. Is the backend running?');
+      return 'Connection failed. Is the backend running?';
+    }
+  }
+
+  Future<AccessStatus?> refreshCurrentSession() async {
+    final token = AppState.token;
+    if (token == null) return null;
+    _state = ViewState.loading;
+    _errorMessage = null;
+    if (!_disposed) notifyListeners();
+    try {
+      final user = await AuthRepository.getCurrentUser();
+      final role = UserRole.fromString(user.role ?? 'guest');
+      final status = AccessStatus.fromString(user.accessStatus ?? 'pending');
+      AppState.setFromLogin(
+        user.id,
+        token,
+        role,
+        name: user.name,
+        status: status,
+      );
+      _state = ViewState.idle;
+      if (!_disposed) notifyListeners();
+      return status;
+    } on ApiException catch (error) {
+      _state = ViewState.error;
+      _errorMessage = 'Could not refresh approval (${error.statusCode}).';
+      if (!_disposed) notifyListeners();
+      return null;
+    } catch (_) {
+      _state = ViewState.error;
+      _errorMessage = 'Could not connect to the backend.';
+      if (!_disposed) notifyListeners();
+      return null;
     }
   }
 
@@ -192,6 +220,7 @@ class AuthViewModel extends ChangeNotifier {
     required String newPassword,
   }) async {
     try {
+      await AuthRepository.verifyResetCode(email: email, otp: otp);
       await AuthRepository.resetPassword(
         email: email,
         otp: otp,
@@ -235,7 +264,6 @@ class AuthViewModel extends ChangeNotifier {
     await AuthRepository.logout();
     await AuthRepository.auth0Logout();
     AppState.clear();
-    await ScreenSecurity.clear();
     if (!_disposed) notifyListeners();
   }
 }

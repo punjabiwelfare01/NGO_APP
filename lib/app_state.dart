@@ -60,6 +60,11 @@ class AppState {
     SessionStorage.remove(_accessStatusKey);
   }
 
+  static void updateStudentName(String name) {
+    studentName = name;
+    SessionStorage.write(_nameKey, name);
+  }
+
   static void restore() {
     final savedToken  = SessionStorage.read(_tokenKey);
     final savedUserId = int.tryParse(SessionStorage.read(_userIdKey) ?? '');

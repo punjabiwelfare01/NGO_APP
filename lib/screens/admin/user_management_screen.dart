@@ -17,9 +17,9 @@ class UserManagementScreen extends StatefulWidget {
 
 class _UserManagementScreenState extends State<UserManagementScreen> {
   final _searchCtrl = TextEditingController();
-  String _filterRole   = '';
+  String _filterRole = '';
   String _filterStatus = '';
-  bool   _loading      = false;
+  bool _loading = false;
 
   @override
   void initState() {
@@ -37,7 +37,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     setState(() => _loading = true);
     await widget.vm.loadAllUsers(
       search: _searchCtrl.text.trim(),
-      role:   _filterRole.isEmpty   ? null : _filterRole,
+      role: _filterRole.isEmpty ? null : _filterRole,
       status: _filterStatus.isEmpty ? null : _filterStatus,
     );
     if (mounted) setState(() => _loading = false);
@@ -80,12 +80,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   onSubmitted: (_) => _fetch(),
                   decoration: InputDecoration(
                     hintText: 'Search by name or email…',
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppColors.muted),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      color: AppColors.muted,
+                    ),
                     suffixIcon: _searchCtrl.text.isEmpty
                         ? null
                         : IconButton(
                             icon: const Icon(Icons.close_rounded),
-                            onPressed: () { _searchCtrl.clear(); _fetch(); },
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              _fetch();
+                            },
                           ),
                     filled: true,
                     fillColor: AppColors.background,
@@ -100,35 +106,126 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: [
-                      _Chip(label: 'All',        selected: _filterStatus.isEmpty && _filterRole.isEmpty,
-                            onTap: () { setState(() { _filterStatus = ''; _filterRole = ''; }); _fetch(); }),
-                      _Chip(label: 'Pending',    color: const Color(0xFFFF8C00),
-                            selected: _filterStatus == 'pending_verification',
-                            onTap: () { setState(() { _filterStatus = 'pending_verification'; _filterRole = ''; }); _fetch(); }),
-                      _Chip(label: 'Approved',   color: AppColors.secondary,
-                            selected: _filterStatus == 'approved',
-                            onTap: () { setState(() { _filterStatus = 'approved'; _filterRole = ''; }); _fetch(); }),
-                      _Chip(label: 'Blocked',    color: AppColors.softRed,
-                            selected: _filterStatus == 'deactivated',
-                            onTap: () { setState(() { _filterStatus = 'deactivated'; _filterRole = ''; }); _fetch(); }),
-                      _Chip(label: 'Rejected',   color: AppColors.muted,
-                            selected: _filterStatus == 'rejected',
-                            onTap: () { setState(() { _filterStatus = 'rejected'; _filterRole = ''; }); _fetch(); }),
-                      const SizedBox(width: 12),
-                      _Chip(label: 'Students',   color: AppColors.primary,
-                            selected: _filterRole == 'student',
-                            onTap: () { setState(() { _filterRole = 'student'; _filterStatus = ''; }); _fetch(); }),
-                      _Chip(label: 'Counsellors', color: AppColors.secondary,
-                            selected: _filterRole == 'mentor',
-                            onTap: () { setState(() { _filterRole = 'mentor'; _filterStatus = ''; }); _fetch(); }),
-                      _Chip(label: 'Creators',   color: AppColors.accent,
-                            selected: _filterRole == 'content_creator',
-                            onTap: () { setState(() { _filterRole = 'content_creator'; _filterStatus = ''; }); _fetch(); }),
-                      _Chip(label: 'Admins',     color: const Color(0xFF6B48FF),
-                            selected: _filterRole == 'admin',
-                            onTap: () { setState(() { _filterRole = 'admin'; _filterStatus = ''; }); _fetch(); }),
-                    ].map((w) => Padding(padding: const EdgeInsets.only(right: 6), child: w)).toList(),
+                    children:
+                        [
+                              _Chip(
+                                label: 'All',
+                                selected:
+                                    _filterStatus.isEmpty &&
+                                    _filterRole.isEmpty,
+                                onTap: () {
+                                  setState(() {
+                                    _filterStatus = '';
+                                    _filterRole = '';
+                                  });
+                                  _fetch();
+                                },
+                              ),
+                              _Chip(
+                                label: 'Pending',
+                                color: const Color(0xFFFF8C00),
+                                selected: _filterStatus == 'pending',
+                                onTap: () {
+                                  setState(() {
+                                    _filterStatus = 'pending';
+                                    _filterRole = '';
+                                  });
+                                  _fetch();
+                                },
+                              ),
+                              _Chip(
+                                label: 'Approved',
+                                color: AppColors.secondary,
+                                selected: _filterStatus == 'approved',
+                                onTap: () {
+                                  setState(() {
+                                    _filterStatus = 'approved';
+                                    _filterRole = '';
+                                  });
+                                  _fetch();
+                                },
+                              ),
+                              _Chip(
+                                label: 'Blocked',
+                                color: AppColors.softRed,
+                                selected: _filterStatus == 'deactivated',
+                                onTap: () {
+                                  setState(() {
+                                    _filterStatus = 'deactivated';
+                                    _filterRole = '';
+                                  });
+                                  _fetch();
+                                },
+                              ),
+                              _Chip(
+                                label: 'Rejected',
+                                color: AppColors.muted,
+                                selected: _filterStatus == 'rejected',
+                                onTap: () {
+                                  setState(() {
+                                    _filterStatus = 'rejected';
+                                    _filterRole = '';
+                                  });
+                                  _fetch();
+                                },
+                              ),
+                              const SizedBox(width: 12),
+                              _Chip(
+                                label: 'Students',
+                                color: AppColors.primary,
+                                selected: _filterRole == 'student',
+                                onTap: () {
+                                  setState(() {
+                                    _filterRole = 'student';
+                                    _filterStatus = '';
+                                  });
+                                  _fetch();
+                                },
+                              ),
+                              _Chip(
+                                label: 'Counsellors',
+                                color: AppColors.secondary,
+                                selected: _filterRole == 'mentor',
+                                onTap: () {
+                                  setState(() {
+                                    _filterRole = 'mentor';
+                                    _filterStatus = '';
+                                  });
+                                  _fetch();
+                                },
+                              ),
+                              _Chip(
+                                label: 'Creators',
+                                color: AppColors.accent,
+                                selected: _filterRole == 'content_creator',
+                                onTap: () {
+                                  setState(() {
+                                    _filterRole = 'content_creator';
+                                    _filterStatus = '';
+                                  });
+                                  _fetch();
+                                },
+                              ),
+                              _Chip(
+                                label: 'Admins',
+                                color: const Color(0xFF6B48FF),
+                                selected: _filterRole == 'admin',
+                                onTap: () {
+                                  setState(() {
+                                    _filterRole = 'admin';
+                                    _filterStatus = '';
+                                  });
+                                  _fetch();
+                                },
+                              ),
+                            ]
+                            .map(
+                              (w) => Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: w,
+                              ),
+                            )
+                            .toList(),
                   ),
                 ),
               ],
@@ -149,11 +246,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       }
                       return _UsersTable(
                         users: users,
-                        onView:    (u) => _openDetail(u),
-                        onBlock:   (u) => _block(u),
+                        onView: (u) => _openDetail(u),
+                        onBlock: (u) => _block(u),
                         onUnblock: (u) => _unblock(u),
-                        onDelete:  (u) => _delete(u),
-                        onAssign:  (u) => _openDetail(u),
+                        onDelete: (u) => _delete(u),
+                        onAssign: (u) => _openDetail(u),
                       );
                     },
                   ),
@@ -166,7 +263,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   void _openDetail(AdminUserItem user) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => UserApprovalDetailScreen(userId: user.id, vm: widget.vm),
+        builder: (_) =>
+            UserApprovalDetailScreen(userId: user.id, vm: widget.vm),
       ),
     );
   }
@@ -181,20 +279,30 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     if (!confirmed || !mounted) return;
     final ok = await widget.vm.blockUser(user.id);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? '${user.name} blocked.' : widget.vm.errorMessage ?? 'Failed.'),
-        backgroundColor: ok ? AppColors.softRed : Colors.grey,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok ? '${user.name} blocked.' : widget.vm.errorMessage ?? 'Failed.',
+          ),
+          backgroundColor: ok ? AppColors.softRed : Colors.grey,
+        ),
+      );
     }
   }
 
   Future<void> _unblock(AdminUserItem user) async {
     final ok = await widget.vm.unblockUser(user.id);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? '${user.name} unblocked.' : widget.vm.errorMessage ?? 'Failed.'),
-        backgroundColor: ok ? AppColors.secondary : Colors.grey,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? '${user.name} unblocked.'
+                : widget.vm.errorMessage ?? 'Failed.',
+          ),
+          backgroundColor: ok ? AppColors.secondary : Colors.grey,
+        ),
+      );
     }
   }
 
@@ -208,10 +316,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     if (!confirmed || !mounted) return;
     final ok = await widget.vm.deleteUser(user.id);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? '${user.name} deleted.' : widget.vm.errorMessage ?? 'Failed.'),
-        backgroundColor: ok ? AppColors.muted : Colors.grey,
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok ? '${user.name} deleted.' : widget.vm.errorMessage ?? 'Failed.',
+          ),
+          backgroundColor: ok ? AppColors.muted : Colors.grey,
+        ),
+      );
     }
   }
 
@@ -224,10 +336,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+        ),
         content: Text(body, style: const TextStyle(color: AppColors.muted)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: confirmColor),
@@ -252,7 +370,7 @@ class _UsersTable extends StatelessWidget {
     required this.onAssign,
   });
 
-  final List<AdminUserItem>       users;
+  final List<AdminUserItem> users;
   final void Function(AdminUserItem) onView;
   final void Function(AdminUserItem) onBlock;
   final void Function(AdminUserItem) onUnblock;
@@ -270,14 +388,14 @@ class _UsersTable extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: const Row(
               children: [
-                _HeaderCell('#',         width: 36),
-                _HeaderCell('User',      flex: 3),
-                _HeaderCell('Role',      flex: 2),
-                _HeaderCell('Location',  flex: 2),
-                _HeaderCell('Status',    flex: 2),
+                _HeaderCell('#', width: 36),
+                _HeaderCell('User', flex: 3),
+                _HeaderCell('Role', flex: 2),
+                _HeaderCell('Location', flex: 2),
+                _HeaderCell('Status', flex: 2),
                 _HeaderCell('Registered', flex: 2),
-                _HeaderCell('Approval',  flex: 2),
-                _HeaderCell('Actions',   flex: 3),
+                _HeaderCell('Approval', flex: 2),
+                _HeaderCell('Actions', flex: 3),
               ],
             ),
           ),
@@ -288,15 +406,16 @@ class _UsersTable extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: users.length,
-            separatorBuilder: (_, _) => const Divider(height: 1, indent: 16, endIndent: 16),
+            separatorBuilder: (_, _) =>
+                const Divider(height: 1, indent: 16, endIndent: 16),
             itemBuilder: (_, i) => _UserRow(
               index: i + 1,
               user: users[i],
-              onView:    () => onView(users[i]),
-              onBlock:   () => onBlock(users[i]),
+              onView: () => onView(users[i]),
+              onBlock: () => onBlock(users[i]),
               onUnblock: () => onUnblock(users[i]),
-              onDelete:  () => onDelete(users[i]),
-              onAssign:  () => onAssign(users[i]),
+              onDelete: () => onDelete(users[i]),
+              onAssign: () => onAssign(users[i]),
             ),
           ),
         ],
@@ -309,7 +428,7 @@ class _HeaderCell extends StatelessWidget {
   const _HeaderCell(this.label, {this.width, this.flex});
   final String label;
   final double? width;
-  final int?    flex;
+  final int? flex;
 
   @override
   Widget build(BuildContext context) {
@@ -340,13 +459,13 @@ class _UserRow extends StatelessWidget {
     required this.onAssign,
   });
 
-  final int           index;
+  final int index;
   final AdminUserItem user;
-  final VoidCallback  onView;
-  final VoidCallback  onBlock;
-  final VoidCallback  onUnblock;
-  final VoidCallback  onDelete;
-  final VoidCallback  onAssign;
+  final VoidCallback onView;
+  final VoidCallback onBlock;
+  final VoidCallback onUnblock;
+  final VoidCallback onDelete;
+  final VoidCallback onAssign;
 
   @override
   Widget build(BuildContext context) {
@@ -425,10 +544,7 @@ class _UserRow extends StatelessWidget {
             ),
 
             // ── Role ───────────────────────────────────────────────────
-            Expanded(
-              flex: 2,
-              child: _RoleBadge(role: user.role),
-            ),
+            Expanded(flex: 2, child: _RoleBadge(role: user.role)),
 
             // ── Location ───────────────────────────────────────────────
             Expanded(
@@ -444,10 +560,7 @@ class _UserRow extends StatelessWidget {
             // ── Status (active/blocked) ────────────────────────────────
             Expanded(
               flex: 2,
-              child: _Badge(
-                label: statusLabel,
-                color: statusColor,
-              ),
+              child: _Badge(label: statusLabel, color: statusColor),
             ),
 
             // ── Registered date ────────────────────────────────────────
@@ -462,10 +575,7 @@ class _UserRow extends StatelessWidget {
             // ── Approval status ────────────────────────────────────────
             Expanded(
               flex: 2,
-              child: _Badge(
-                label: approvalLabel,
-                color: approvalColor,
-              ),
+              child: _Badge(label: approvalLabel, color: approvalColor),
             ),
 
             // ── Actions ────────────────────────────────────────────────
@@ -473,11 +583,11 @@ class _UserRow extends StatelessWidget {
               flex: 3,
               child: _ActionsCell(
                 user: user,
-                onView:    onView,
-                onBlock:   onBlock,
+                onView: onView,
+                onBlock: onBlock,
                 onUnblock: onUnblock,
-                onDelete:  onDelete,
-                onAssign:  onAssign,
+                onDelete: onDelete,
+                onAssign: onAssign,
               ),
             ),
           ],
@@ -487,35 +597,35 @@ class _UserRow extends StatelessWidget {
   }
 
   static Color _statusColor(String s) => switch (s) {
-        'approved'             => AppColors.secondary,
-        'pending_verification' => const Color(0xFFFF8C00),
-        'deactivated'          => AppColors.softRed,
-        _                      => AppColors.muted,
-      };
+    'approved' => AppColors.secondary,
+    'pending' || 'pending_verification' => const Color(0xFFFF8C00),
+    'deactivated' => AppColors.softRed,
+    _ => AppColors.muted,
+  };
 
   static String _statusLabel(String s) => switch (s) {
-        'approved'             => 'Active',
-        'pending_verification' => 'Pending',
-        'deactivated'          => 'Blocked',
-        'rejected'             => 'Rejected',
-        _                      => s,
-      };
+    'approved' => 'Active',
+    'pending' || 'pending_verification' => 'Pending',
+    'deactivated' => 'Blocked',
+    'rejected' => 'Rejected',
+    _ => s,
+  };
 
   static Color _approvalColor(String s) => switch (s) {
-        'approved'             => AppColors.secondary,
-        'pending_verification' => const Color(0xFFFF8C00),
-        'rejected'             => AppColors.softRed,
-        'deactivated'          => AppColors.softRed,
-        _                      => AppColors.muted,
-      };
+    'approved' => AppColors.secondary,
+    'pending' || 'pending_verification' => const Color(0xFFFF8C00),
+    'rejected' => AppColors.softRed,
+    'deactivated' => AppColors.softRed,
+    _ => AppColors.muted,
+  };
 
   static String _approvalLabel(String s) => switch (s) {
-        'approved'             => 'Approved',
-        'pending_verification' => 'Waiting',
-        'rejected'             => 'Rejected',
-        'deactivated'          => 'Blocked',
-        _                      => s,
-      };
+    'approved' => 'Approved',
+    'pending' || 'pending_verification' => 'Waiting',
+    'rejected' => 'Rejected',
+    'deactivated' => 'Blocked',
+    _ => s,
+  };
 
   static String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
@@ -534,11 +644,11 @@ class _ActionsCell extends StatelessWidget {
   });
 
   final AdminUserItem user;
-  final VoidCallback  onView;
-  final VoidCallback  onBlock;
-  final VoidCallback  onUnblock;
-  final VoidCallback  onDelete;
-  final VoidCallback  onAssign;
+  final VoidCallback onView;
+  final VoidCallback onBlock;
+  final VoidCallback onUnblock;
+  final VoidCallback onDelete;
+  final VoidCallback onAssign;
 
   @override
   Widget build(BuildContext context) {
@@ -546,15 +656,45 @@ class _ActionsCell extends StatelessWidget {
       spacing: 4,
       runSpacing: 4,
       children: [
-        _MiniBtn(icon: Icons.visibility_outlined, tooltip: 'View', color: AppColors.primary, onTap: onView),
+        _MiniBtn(
+          icon: Icons.visibility_outlined,
+          tooltip: 'View',
+          color: AppColors.primary,
+          onTap: onView,
+        ),
         if (user.isPending)
-          _MiniBtn(icon: Icons.check_circle_outline_rounded, tooltip: 'Approve', color: AppColors.secondary, onTap: onAssign),
+          _MiniBtn(
+            icon: Icons.check_circle_outline_rounded,
+            tooltip: 'Approve',
+            color: AppColors.secondary,
+            onTap: onAssign,
+          ),
         if (user.isBlocked)
-          _MiniBtn(icon: Icons.lock_open_rounded, tooltip: 'Unblock', color: AppColors.secondary, onTap: onUnblock)
+          _MiniBtn(
+            icon: Icons.lock_open_rounded,
+            tooltip: 'Unblock',
+            color: AppColors.secondary,
+            onTap: onUnblock,
+          )
         else if (!user.isPending)
-          _MiniBtn(icon: Icons.block_rounded, tooltip: 'Block', color: AppColors.softRed, onTap: onBlock),
-        _MiniBtn(icon: Icons.manage_accounts_rounded, tooltip: 'Assign Role', color: const Color(0xFF6B48FF), onTap: onAssign),
-        _MiniBtn(icon: Icons.delete_outline_rounded, tooltip: 'Delete', color: AppColors.muted, onTap: onDelete),
+          _MiniBtn(
+            icon: Icons.block_rounded,
+            tooltip: 'Block',
+            color: AppColors.softRed,
+            onTap: onBlock,
+          ),
+        _MiniBtn(
+          icon: Icons.manage_accounts_rounded,
+          tooltip: 'Assign Role',
+          color: const Color(0xFF6B48FF),
+          onTap: onAssign,
+        ),
+        _MiniBtn(
+          icon: Icons.delete_outline_rounded,
+          tooltip: 'Delete',
+          color: AppColors.muted,
+          onTap: onDelete,
+        ),
       ],
     );
   }
@@ -568,9 +708,9 @@ class _MiniBtn extends StatelessWidget {
     required this.onTap,
   });
 
-  final IconData     icon;
-  final String       tooltip;
-  final Color        color;
+  final IconData icon;
+  final String tooltip;
+  final Color color;
   final VoidCallback onTap;
 
   @override
@@ -598,7 +738,7 @@ class _MiniBtn extends StatelessWidget {
 class _Badge extends StatelessWidget {
   const _Badge({required this.label, required this.color});
   final String label;
-  final Color  color;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -626,12 +766,12 @@ class _RoleBadge extends StatelessWidget {
   final String role;
 
   static final _config = {
-    'student':         (AppColors.primary,        'Student'),
-    'mentor':          (AppColors.secondary,       'Counsellor'),
-    'content_creator': (AppColors.accent,          'Creator'),
-    'admin':           (const Color(0xFF6B48FF),   'Admin'),
-    'super_admin':     (const Color(0xFF6B48FF),   'Super Admin'),
-    'guest':           (AppColors.muted,           'Guest'),
+    'student': (AppColors.primary, 'Student'),
+    'mentor': (AppColors.secondary, 'Counsellor'),
+    'content_creator': (AppColors.accent, 'Creator'),
+    'admin': (const Color(0xFF6B48FF), 'Admin'),
+    'super_admin': (const Color(0xFF6B48FF), 'Super Admin'),
+    'guest': (AppColors.muted, 'Guest'),
   };
 
   @override
@@ -651,10 +791,10 @@ class _Chip extends StatelessWidget {
     this.color,
   });
 
-  final String       label;
-  final bool         selected;
+  final String label;
+  final bool selected;
   final VoidCallback onTap;
-  final Color?       color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -698,7 +838,11 @@ class _EmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.people_outline_rounded, size: 56, color: AppColors.muted),
+            Icon(
+              Icons.people_outline_rounded,
+              size: 56,
+              color: AppColors.muted,
+            ),
             SizedBox(height: 12),
             Text(
               'No users found yet.',

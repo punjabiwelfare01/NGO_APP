@@ -49,9 +49,22 @@ class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
     try {
       final user = await AdminRepository.getUserDetail(widget.userId);
       if (mounted) {
+        final requestedRole = user.requestedRole == 'counsellor'
+            ? 'mentor'
+            : user.requestedRole;
+        const assignableRoles = {
+          'student',
+          'mentor',
+          'content_creator',
+          'event_manager',
+          'support_staff',
+          'school_partner',
+        };
         setState(() {
           _user = user;
-          _selectedRole = user.requestedRole ?? 'student';
+          _selectedRole = assignableRoles.contains(requestedRole)
+              ? requestedRole
+              : null;
           _loading = false;
         });
       }
@@ -324,10 +337,13 @@ class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
   }
 
   static String _roleLabel(String role) => switch (role) {
-    'mentor' => 'Mentor',
+    'mentor' || 'counsellor' => 'Counsellor',
     'content_creator' => 'Content Creator',
+    'event_manager' => 'Event Manager',
+    'support_staff' => 'Support Staff',
+    'school_partner' => 'School Partner',
     'admin' => 'Admin',
-    _ => 'Student',
+    _ => 'Student Volunteer',
   };
 }
 
@@ -532,6 +548,12 @@ class _RoleSelector extends StatelessWidget {
       'Support Staff',
       Icons.support_agent_rounded,
       Color(0xFF009688),
+    ),
+    (
+      'school_partner',
+      'School Partner',
+      Icons.account_balance_rounded,
+      Color(0xFF1565C0),
     ),
   ];
 

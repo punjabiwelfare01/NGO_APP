@@ -54,4 +54,37 @@ class UserRepository {
             as Map<String, dynamic>;
     return AppUser.fromJson(json);
   }
+
+  /// POST /users/me/photo — uploads image bytes and returns the updated user.
+  /// Pass [bytes] on web (where file paths are unavailable) or [filePath] on
+  /// mobile. Exactly one must be non-null.
+  static Future<AppUser> uploadProfilePhoto({
+    List<int>? bytes,
+    String? filePath,
+    required String fileName,
+  }) async {
+    assert(
+      (bytes != null) != (filePath != null),
+      'Provide bytes (web) OR filePath (mobile), not both',
+    );
+    final Map<String, dynamic> json;
+    if (bytes != null) {
+      json = await ApiClient.postMultipart(
+        '/users/me/photo',
+        fields: const {},
+        fileBytes: bytes,
+        fileName: fileName,
+        fileField: 'file',
+      ) as Map<String, dynamic>;
+    } else {
+      json = await ApiClient.postMultipartFromPath(
+        '/users/me/photo',
+        fields: const {},
+        filePath: filePath!,
+        fileName: fileName,
+        fileField: 'file',
+      ) as Map<String, dynamic>;
+    }
+    return AppUser.fromJson(json);
+  }
 }

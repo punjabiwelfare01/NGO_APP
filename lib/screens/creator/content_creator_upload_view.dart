@@ -11,10 +11,10 @@ import '../../repositories/creator_repository.dart';
 import '../../repositories/event_repository.dart';
 import '../../repositories/quiz_repository.dart';
 import 'create_post_screen.dart';
+import '../learn/admin/create_lesson_screen.dart';
 import '../events/admin/create_event/create_event_view.dart';
 import '../events/admin/create_event/quiz/create_quiz_screen.dart';
-import '../learn/learn_view.dart';
-import '../learn/admin/create_course_screen.dart';
+import '../learn/admin/create_free_course_screen.dart';
 import '../learn/admin/manage_skill_categories_screen.dart';
 
 class ContentCreatorUploadView extends StatefulWidget {
@@ -85,11 +85,12 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
           const SizedBox(height: 18),
           _CreateActionGrid(
             onCreateEvent: _openCreateEvent,
-            onAddCourse: _openCreateCourse,
-            onAddLesson: _openCreateLesson,
+            onCreateFreeCourse: _openCreateCourse,
+            onAddLesson: () => _openCreateLesson(),
             onCreateQuiz: _openCreateQuiz,
             onCreatePost: _openCreatePost,
-            onUploadPdfNotes: _openCreateLesson,
+            onUploadPdfNotes: () => _openCreateLesson(notesFirst: true),
+            onReviewPending: () => _showDrafts(recentUploads),
           ),
           const SizedBox(height: 18),
           _CategoryFilters(
@@ -189,18 +190,55 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
 
   Future<void> _openCreateCourse() async {
     final created = await Navigator.of(context).push<Course>(
-      MaterialPageRoute(builder: (_) => const CreateCourseScreen()),
+      MaterialPageRoute(builder: (_) => const CreateFreeCourseScreen()),
     );
     if (created != null) await _load();
   }
 
-  Future<void> _openCreateLesson() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const Scaffold(body: LearnView()),
+  Future<void> _openCreateLesson({bool notesFirst = false}) async {
+    if (_courses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Create a free course before adding lessons.'),
+        ),
+      );
+      return;
+    }
+    final course = await showDialog<Course>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(
+          notesFirst ? 'Add notes to course' : 'Add lesson to course',
+        ),
+        children: _courses
+            .map(
+              (course) => SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, course),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(course.icon, color: AppColors.primary),
+                  title: Text(course.title),
+                  subtitle: Text(course.freeCategory),
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
-    await _load();
+    if (course == null || !mounted) return;
+    final saved = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateLessonScreen(
+          courseId: course.id,
+          courseType: CourseType.skill,
+          courseTitle: course.title,
+          subject: course.subjects.firstOrNull ?? course.subject,
+          skillCategory: course.freeCategory,
+          nextOrder: course.lessonCount,
+        ),
+      ),
+    );
+    if (saved != null) await _load();
   }
 
   Future<void> _openCreateQuiz() async {
@@ -292,36 +330,31 @@ class _UploadHeader extends StatelessWidget {
 class _CreateActionGrid extends StatelessWidget {
   const _CreateActionGrid({
     required this.onCreateEvent,
-    required this.onAddCourse,
+    required this.onCreateFreeCourse,
     required this.onAddLesson,
     required this.onCreateQuiz,
     required this.onCreatePost,
     required this.onUploadPdfNotes,
+    required this.onReviewPending,
   });
 
   final VoidCallback onCreateEvent;
-  final VoidCallback onAddCourse;
+  final VoidCallback onCreateFreeCourse;
   final VoidCallback onAddLesson;
   final VoidCallback onCreateQuiz;
   final VoidCallback onCreatePost;
   final VoidCallback onUploadPdfNotes;
+  final VoidCallback onReviewPending;
 
   @override
   Widget build(BuildContext context) {
     final actions = [
       _CreateActionData(
-        icon: Icons.calendar_month_rounded,
-        title: 'Create Event',
-        subtitle: '8-step event setup',
-        color: AppColors.primary,
-        onTap: onCreateEvent,
-      ),
-      _CreateActionData(
         icon: Icons.school_rounded,
-        title: 'Add Course',
-        subtitle: 'New course structure',
-        color: AppColors.secondary,
-        onTap: onAddCourse,
+        title: 'Create Free Course',
+        subtitle: 'Videos, notes, chapters and quizzes',
+        color: const Color(0xFF216DF4),
+        onTap: onCreateFreeCourse,
       ),
       _CreateActionData(
         icon: Icons.video_file_rounded,
@@ -331,25 +364,39 @@ class _CreateActionGrid extends StatelessWidget {
         onTap: onAddLesson,
       ),
       _CreateActionData(
+        icon: Icons.description_rounded,
+        title: 'Upload Notes',
+        subtitle: 'PDF, DOCX, worksheets',
+        color: const Color(0xFF13B8B2),
+        onTap: onUploadPdfNotes,
+      ),
+      _CreateActionData(
         icon: Icons.help_rounded,
         title: 'Create Quiz',
-        subtitle: 'Add questions & rewards',
+        subtitle: 'Questions and rewards',
         color: AppColors.accent,
         onTap: onCreateQuiz,
       ),
       _CreateActionData(
+        icon: Icons.calendar_month_rounded,
+        title: 'Create Event',
+        subtitle: 'NGO event or workshop',
+        color: AppColors.primary,
+        onTap: onCreateEvent,
+      ),
+      _CreateActionData(
         icon: Icons.campaign_rounded,
         title: 'Create Post',
-        subtitle: 'Learning post or NGO event post',
+        subtitle: 'Learning or NGO update',
         color: const Color(0xFF2F8BFF),
         onTap: onCreatePost,
       ),
       _CreateActionData(
-        icon: Icons.description_rounded,
-        title: 'Upload PDF/Notes',
-        subtitle: 'Resources and study material',
-        color: const Color(0xFF13B8B2),
-        onTap: onUploadPdfNotes,
+        icon: Icons.pending_actions_rounded,
+        title: 'Review Pending',
+        subtitle: 'Approve submitted content',
+        color: const Color(0xFFFF9A2E),
+        onTap: onReviewPending,
       ),
     ];
 

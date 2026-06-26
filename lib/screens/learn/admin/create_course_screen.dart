@@ -7,9 +7,14 @@ import '../../../repositories/course_repository.dart';
 import '../../../utils/icon_mapper.dart';
 
 class CreateCourseScreen extends StatefulWidget {
-  const CreateCourseScreen({this.initialCourse, super.key});
+  const CreateCourseScreen({
+    this.initialCourse,
+    this.initialCourseType,
+    super.key,
+  });
 
   final Course? initialCourse;
+  final String? initialCourseType;
 
   @override
   State<CreateCourseScreen> createState() => _CreateCourseScreenState();
@@ -18,17 +23,44 @@ class CreateCourseScreen extends StatefulWidget {
 class _CreateCourseScreenState extends State<CreateCourseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
   final _durationCtrl = TextEditingController();
 
+  String _courseType = CourseType.skill;
+  String _classLevel = '8';
+  String _subject = 'Science';
+  String _skillCategory = 'Digital Literacy';
   String _level = 'Beginner';
   String _iconName = 'code_rounded';
   String _colorHex = '#DDF1FF';
   int? _categoryId;
+  int? _recommendedClassMin;
+  int? _recommendedClassMax;
 
   List<SkillCategory> _categories = [];
   bool _saving = false;
 
   static const _levels = ['Beginner', 'Intermediate', 'Advanced'];
+
+  static const _skillCategories = [
+    'Video Editing',
+    'Cyber Security',
+    'Programming',
+    'Python Programming',
+    'Web Development',
+    'App Development',
+    'Animation Creation',
+    'Graphic Design',
+    'Digital Literacy',
+    'Communication Skills',
+    'Public Speaking',
+    'Career Guidance',
+    'Resume Building',
+    'AI Basics',
+    'Financial Literacy',
+    'Internet Safety',
+    'Computer Basics',
+  ];
 
   static const _iconOptions = <String, IconData>{
     'code_rounded': Icons.code_rounded,
@@ -64,18 +96,29 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     final course = widget.initialCourse;
     if (course != null) {
       _titleCtrl.text = course.title;
+      _descCtrl.text = course.courseDescription ?? '';
       _durationCtrl.text = course.duration;
+      _courseType = course.courseType;
+      _classLevel = course.classLevel ?? _classLevel;
+      _subject = course.subject ?? _subject;
+      _skillCategory = course.skillCategory ?? _skillCategory;
       _level = course.level;
       _iconName = course.iconName;
       _colorHex = course.colorHex;
       _categoryId = course.categoryId;
+      _recommendedClassMin = course.recommendedClassMin;
+      _recommendedClassMax = course.recommendedClassMax;
+    } else if (widget.initialCourseType != null) {
+      _courseType = widget.initialCourseType!;
     }
+    _ensureValidSubjectForClass();
     _loadCategories();
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
+    _descCtrl.dispose();
     _durationCtrl.dispose();
     super.dispose();
   }
@@ -87,7 +130,21 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
     } catch (_) {}
   }
 
-  Future<void> _save() async {
+  void _setClassLevel(String level) {
+    setState(() {
+      _classLevel = level;
+      _ensureValidSubjectForClass();
+    });
+  }
+
+  void _ensureValidSubjectForClass() {
+    final subjects = academicSubjectsForClass(_classLevel, includeAll: false);
+    if (!subjects.contains(_subject)) {
+      _subject = subjects.first;
+    }
+  }
+
+  Future<void> _saveAs({required bool publish}) async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
@@ -104,6 +161,21 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
               iconName: _iconName,
               colorHex: _colorHex,
               categoryId: _categoryId,
+              courseType: _courseType,
+              classLevel: _courseType == CourseType.academic
+                  ? _classLevel
+                  : null,
+              subject: _courseType == CourseType.academic ? _subject : null,
+              skillCategory: _courseType == CourseType.skill
+                  ? _skillCategory
+                  : null,
+              recommendedClassMin: _courseType == CourseType.skill
+                  ? _recommendedClassMin
+                  : null,
+              recommendedClassMax: _courseType == CourseType.skill
+                  ? _recommendedClassMax
+                  : null,
+              isPublished: publish,
             )
           : await CourseRepository.updateCourse(
               initial.id,
@@ -113,7 +185,28 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
               iconName: _iconName,
               colorHex: _colorHex,
               categoryId: _categoryId,
+              courseType: _courseType,
+              classLevel: _courseType == CourseType.academic
+                  ? _classLevel
+                  : null,
+              subject: _courseType == CourseType.academic ? _subject : null,
+              skillCategory: _courseType == CourseType.skill
+                  ? _skillCategory
+                  : null,
+              recommendedClassMin: _courseType == CourseType.skill
+                  ? _recommendedClassMin
+                  : null,
+              recommendedClassMax: _courseType == CourseType.skill
+                  ? _recommendedClassMax
+                  : null,
+              isPublished: publish,
             );
+      if (_descCtrl.text.trim().isNotEmpty) {
+        await CourseRepository.updateCourseSalesInfo(
+          course.id,
+          courseDescription: _descCtrl.text.trim(),
+        );
+      }
       if (mounted) Navigator.of(context).pop(course);
     } catch (_) {
       if (mounted) {
@@ -144,31 +237,7 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
             color: AppColors.ink,
           ),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-              ),
-              child: _saving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(widget.initialCourse == null ? 'Create' : 'Save'),
-            ),
-          ),
-        ],
+        actions: const [],
       ),
       body: Form(
         key: _formKey,
@@ -196,6 +265,139 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                   (v == null || v.trim().isEmpty) ? 'Title is required' : null,
             ),
             const SizedBox(height: 20),
+
+            _Label('Course Type'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _SelectChip(
+                    label: 'Academic',
+                    selected: _courseType == CourseType.academic,
+                    onTap: () =>
+                        setState(() => _courseType = CourseType.academic),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _SelectChip(
+                    label: 'Skill',
+                    selected: _courseType == CourseType.skill,
+                    onTap: () => setState(() => _courseType = CourseType.skill),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            _Label('Description'),
+            const SizedBox(height: 6),
+            TextFormField(
+              controller: _descCtrl,
+              decoration: _deco('What will students learn in this course?'),
+              minLines: 3,
+              maxLines: 5,
+              onChanged: (_) => setState(() {}),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Description is required'
+                  : null,
+            ),
+            const SizedBox(height: 20),
+
+            if (_courseType == CourseType.academic) ...[
+              _Label('Class Level'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: academicClasses
+                    .map(
+                      (level) => _SelectChip(
+                        label: 'Class $level',
+                        selected: _classLevel == level,
+                        onTap: () => _setClassLevel(level),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 20),
+              _Label('Subject'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    academicSubjectsForClass(_classLevel, includeAll: false)
+                        .map(
+                          (subject) => _SelectChip(
+                            label: subject,
+                            selected: _subject == subject,
+                            onTap: () => setState(() => _subject = subject),
+                          ),
+                        )
+                        .toList(),
+              ),
+              const SizedBox(height: 20),
+            ] else ...[
+              _Label('Skill Category'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _skillCategories
+                    .map(
+                      (category) => _SelectChip(
+                        label: category,
+                        selected: _skillCategory == category,
+                        onTap: () => setState(() => _skillCategory = category),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 20),
+              _Label('Recommended Class Range (optional)'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      initialValue: _recommendedClassMin,
+                      decoration: _deco('Min'),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('Any')),
+                        ...academicClasses.map(
+                          (level) => DropdownMenuItem(
+                            value: int.parse(level),
+                            child: Text('Class $level'),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _recommendedClassMin = value),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      initialValue: _recommendedClassMax,
+                      decoration: _deco('Max'),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('Any')),
+                        ...academicClasses.map(
+                          (level) => DropdownMenuItem(
+                            value: int.parse(level),
+                            child: Text('Class $level'),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _recommendedClassMax = value),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // Duration
             _Label('Duration (e.g. 2h 30m)'),
@@ -328,7 +530,74 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
+
+            // ── Publish actions ───────────────────────────────────────────
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FilledButton.icon(
+                  onPressed: _saving ? null : () => _saveAs(publish: true),
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.publish_rounded, size: 18),
+                  label: Text(
+                    widget.initialCourse == null
+                        ? 'Publish Course'
+                        : 'Save & Publish',
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF2FAE65),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _saving ? null : () => _saveAs(publish: false),
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: Text(
+                    widget.initialCourse == null
+                        ? 'Save as Draft'
+                        : 'Save as Draft',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Center(
+                  child: Text(
+                    'Draft courses are not visible to students.',
+                    style: TextStyle(
+                      color: AppColors.muted.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

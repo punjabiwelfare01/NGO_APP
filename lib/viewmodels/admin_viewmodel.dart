@@ -38,9 +38,11 @@ class AdminViewModel extends ChangeNotifier {
     try {
       final results = await Future.wait([
         AdminRepository.getPendingUsers(),
-        AdminRepository.getNotifications(),
+        AdminRepository.getNotifications().catchError(
+          (_) => <AdminNotification>[],
+        ),
         AdminRepository.getStats(),
-        AdminRepository.getAllUsers(),
+        AdminRepository.getAllUsers().catchError((_) => <AdminUserItem>[]),
       ]);
       _pendingUsers = results[0] as List<PendingUserItem>;
       _notifications = results[1] as List<AdminNotification>;
@@ -58,11 +60,19 @@ class AdminViewModel extends ChangeNotifier {
   }
 
   Future<void> loadPendingUsers() async {
+    _state = ViewState.loading;
+    _errorMessage = null;
+    if (!_disposed) notifyListeners();
     try {
       _pendingUsers = await AdminRepository.getPendingUsers();
-    } on ApiException {
-      // silently ignore
-    } catch (_) {}
+      _state = ViewState.idle;
+    } on ApiException catch (error) {
+      _state = ViewState.error;
+      _errorMessage = 'Unable to load pending approvals (${error.statusCode}).';
+    } catch (_) {
+      _state = ViewState.error;
+      _errorMessage = 'Unable to load pending approvals. Please refresh.';
+    }
     if (!_disposed) notifyListeners();
   }
 

@@ -18,6 +18,44 @@ router = APIRouter(prefix="/counselling", tags=["Counselling"])
 
 # ── Mentor Profiles ────────────────────────────────────────────────────────────
 
+@router.get("/mentors/me", response_model=MentorProfileResponse,
+            summary="Get the current counsellor's profile")
+def get_my_mentor_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.mentor:
+        raise HTTPException(status_code=403, detail="Counsellor access required")
+    profile = counselling_crud.get_mentor_by_user(db, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Counsellor profile not found")
+    return profile
+
+
+@router.patch("/mentors/me", response_model=MentorProfileResponse,
+              summary="Create or update the current counsellor's editable public profile")
+def update_my_mentor_profile(
+    payload: MentorProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.mentor:
+        raise HTTPException(status_code=403, detail="Counsellor access required")
+    profile = counselling_crud.get_mentor_by_user(db, current_user.id)
+    if not profile:
+        return counselling_crud.create_mentor_profile(
+            db,
+            current_user.id,
+            MentorProfileCreate(
+                display_name=payload.display_name or current_user.name,
+                bio=payload.bio,
+                expertise=payload.expertise,
+                category=payload.category,
+                profile_image_url=payload.profile_image_url,
+            ),
+        )
+    return counselling_crud.update_mentor_profile(db, profile.id, payload)
+
 @router.get("/mentors", response_model=list[MentorProfileResponse],
             summary="List active mentor profiles [authenticated]")
 def list_mentors(

@@ -91,7 +91,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           lesson.contentType == 'text' ||
               lesson.contentType == 'mixed' ||
               (lesson.contentText?.trim().isNotEmpty ?? false),
-        'pdf' => resources.any((r) => r.type == 'pdf'),
+        'pdf' => resources.any((r) => r.type == 'pdf' || r.type == 'pdf_notes'),
         'completed' => lesson.completed,
         'pending' => !lesson.completed,
         _ => true,
@@ -119,6 +119,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       MaterialPageRoute(
         builder: (_) => CreateLessonScreen(
           courseId: _course.id,
+          courseType: CourseType.skill,
+          subject: _course.subjects.firstOrNull ?? _course.subject,
           nextOrder: _lessons.length,
         ),
       ),
@@ -210,14 +212,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     }
   }
 
-  void _showPlanSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _BuyPlanSheet(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final filteredLessons = _filteredLessons;
@@ -256,15 +250,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               lessonCount: _lessons.length,
               onContinue: () {},
             ),
-            const SizedBox(height: 14),
-            _BuyPlanCard(onBuy: _showPlanSheet),
-            const SizedBox(height: 14),
             _PreviewPanel(
               course: _course,
               lessons: _lessons,
               resourcesByLesson: _resourcesByLesson,
               videoUrl: _previewVideoUrl,
-              onBuy: _showPlanSheet,
             ),
             const SizedBox(height: 18),
             _FilterBar(
@@ -306,18 +296,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 text: 'No lessons match this filter.',
               )
             else
-              ...filteredLessons.map(
-                (lesson) => _LessonExpansionCard(
-                  courseId: _course.id,
-                  lesson: lesson,
-                  index: _lessons.indexWhere((item) => item.id == lesson.id),
-                  resources: _visibleResourcesFor(lesson),
-                  nextLesson: _nextLessonAfter(lesson),
-                  canManage: _canManage,
-                  onComplete: () => _markComplete(lesson),
-                  onDelete: () => _confirmDeleteLesson(lesson),
-                ),
-              ),
+              ..._groupedLessonWidgets(filteredLessons),
             if (_lessons.isNotEmpty &&
                 _lessons.every((lesson) => lesson.completed)) ...[
               const SizedBox(height: 12),
@@ -342,6 +321,79 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           (resource.textContent?.trim() == lesson.contentText?.trim());
       return !isLegacyOutcomeNote;
     }).toList();
+  }
+
+  List<Widget> _groupedLessonWidgets(List<Lesson> lessons) {
+    final subjects = <String, Map<String, List<Lesson>>>{};
+    for (final lesson in lessons) {
+      final subject = lesson.subject?.trim().isNotEmpty == true
+          ? lesson.subject!.trim()
+          : (_course.subject?.trim().isNotEmpty == true
+                ? _course.subject!.trim()
+                : 'Course Content');
+      final chapter = lesson.chapter?.trim().isNotEmpty == true
+          ? lesson.chapter!.trim()
+          : 'Core Lessons';
+      subjects.putIfAbsent(subject, () => {});
+      subjects[subject]!.putIfAbsent(chapter, () => []).add(lesson);
+    }
+    return [
+      for (final subject in subjects.entries) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 14, 2, 8),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.menu_book_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  subject.key,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        for (final chapter in subject.value.entries) ...[
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              chapter.key,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          for (final lesson in chapter.value)
+            _LessonExpansionCard(
+              courseId: _course.id,
+              lesson: lesson,
+              index: _lessons.indexWhere((item) => item.id == lesson.id),
+              resources: _visibleResourcesFor(lesson),
+              nextLesson: _nextLessonAfter(lesson),
+              canManage: _canManage,
+              onComplete: () => _markComplete(lesson),
+              onDelete: () => _confirmDeleteLesson(lesson),
+            ),
+        ],
+      ],
+    ];
   }
 }
 
@@ -396,7 +448,9 @@ class _CourseHeader extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Learn ${course.title.toLowerCase()} step by step.',
+                      course.courseDescription?.trim().isNotEmpty == true
+                          ? course.courseDescription!.trim()
+                          : 'Learn ${course.title.toLowerCase()} step by step.',
                       style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 13,
@@ -415,6 +469,15 @@ class _CourseHeader extends StatelessWidget {
               _StatChip(course.level, Icons.bar_chart_rounded),
               _StatChip(course.duration, Icons.timer_outlined),
               _StatChip('$lessonCount lessons', Icons.menu_book_rounded),
+              if (course.isAcademic && course.classLevel != null)
+                _StatChip('Class ${course.classLevel}', Icons.school_outlined),
+              if (course.isAcademic && course.subject != null)
+                _StatChip(course.subject!, Icons.category_outlined),
+              if (course.isSkill && course.skillCategory != null)
+                _StatChip(
+                  course.skillCategory!,
+                  Icons.workspace_premium_outlined,
+                ),
             ],
           ),
           const SizedBox(height: 14),
@@ -448,111 +511,11 @@ class _CourseHeader extends StatelessWidget {
   }
 }
 
-class _BuyPlanCard extends StatelessWidget {
-  const _BuyPlanCard({required this.onBuy});
-
-  final VoidCallback onBuy;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF3D0),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.workspace_premium_rounded, color: AppColors.ink),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Learning Plus Plan',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  '₹199/month · videos, PDF notes, offline downloads',
-                  style: TextStyle(color: AppColors.muted, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          FilledButton(
-            onPressed: onBuy,
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Buy Plan'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BuyPlanSheet extends StatelessWidget {
-  const _BuyPlanSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: const BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Learning Plus',
-            style: TextStyle(
-              color: AppColors.ink,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '₹199/month',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Includes demo video lessons, downloadable PDF notes, and offline learning resources.',
-            style: TextStyle(color: AppColors.muted, height: 1.5),
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-              child: const Text('Continue'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _PreviewPanel extends StatelessWidget {
   const _PreviewPanel({
     required this.course,
     required this.lessons,
     required this.resourcesByLesson,
-    required this.onBuy,
     this.videoUrl,
   });
 
@@ -560,7 +523,6 @@ class _PreviewPanel extends StatelessWidget {
   final List<Lesson> lessons;
   final Map<int, List<LearningResource>> resourcesByLesson;
   final String? videoUrl;
-  final VoidCallback onBuy;
 
   List<String> get _learnItems {
     if (course.learnItems != null && course.learnItems!.isNotEmpty) {
@@ -589,7 +551,9 @@ class _PreviewPanel extends StatelessWidget {
           lesson.contentType == 'video' || lesson.contentType == 'mixed',
     );
     final hasPdf = resourcesByLesson.values.any(
-      (resources) => resources.any((resource) => resource.type == 'pdf'),
+      (resources) => resources.any(
+        (resource) => resource.type == 'pdf' || resource.type == 'pdf_notes',
+      ),
     );
     final hasNotes = resourcesByLesson.values.any(
       (resources) => resources.any((resource) => resource.type == 'note'),
@@ -659,10 +623,6 @@ class _PreviewPanel extends StatelessWidget {
                 learnItems: _learnItems,
                 skillItems: _skillItems,
                 courseContent: _courseContent,
-                onBuy: onBuy,
-                offerPrice: course.offerPrice,
-                originalPrice: course.originalPrice,
-                offerLabel: course.offerLabel,
               );
 
               if (!wide) {
@@ -693,19 +653,11 @@ class _CourseSalesSummary extends StatelessWidget {
     required this.learnItems,
     required this.skillItems,
     required this.courseContent,
-    required this.onBuy,
-    this.offerPrice,
-    this.originalPrice,
-    this.offerLabel,
   });
 
   final List<String> learnItems;
   final List<String> skillItems;
   final String courseContent;
-  final VoidCallback onBuy;
-  final int? offerPrice;
-  final int? originalPrice;
-  final String? offerLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -771,86 +723,6 @@ class _CourseSalesSummary extends StatelessWidget {
               color: AppColors.muted,
               fontSize: 13,
               height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF3D0),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Limited learning offer',
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            '₹${offerPrice ?? 199}',
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          if (originalPrice != null) ...[
-                            const SizedBox(width: 8),
-                            Text(
-                              '₹$originalPrice',
-                              style: const TextStyle(
-                                color: AppColors.muted,
-                                fontSize: 13,
-                                decoration: TextDecoration.lineThrough,
-                              ),
-                            ),
-                          ] else ...[
-                            const SizedBox(width: 8),
-                            const Text(
-                              '₹499',
-                              style: TextStyle(
-                                color: AppColors.muted,
-                                fontSize: 13,
-                                decoration: TextDecoration.lineThrough,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        offerLabel ?? 'Save 60% · videos, PDFs, downloads',
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                FilledButton(
-                  onPressed: onBuy,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 12,
-                    ),
-                  ),
-                  child: const Text('Buy Now'),
-                ),
-              ],
             ),
           ),
         ],
@@ -1170,10 +1042,12 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
         .map((tag) => TextEditingController(text: tag))
         .toList();
     _descController = TextEditingController(text: c.courseDescription ?? '');
-    _offerPriceController =
-        TextEditingController(text: c.offerPrice?.toString() ?? '');
-    _originalPriceController =
-        TextEditingController(text: c.originalPrice?.toString() ?? '');
+    _offerPriceController = TextEditingController(
+      text: c.offerPrice?.toString() ?? '',
+    );
+    _originalPriceController = TextEditingController(
+      text: c.originalPrice?.toString() ?? '',
+    );
     _offerLabelController = TextEditingController(text: c.offerLabel ?? '');
   }
 
@@ -1201,8 +1075,7 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
           .where((s) => s.isNotEmpty)
           .toList();
       final offerPrice = int.tryParse(_offerPriceController.text.trim());
-      final originalPrice =
-          int.tryParse(_originalPriceController.text.trim());
+      final originalPrice = int.tryParse(_originalPriceController.text.trim());
       final offerLabel = _offerLabelController.text.trim();
       final desc = _descController.text.trim();
 
@@ -1288,8 +1161,9 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
                 ),
               ),
               TextButton.icon(
-                onPressed: () =>
-                    setState(() => _learnControllers.add(TextEditingController())),
+                onPressed: () => setState(
+                  () => _learnControllers.add(TextEditingController()),
+                ),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add item'),
               ),
@@ -1305,7 +1179,9 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
                       Expanded(
                         child: TextField(
                           controller: entry.value,
-                          decoration: _fieldDecoration('Skill ${entry.key + 1}'),
+                          decoration: _fieldDecoration(
+                            'Skill ${entry.key + 1}',
+                          ),
                         ),
                       ),
                       IconButton(
@@ -1322,8 +1198,9 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
                 ),
               ),
               TextButton.icon(
-                onPressed: () =>
-                    setState(() => _skillControllers.add(TextEditingController())),
+                onPressed: () => setState(
+                  () => _skillControllers.add(TextEditingController()),
+                ),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add skill'),
               ),
@@ -1372,8 +1249,9 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed:
-                        _saving ? null : () => Navigator.of(context).pop(),
+                    onPressed: _saving
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 8),
@@ -1403,23 +1281,20 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
   }
 
   InputDecoration _fieldDecoration(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.muted),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide:
-              BorderSide(color: AppColors.muted.withValues(alpha: 0.2)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide:
-              BorderSide(color: AppColors.muted.withValues(alpha: 0.2)),
-        ),
-      );
+    hintText: hint,
+    hintStyle: const TextStyle(color: AppColors.muted),
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: AppColors.muted.withValues(alpha: 0.2)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: AppColors.muted.withValues(alpha: 0.2)),
+    ),
+  );
 }
 
 class _SectionLabel extends StatelessWidget {
@@ -1474,4 +1349,3 @@ class _StatChip extends StatelessWidget {
     );
   }
 }
-

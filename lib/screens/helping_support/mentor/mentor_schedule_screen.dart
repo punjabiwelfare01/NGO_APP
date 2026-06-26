@@ -538,6 +538,7 @@ class _CreateSlotSheetState extends State<_CreateSlotSheet> {
       DateTime.now().add(const Duration(hours: 1)));
   int _durationMinutes = 45;
   int _capacity = 1;
+  final _capacityController = TextEditingController(text: '1');
   bool _saving = false;
   String? _error;
 
@@ -547,6 +548,7 @@ class _CreateSlotSheetState extends State<_CreateSlotSheet> {
   void dispose() {
     _topic.dispose();
     _meetingUrl.dispose();
+    _capacityController.dispose();
     super.dispose();
   }
 
@@ -727,43 +729,29 @@ class _CreateSlotSheetState extends State<_CreateSlotSheet> {
               const SizedBox(height: 14),
 
               // Capacity
-              const Text('Capacity (max students)',
-                  style: TextStyle(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  IconButton.outlined(
-                    onPressed: _capacity > 1
-                        ? () => setState(() => _capacity--)
-                        : null,
-                    icon: const Icon(Icons.remove_rounded),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      '$_capacity',
-                      style: const TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900),
-                    ),
-                  ),
-                  IconButton.outlined(
-                    onPressed: _capacity < 10
-                        ? () => setState(() => _capacity++)
-                        : null,
-                    icon: const Icon(Icons.add_rounded),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _capacity == 1 ? 'student' : 'students',
-                    style: const TextStyle(
-                        color: AppColors.muted, fontSize: 13),
-                  ),
-                ],
+              TextFormField(
+                controller: _capacityController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Capacity (max students)',
+                  hintText: '1 – 100',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.group_rounded),
+                  suffixText: 'students',
+                ),
+                onChanged: (val) {
+                  final parsed = int.tryParse(val);
+                  if (parsed != null && parsed >= 1 && parsed <= 100) {
+                    setState(() => _capacity = parsed);
+                  }
+                },
+                validator: (val) {
+                  final parsed = int.tryParse(val ?? '');
+                  if (parsed == null || parsed < 1 || parsed > 100) {
+                    return 'Enter a number between 1 and 100';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 14),
 

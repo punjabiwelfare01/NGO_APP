@@ -50,7 +50,7 @@ class NotificationsStep extends StatelessWidget {
                     color: AppColors.secondary),
                 title: const Text('In-App Notification'),
                 subtitle: const Text(
-                    'Show notifications inside the CareSkill app'),
+                    'Show notifications inside the Punjabi Welfare Trust app'),
                 value: vm.inAppNotification,
                 onChanged: (v) => vm.setInAppNotification(v ?? true),
                 activeColor: AppColors.primary,

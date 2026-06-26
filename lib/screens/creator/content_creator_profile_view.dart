@@ -507,7 +507,7 @@ class _InfoSection extends StatelessWidget {
         _ProfileRow(
           icon: Icons.apartment_rounded,
           label: 'Organization',
-          value: _value(user?.schoolName, fallback: 'CareSkill NGO'),
+          value: _value(user?.schoolName, fallback: 'Punjabi Welfare Trust'),
           color: AppColors.primary,
         ),
         _ProfileRow(
@@ -551,8 +551,11 @@ class _LogoutCard extends StatelessWidget {
                   color: AppColors.softRed.withValues(alpha: 0.11),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.logout_rounded,
-                    color: AppColors.softRed, size: 20),
+                child: const Icon(
+                  Icons.logout_rounded,
+                  color: AppColors.softRed,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 13),
               const Expanded(
@@ -565,8 +568,11 @@ class _LogoutCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppColors.muted, size: 24),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.muted,
+                size: 24,
+              ),
             ],
           ),
         ),
@@ -972,7 +978,7 @@ String _roleLabel(String? role) => switch (role) {
 
 String _statusLabel(String? status) => switch (status) {
   'approved' => 'Approved',
-  'pending_verification' => 'Pending Verification',
+  'pending' || 'pending_verification' => 'Pending Verification',
   'rejected' => 'Rejected',
   'deactivated' => 'Deactivated',
   _ => 'Unknown',

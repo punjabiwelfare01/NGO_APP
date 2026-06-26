@@ -1,53 +1,58 @@
 enum UserRole {
   superAdmin,
   admin,
-  mentor,       // Counsellor
+  mentor, // Counsellor
   contentCreator,
   student,
   eventManager,
   supportStaff,
+  schoolPartner,
   guest;
 
   static UserRole fromString(String value) => switch (value) {
-        'super_admin'     => UserRole.superAdmin,
-        'admin'           => UserRole.admin,
-        'mentor'          => UserRole.mentor,
-        'counsellor'      => UserRole.mentor,   // backend alias
-        'content_creator' => UserRole.contentCreator,
-        'student'         => UserRole.student,
-        'event_manager'   => UserRole.eventManager,
-        'support_staff'   => UserRole.supportStaff,
-        _                 => UserRole.guest,
-      };
+    'super_admin' => UserRole.superAdmin,
+    'admin' => UserRole.admin,
+    'mentor' => UserRole.mentor,
+    'counsellor' => UserRole.mentor, // backend alias
+    'content_creator' => UserRole.contentCreator,
+    'student' => UserRole.student,
+    'event_manager' => UserRole.eventManager,
+    'support_staff' => UserRole.supportStaff,
+    'school_partner' => UserRole.schoolPartner,
+    _ => UserRole.guest,
+  };
 
-  bool get isAdmin          => this == superAdmin || this == admin;
-  bool get isMentor         => this == mentor;
-  bool get isStudent        => this == student;
+  bool get isAdmin => this == superAdmin || this == admin;
+  bool get isMentor => this == mentor;
+  bool get isStudent => this == student;
   bool get isContentCreator => this == contentCreator;
-  bool get isEventManager   => this == eventManager;
-  bool get isSupportStaff   => this == supportStaff;
+  bool get isEventManager => this == eventManager;
+  bool get isSupportStaff => this == supportStaff;
+  bool get isSchoolPartner => this == schoolPartner;
 
   String get displayName => switch (this) {
-        UserRole.superAdmin     => 'Super Admin',
-        UserRole.admin          => 'Admin',
-        UserRole.mentor         => 'Counsellor',
-        UserRole.contentCreator => 'Content Creator',
-        UserRole.student        => 'Student',
-        UserRole.eventManager   => 'Event Manager',
-        UserRole.supportStaff   => 'Support Staff',
-        UserRole.guest          => 'Guest',
-      };
+    UserRole.superAdmin => 'Super Admin',
+    UserRole.admin => 'Admin',
+    UserRole.mentor => 'Counsellor',
+    UserRole.contentCreator => 'Content Creator',
+    UserRole.student => 'Student',
+    UserRole.eventManager => 'Event Manager',
+    UserRole.supportStaff => 'Support Staff',
+    UserRole.schoolPartner => 'School Partner',
+    UserRole.guest => 'Guest',
+  };
 
   String get apiValue => switch (this) {
-        UserRole.superAdmin     => 'super_admin',
-        UserRole.admin          => 'admin',
-        UserRole.mentor         => 'mentor',
-        UserRole.contentCreator => 'content_creator',
-        UserRole.student        => 'student',
-        UserRole.eventManager   => 'event_manager',
-        UserRole.supportStaff   => 'support_staff',
-        UserRole.guest          => 'guest',
-      };
+    UserRole.superAdmin => 'super_admin',
+    UserRole.admin => 'admin',
+    UserRole.mentor => 'mentor',
+    UserRole.contentCreator => 'content_creator',
+    UserRole.student => 'student',
+    UserRole.eventManager => 'event_manager',
+    UserRole.supportStaff => 'support_staff',
+    UserRole.schoolPartner => 'school_partner',
+    UserRole.guest => 'guest',
+  };
 }
 
 /// Account verification status set by admin after registration.
@@ -58,22 +63,25 @@ enum AccessStatus {
   deactivated;
 
   static AccessStatus fromString(String value) => switch (value) {
-        'pending_verification' => AccessStatus.pendingVerification,
-        'approved'             => AccessStatus.approved,
-        'rejected'             => AccessStatus.rejected,
-        'deactivated'          => AccessStatus.deactivated,
-        _                      => AccessStatus.pendingVerification,
-      };
+    'pending' => AccessStatus.pendingVerification,
+    'pending_verification' => AccessStatus.pendingVerification,
+    'pending_review' => AccessStatus.pendingVerification,
+    'under_review' => AccessStatus.pendingVerification,
+    'approved' => AccessStatus.approved,
+    'rejected' => AccessStatus.rejected,
+    'deactivated' => AccessStatus.deactivated,
+    _ => AccessStatus.pendingVerification,
+  };
 
   String get apiValue => switch (this) {
-        AccessStatus.pendingVerification => 'pending_verification',
-        AccessStatus.approved            => 'approved',
-        AccessStatus.rejected            => 'rejected',
-        AccessStatus.deactivated         => 'deactivated',
-      };
+    AccessStatus.pendingVerification => 'pending',
+    AccessStatus.approved => 'approved',
+    AccessStatus.rejected => 'rejected',
+    AccessStatus.deactivated => 'deactivated',
+  };
 
   bool get isApproved => this == approved;
-  bool get isPending  => this == pendingVerification;
+  bool get isPending => this == pendingVerification;
   bool get isRejected => this == rejected;
 }
 
@@ -100,19 +108,19 @@ class TokenResponse {
     //  2. Login+user:  nested { access_token, user: { id, role, name, ... } }
     //  3. Register:    { message, user: { id, role, name, access_status, ... } }
     //     (no access_token — registration keeps user in pending state)
-    final user  = j['user'] as Map<String, dynamic>?;
+    final user = j['user'] as Map<String, dynamic>?;
     final token = (j['access_token'] as String?) ?? '';
-    final role  = ((user?['role'] ?? j['role']) as String?) ?? 'student';
-    final id    = (user?['id'] ?? user?['user_id'] ?? j['user_id']) as int? ?? 0;
-    final name  = ((user?['name'] ?? j['name']) as String?) ?? '';
+    final role = ((user?['role'] ?? j['role']) as String?) ?? 'student';
+    final id = (user?['id'] ?? user?['user_id'] ?? j['user_id']) as int? ?? 0;
+    final name = ((user?['name'] ?? j['name']) as String?) ?? '';
     final status = (user?['access_status'] ?? j['access_status']) as String?;
     final reqRole = (user?['requested_role'] ?? j['requested_role']) as String?;
     return TokenResponse(
-      accessToken:   token,
-      role:          role,
-      userId:        id,
-      name:          name,
-      accessStatus:  status,
+      accessToken: token,
+      role: role,
+      userId: id,
+      name: name,
+      accessStatus: status,
       requestedRole: reqRole,
     );
   }

@@ -24,6 +24,13 @@ class Course(Base):
     icon_name = Column(String, nullable=False)
     color_hex = Column(String, nullable=False)
     category_id = Column(Integer, ForeignKey("skill_categories.id"), nullable=True)
+    course_type = Column(String, nullable=False, default="skill")  # academic | skill
+    class_level = Column(String, nullable=True)
+    subject = Column(String, nullable=True)
+    skill_category = Column(String, nullable=True)
+    recommended_class_min = Column(Integer, nullable=True)
+    recommended_class_max = Column(Integer, nullable=True)
+    is_published = Column(Boolean, nullable=False, default=True)
 
     # Admin-editable sales/preview card fields
     learn_items = Column(JSON, nullable=True)       # list[str] | null
@@ -66,6 +73,9 @@ class Lesson(Base):
     content_type = Column(String, nullable=False, default="text")  # text | video
     content_url = Column(String, nullable=True)   # used when content_type == 'video'
     content_text = Column(Text, nullable=True)    # used when content_type == 'text'
+    class_level = Column(String, nullable=True)
+    subject = Column(String, nullable=True)
+    chapter = Column(String, nullable=True)
     order = Column(Integer, nullable=False, default=0)
     duration_minutes = Column(Integer, nullable=True)
     is_published = Column(Boolean, nullable=False, default=True)

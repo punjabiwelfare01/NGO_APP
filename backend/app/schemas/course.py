@@ -31,6 +31,13 @@ class CourseCreate(BaseModel):
     icon_name: str
     color_hex: str
     category_id: Optional[int] = None
+    course_type: str = "skill"
+    class_level: Optional[str] = None
+    subject: Optional[str] = None
+    skill_category: Optional[str] = None
+    recommended_class_min: Optional[int] = None
+    recommended_class_max: Optional[int] = None
+    is_published: bool = True
     learn_items: Optional[list[str]] = None
     skill_tags: Optional[list[str]] = None
     course_description: Optional[str] = None
@@ -46,6 +53,13 @@ class CourseUpdate(BaseModel):
     icon_name: Optional[str] = None
     color_hex: Optional[str] = None
     category_id: Optional[int] = None
+    course_type: Optional[str] = None
+    class_level: Optional[str] = None
+    subject: Optional[str] = None
+    skill_category: Optional[str] = None
+    recommended_class_min: Optional[int] = None
+    recommended_class_max: Optional[int] = None
+    is_published: Optional[bool] = None
     learn_items: Optional[list[str]] = None
     skill_tags: Optional[list[str]] = None
     course_description: Optional[str] = None
@@ -62,6 +76,13 @@ class CourseResponse(BaseModel):
     icon_name: str
     color_hex: str
     category_id: Optional[int]
+    course_type: str = "skill"
+    class_level: Optional[str] = None
+    subject: Optional[str] = None
+    skill_category: Optional[str] = None
+    recommended_class_min: Optional[int] = None
+    recommended_class_max: Optional[int] = None
+    is_published: bool = True
     lesson_count: int = 0
     learn_items: Optional[list[str]] = None
     skill_tags: Optional[list[str]] = None
@@ -88,6 +109,8 @@ class LessonDetailResponse(BaseModel):
     content_type: str
     content: Optional[str]
     video_url: Optional[str]
+    class_level: Optional[str] = None
+    subject: Optional[str] = None
     duration_minutes: Optional[int]
     is_completed: bool = False
     is_published: bool = True
@@ -99,6 +122,10 @@ class CourseDetailResponse(BaseModel):
     title: str
     description: str
     difficulty: str
+    course_type: str = "skill"
+    class_level: Optional[str] = None
+    subject: Optional[str] = None
+    skill_category: Optional[str] = None
     duration_minutes: Optional[int]
     duration: str
     progress: int
@@ -133,6 +160,9 @@ class LessonCreate(BaseModel):
     content_type: str = "text"          # text | video
     content_url: Optional[str] = None
     content_text: Optional[str] = None
+    class_level: Optional[str] = None
+    subject: Optional[str] = None
+    chapter: Optional[str] = None
     order: int = 0
     duration_minutes: Optional[int] = None
     is_published: bool = True
@@ -144,6 +174,9 @@ class LessonUpdate(BaseModel):
     content_type: Optional[str] = None
     content_url: Optional[str] = None
     content_text: Optional[str] = None
+    class_level: Optional[str] = None
+    subject: Optional[str] = None
+    chapter: Optional[str] = None
     order: Optional[int] = None
     duration_minutes: Optional[int] = None
     is_published: Optional[bool] = None
@@ -157,6 +190,9 @@ class LessonResponse(BaseModel):
     content_type: str
     content_url: Optional[str]
     content_text: Optional[str]
+    class_level: Optional[str] = None
+    subject: Optional[str] = None
+    chapter: Optional[str] = None
     order: int
     duration_minutes: Optional[int]
     is_published: bool
@@ -167,7 +203,16 @@ class LessonResponse(BaseModel):
 
 # ── LearningResource schemas ────────────────────────────────────────────────────
 
-RESOURCE_TYPES = {"video", "pdf", "image", "note", "link", "zip"}
+RESOURCE_TYPES = {
+    "video",
+    "pdf",
+    "pdf_notes",
+    "image",
+    "note",
+    "link",
+    "zip",
+    "code_file",
+}
 
 
 class LearningResourceCreate(BaseModel):

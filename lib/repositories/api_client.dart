@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:dio/dio.dart' as dio_pkg;
 import 'package:http/http.dart' as http;
 
 import '../app_state.dart';
@@ -95,6 +96,7 @@ class ApiClient {
     required List<int> fileBytes,
     required String fileName,
     String fileField = 'file',
+    Duration? timeout,
   }) async {
     AppLogger.request('POST (multipart)', path);
     final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
@@ -107,11 +109,116 @@ class ApiClient {
     request.files.add(
       http.MultipartFile.fromBytes(fileField, fileBytes, filename: fileName),
     );
-    final streamed = await request.send().timeout(AppConfig.apiTimeout);
+    final streamed = await request.send().timeout(timeout ?? AppConfig.apiTimeout);
     final res = await http.Response.fromStream(streamed);
     AppLogger.response(res.statusCode, path);
     _check(res);
     return _decodeJson(res, path);
+  }
+
+  /// Upload a file by path (streams from disk — does NOT load the whole file into
+  /// memory). Use this instead of [postMultipart] for large files on non-web
+  /// platforms where a file path is available.
+  static Future<dynamic> postMultipartFromPath(
+    String path, {
+    required Map<String, String> fields,
+    required String filePath,
+    required String fileName,
+    String fileField = 'file',
+    Duration? timeout,
+  }) async {
+    AppLogger.request('POST (multipart/path)', path);
+    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
+    if (AppState.token != null) {
+      request.headers['Authorization'] = 'Bearer ${AppState.token}';
+    }
+    request.headers['Accept'] = 'application/json';
+    request.headers['ngrok-skip-browser-warning'] = 'true';
+    request.fields.addAll(fields);
+    request.files.add(
+      await http.MultipartFile.fromPath(fileField, filePath, filename: fileName),
+    );
+    final streamed = await request.send().timeout(timeout ?? AppConfig.apiTimeout);
+    final res = await http.Response.fromStream(streamed);
+    AppLogger.response(res.statusCode, path);
+    _check(res);
+    return _decodeJson(res, path);
+  }
+
+  /// Upload a file using dio with real send-progress callbacks.
+  ///
+  /// Pass either [filePath] OR ([fileStream] + [fileStreamSize]):
+  /// - [filePath]: lazy file open (may fail if Android deletes the cache file
+  ///   between pick and upload — use as fallback / retry only).
+  /// - [fileStream] + [fileStreamSize]: immediately-opened stream from
+  ///   `file_picker`'s `withReadStream: true`; the file descriptor stays alive
+  ///   even if Android cleans the cache, making it safe for large files.
+  static Future<dynamic> uploadFileWithProgress(
+    String path, {
+    String? filePath,
+    Stream<List<int>>? fileStream,
+    int? fileStreamSize,
+    required String fileName,
+    Map<String, String> fields = const {},
+    String fileField = 'file',
+    Duration? timeout,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    assert(
+      filePath != null || (fileStream != null && fileStreamSize != null),
+      'Provide filePath OR fileStream+fileStreamSize',
+    );
+    AppLogger.request('POST (dio/multipart)', path);
+
+    final effectiveTimeout = timeout ?? AppConfig.videoUploadTimeout;
+    final client = dio_pkg.Dio(
+      dio_pkg.BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: effectiveTimeout,
+        sendTimeout: effectiveTimeout,
+        headers: {
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          if (AppState.token != null) 'Authorization': 'Bearer ${AppState.token}',
+        },
+      ),
+    );
+
+    // Prefer the already-open stream; fall back to opening from path.
+    final dio_pkg.MultipartFile multipartFile;
+    if (fileStream != null && fileStreamSize != null) {
+      multipartFile = dio_pkg.MultipartFile.fromStream(
+        () => fileStream,
+        fileStreamSize,
+        filename: fileName,
+      );
+    } else {
+      multipartFile = await dio_pkg.MultipartFile.fromFile(
+        filePath!,
+        filename: fileName,
+      );
+    }
+
+    final formData = dio_pkg.FormData.fromMap({
+      ...fields,
+      fileField: multipartFile,
+    });
+
+    final response = await client.post<Map<String, dynamic>>(
+      path,
+      data: formData,
+      onSendProgress: onProgress,
+    );
+
+    AppLogger.response(response.statusCode ?? 0, path);
+    if ((response.statusCode ?? 0) < 200 || (response.statusCode ?? 0) >= 300) {
+      throw ApiException(
+        response.statusCode ?? 0,
+        response.data?.toString() ?? 'Unknown error',
+      );
+    }
+    return response.data;
   }
 
   static void _check(http.Response res) {

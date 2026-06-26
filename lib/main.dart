@@ -7,12 +7,19 @@ import 'models/auth_models.dart';
 import 'models/skill_category.dart';
 import 'repositories/auth0_strategy.dart';
 import 'repositories/auth_repository.dart';
+import 'repositories/api_client.dart';
 import 'screens/admin/pending_approvals_screen.dart';
+import 'screens/admin/volunteer_admin_screen.dart';
+import 'screens/admin/counsellor_admin_screen.dart';
+import 'screens/admin/admin_shell.dart';
+import 'screens/volunteer/volunteer_dashboard_screen.dart';
 import 'screens/auth/auth_page.dart';
 import 'screens/auth/pending_approval_screen.dart';
 import 'screens/auth/rejected_screen.dart';
 import 'screens/auth/student_register_screen.dart';
+import 'screens/counsellor/counsellor_shell.dart';
 import 'screens/creator/content_creator_shell.dart';
+import 'screens/event_manager/event_manager_shell.dart';
 import 'screens/events/events_view.dart';
 import 'screens/events/student/event_detail_screen.dart';
 import 'screens/home/home_view.dart';
@@ -20,17 +27,35 @@ import 'screens/learn/learn_view.dart';
 import 'screens/profile/profile_view.dart';
 import 'screens/quiz/quiz_play_screen.dart';
 import 'screens/helping_support/helping_support_view.dart';
-import 'services/screen_security.dart';
-import 'widgets/secure_app_wrapper.dart';
+import 'screens/internship/internship_view.dart';
+import 'screens/internship/wall_of_impact_view.dart';
+import 'screens/school_portal/school_partner_portal_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initializes the Auth0 JS client on web (no-op on Android/iOS).
   await initAuth0(AppConfig.auth0Domain, AppConfig.auth0ClientId);
   AppState.restore();
-  // Apply FLAG_SECURE immediately for any restored session.
-  await ScreenSecurity.apply();
-
+  // Reconcile the cached role with the backend before choosing a dashboard.
+  // Admin approval may have changed a provisional student into a counsellor.
+  if (AppState.isAuthenticated) {
+    try {
+      final currentUser = await AuthRepository.getCurrentUser();
+      AppState.setFromLogin(
+        currentUser.id,
+        AppState.token!,
+        UserRole.fromString(currentUser.role ?? 'guest'),
+        name: currentUser.name,
+        status: AccessStatus.fromString(currentUser.accessStatus ?? 'pending'),
+      );
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        AppState.clear();
+      }
+    } catch (_) {
+      // A temporary network outage should not destroy a valid saved session.
+    }
+  }
   // Web only: if Auth0 just redirected back with a code, exchange it now.
   // On Android/iOS this always returns null (login completes in loginWithAuth0).
   try {
@@ -46,7 +71,7 @@ void main() async {
     // Ignore — user will see the login screen and can retry.
   }
 
-  runApp(const SecureAppWrapper(child: CareSkillApp()));
+  runApp(const PunjabiWelfareApp());
 }
 
 String _resolveInitialRoute() {
@@ -59,8 +84,8 @@ String _resolveInitialRoute() {
   };
 }
 
-class CareSkillApp extends StatelessWidget {
-  const CareSkillApp({super.key});
+class PunjabiWelfareApp extends StatelessWidget {
+  const PunjabiWelfareApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -91,11 +116,23 @@ class CareSkillApp extends StatelessWidget {
         '/login': (_) => const AuthPage(),
         '/home': (_) => AppState.role.isContentCreator
             ? const ContentCreatorShell()
+            : AppState.role.isEventManager
+            ? const EventManagerShell()
+            : AppState.role.isMentor
+            ? const CounsellorShell()
+            : AppState.role.isSchoolPartner
+            ? const SchoolPartnerPortalScreen()
+            : AppState.role.isAdmin
+            ? const AdminShell()
             : const AppShell(),
         '/register/student': (_) => const StudentRegisterScreen(),
         '/pending-approval': (_) => const PendingApprovalScreen(),
         '/rejected': (_) => const RejectedScreen(),
         '/admin/pending-approvals': (_) => const PendingApprovalsScreen(),
+        '/admin/volunteer': (_) => const VolunteerAdminScreen(),
+        '/admin/counsellors': (_) => const CounsellorAdminScreen(),
+        '/school-partner': (_) => const SchoolPartnerPortalScreen(),
+        '/volunteer': (_) => const VolunteerDashboardScreen(),
       },
       onGenerateRoute: (settings) {
         final name = settings.name ?? '';
@@ -155,54 +192,171 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      HomeView(onOpenLearn: _openLearn),
-      LearnView(
-        key: ValueKey('learn-$_learnOpenVersion'),
-        initialCategory: _selectedLearnCategory,
+    final isStudent = AppState.role.isStudent;
+
+    final pages = isStudent
+        ? [
+            HomeView(onOpenLearn: _openLearn),
+            LearnView(
+              key: ValueKey('learn-$_learnOpenVersion'),
+              initialCategory: _selectedLearnCategory,
+            ),
+            InternshipView(onBack: () => setState(() => _selectedIndex = 0)),
+            const WallOfImpactView(),
+            const ProfileView(),
+          ]
+        : [
+            HomeView(onOpenLearn: _openLearn),
+            LearnView(
+              key: ValueKey('learn-$_learnOpenVersion'),
+              initialCategory: _selectedLearnCategory,
+            ),
+            const EventsView(),
+            const HelpingSupportView(),
+            const ProfileView(),
+          ];
+
+    const studentItems = [
+      _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
+      _NavItem(Icons.school_outlined, Icons.school_rounded, 'Learn'),
+      _NavItem(
+        Icons.volunteer_activism_outlined,
+        Icons.volunteer_activism_rounded,
+        'Work',
       ),
-      const EventsView(),
-      const HelpingSupportView(),
-      const ProfileView(),
+      _NavItem(
+        Icons.emoji_events_outlined,
+        Icons.emoji_events_rounded,
+        'Impact',
+      ),
+      _NavItem(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
     ];
+
+    const staffItems = [
+      _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
+      _NavItem(Icons.school_outlined, Icons.school_rounded, 'Learn'),
+      _NavItem(
+        Icons.calendar_month_outlined,
+        Icons.calendar_month_rounded,
+        'Calendar',
+      ),
+      _NavItem(
+        Icons.support_agent_outlined,
+        Icons.support_agent_rounded,
+        'Support',
+      ),
+      _NavItem(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
+    ];
+
     return Scaffold(
       body: SafeArea(child: pages[_selectedIndex]),
-      bottomNavigationBar: NavigationBar(
-        height: 72,
+      bottomNavigationBar: _CustomNavBar(
         selectedIndex: _selectedIndex,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.16),
-        onDestinationSelected: (index) => setState(() {
+        items: isStudent ? studentItems : staffItems,
+        onTap: (index) => setState(() {
           _selectedIndex = index;
           if (index != 1) _selectedLearnCategory = null;
           if (index == 1) _learnOpenVersion++;
         }),
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.school_outlined),
-            selectedIcon: Icon(Icons.school_rounded),
-            label: 'Learn',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month_rounded),
-            label: 'Calendar',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.support_agent_outlined),
-            selectedIcon: Icon(Icons.support_agent_rounded),
-            label: 'Helping Support',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom bottom navigation
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NavItem {
+  const _NavItem(this.icon, this.activeIcon, this.label);
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+}
+
+class _CustomNavBar extends StatelessWidget {
+  const _CustomNavBar({
+    required this.selectedIndex,
+    required this.items,
+    required this.onTap,
+  });
+
+  final int selectedIndex;
+  final List<_NavItem> items;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x1417324D),
+            blurRadius: 20,
+            offset: Offset(0, -4),
           ),
         ],
+      ),
+      padding: EdgeInsets.only(
+        top: 8,
+        bottom: bottomPadding > 0 ? bottomPadding : 10,
+      ),
+      child: Row(
+        children: List.generate(items.length, (i) {
+          final item = items[i];
+          final active = i == selectedIndex;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onTap(i),
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeInOut,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? const Color(0xFFDEEAFF)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Icon(
+                      active ? item.activeIcon : item.icon,
+                      size: 22,
+                      color: active
+                          ? const Color(0xFF17324D)
+                          : const Color(0xFFB0BEC5),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 220),
+                    style: TextStyle(
+                      color: active
+                          ? const Color(0xFF17324D)
+                          : const Color(0xFFB0BEC5),
+                      fontSize: 10.5,
+                      fontWeight: active ? FontWeight.w800 : FontWeight.w500,
+                      height: 1,
+                    ),
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

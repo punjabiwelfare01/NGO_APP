@@ -13,3 +13,13 @@ from .chat import ChatMessage
 from .notification import AdminNotification
 from .calendar import StudentReminder
 from .creator_post import CreatorPost
+from .volunteer import VolunteerActivity, ActivityApplication, ActivityAssignment, WorkSubmission, DailyLog, ImpactStory
+from .donation import Donation, StipendConfig, StipendRecord, NGOPaymentDetails
+from .certificate import Certificate
+from .impact import ImpactPost, ImpactPostMedia, ImpactPostReaction
+from .platform import (
+    Notification, NotificationPreference, UserSetting, NGOProfileSetting,
+    BankSetting, RolePermissionSetting, AppSetting, AdminAuditLog,
+    Announcement, PasswordResetToken, ReminderJob, EventReportFile,
+    SchoolCounsellorRequest, CounsellorSessionReport,
+)

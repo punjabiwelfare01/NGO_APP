@@ -50,15 +50,17 @@ class UserResponse(BaseModel):
     level: int
     xp: int
     role: str = "student"
-    access_status: str = "pending_verification"
+    access_status: str = "pending"
     is_active: bool = True
     parent_email: Optional[str] = None
+    class_level: Optional[str] = None
     class_name: Optional[str] = None
     school_name: Optional[str] = None
     location: Optional[str] = None
     phone: Optional[str] = None
     requested_role: Optional[str] = None
     verification_note: Optional[str] = None
+    photo_url: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

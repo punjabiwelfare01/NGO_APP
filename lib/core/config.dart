@@ -12,7 +12,7 @@ class AppConfig {
   const AppConfig._();
 
   // ── App identity ──────────────────────────────────────────────────────────
-  static const String appName = 'CareSkill';
+  static const String appName = 'Punjabi Welfare Trust';
   static const String appVersion = '1.0.0';
   static const String fontFamily = 'Inter';
 
@@ -26,6 +26,10 @@ class AppConfig {
     'BACKEND_ENV',
   );
   static const Duration apiTimeout = Duration(seconds: 10);
+
+  // Large video files (100 MB+) can take many minutes over mobile connections.
+  // 30 min allows ~155 MB even at a slow 700 kbps upload rate.
+  static const Duration videoUploadTimeout = Duration(minutes: 30);
 
   /// Change this one value when you want the whole frontend to point somewhere
   /// else without editing screens, repositories, or API calls.
@@ -49,7 +53,8 @@ class AppConfig {
   // using start_dev.sh. Replace with the URL printed by `ngrok http 8000`.
   static const String ngrokBackendUrl =
       'https://streak-pogo-bonded.ngrok-free.dev';
-  static const String localBackendUrl = 'http://localhost:8000';
+  // static const String localBackendUrl = 'http://localhost:8000';
+  static const String localBackendUrl = 'http://10.42.112.128:8000';
   // Android emulator reaches the host machine via 10.0.2.2.
   static const String androidEmulatorBackendUrl = 'http://10.0.2.2:8000';
   static const String testBackendUrl =
@@ -140,7 +145,9 @@ class AppConfig {
   /// http://... → ws://...   |   https://... → wss://...
   static String get wsBaseUrl {
     final base = apiBaseUrl;
-    if (base.startsWith('https://')) return base.replaceFirst('https://', 'wss://');
+    if (base.startsWith('https://')) {
+      return base.replaceFirst('https://', 'wss://');
+    }
     return base.replaceFirst('http://', 'ws://');
   }
 

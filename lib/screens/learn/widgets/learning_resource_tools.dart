@@ -166,6 +166,7 @@ class LearningResourceTile extends StatelessWidget {
       resource.type == 'image' ||
       resource.type == 'video' ||
       resource.type == 'pdf' ||
+      resource.type == 'pdf_notes' ||
       resource.type == 'link';
 
   Future<void> _download(BuildContext context) async {
@@ -304,8 +305,24 @@ class AddResourceSheet extends StatefulWidget {
 }
 
 class _AddResourceSheetState extends State<AddResourceSheet> {
-  static const _types = ['link', 'pdf', 'image', 'video', 'note'];
-  static const _fileTypes = {'pdf', 'image', 'video'};
+  static const _types = [
+    'link',
+    'pdf',
+    'pdf_notes',
+    'image',
+    'video',
+    'note',
+    'zip',
+    'code_file',
+  ];
+  static const _fileTypes = {
+    'pdf',
+    'pdf_notes',
+    'image',
+    'video',
+    'zip',
+    'code_file',
+  };
 
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
@@ -334,8 +351,15 @@ class _AddResourceSheetState extends State<AddResourceSheet> {
     List<String>? allowedExtensions;
     switch (_type) {
       case 'pdf':
+      case 'pdf_notes':
         fileType = FileType.custom;
         allowedExtensions = ['pdf'];
+      case 'zip':
+        fileType = FileType.custom;
+        allowedExtensions = ['zip'];
+      case 'code_file':
+        fileType = FileType.custom;
+        allowedExtensions = ['py', 'js', 'dart', 'html', 'css', 'txt', 'json'];
       case 'image':
         fileType = FileType.image;
       case 'video':
@@ -687,7 +711,7 @@ class _ResourcePreviewDialog extends StatelessWidget {
     if (resource.type == 'video') {
       return LessonVideoContent(url: url);
     }
-    if (resource.type == 'pdf') {
+    if (resource.type == 'pdf' || resource.type == 'pdf_notes') {
       return ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: buildDocumentEmbed(url),

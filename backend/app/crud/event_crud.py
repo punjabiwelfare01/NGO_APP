@@ -9,6 +9,7 @@ from ..models.event import (
     EventStatus, EventType, SelectionMethod,
 )
 from ..models.quiz import Quiz
+from ..models.volunteer import VolunteerActivity
 from ..models.wellness import CounsellingSession
 from ..schemas.event import AttachQuizRequest, EventCreate, EventSlotCreate, EventUpdate, RunSelectionRequest
 from ..schemas.quiz import QuizCreate
@@ -196,6 +197,14 @@ def delete_event(db: Session, event_id: int) -> bool:
     return True
 
 
+def _set_linked_activities_active(db: Session, event_id: int, active: bool) -> None:
+    """Activate or deactivate all VolunteerActivity records linked to this event."""
+    db.query(VolunteerActivity).filter(
+        VolunteerActivity.event_id == event_id
+    ).update({"is_active": active}, synchronize_session=False)
+    db.commit()
+
+
 def publish_event(db: Session, event_id: int) -> Event | None:
     event = get_event(db, event_id)
     if not event:
@@ -209,6 +218,8 @@ def publish_event(db: Session, event_id: int) -> Event | None:
     event.updated_at = now
     db.commit()
     db.refresh(event)
+    # Activate linked volunteer activities so students can see them
+    _set_linked_activities_active(db, event_id, True)
     sync_quiz_mapping(db, event)
     if _is_public_status(event.status):
         sync_daily_challenge(db, event)
@@ -223,6 +234,9 @@ def advance_status(db: Session, event_id: int, new_status: EventStatus) -> Event
     event.updated_at = _utc_now_naive()
     db.commit()
     db.refresh(event)
+    # Deactivate linked activities when event goes back to draft
+    if new_status == EventStatus.draft:
+        _set_linked_activities_active(db, event_id, False)
     if _is_public_status(event.status):
         sync_daily_challenge(db, event)
     return event

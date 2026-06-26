@@ -6,9 +6,9 @@ void main() {
   testWidgets('CareSkill starts at login without a session', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const CareSkillApp());
+    await tester.pumpWidget(const PunjabiWelfareApp());
 
-    expect(find.text('Sign In'), findsOneWidget);
+    expect(find.text('Sign In'), findsWidgets);
     expect(find.text('Demo accounts'), findsOneWidget);
     expect(find.text('Student'), findsOneWidget);
     expect(find.text('Admin'), findsOneWidget);

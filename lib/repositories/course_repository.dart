@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+import '../core/config.dart';
 import '../models/course.dart';
 import '../models/learning_resource.dart';
 import '../models/lesson.dart';
@@ -49,8 +52,47 @@ class CourseRepository {
     await ApiClient.delete('/categories/$categoryId');
   }
 
-  static Future<List<Course>> getCourses() async {
-    final list = await ApiClient.get('/courses') as List<dynamic>;
+  static Future<List<Course>> getCourses({
+    String? courseType,
+    String? classLevel,
+    String? subject,
+    String? skillCategory,
+  }) async {
+    final path = _pathWithQuery('/courses', {
+      'course_type': courseType,
+      'class_level': classLevel,
+      'subject': subject,
+      'skill_category': skillCategory,
+    });
+    final list = await ApiClient.get(path) as List<dynamic>;
+    return list.map((j) => Course.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  static Future<List<Course>> getRecommendedAcademic(String classLevel) async {
+    final path = _pathWithQuery('/learn/recommended', {
+      'class_level': classLevel,
+    });
+    final list = await ApiClient.get(path) as List<dynamic>;
+    return list.map((j) => Course.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  static Future<List<Course>> getAcademicCourses({
+    String? classLevel,
+    String? subject,
+  }) async {
+    final path = _pathWithQuery('/learn/courses', {
+      'class_level': classLevel,
+      'subject': subject == 'All' ? null : subject,
+    });
+    final list = await ApiClient.get(path) as List<dynamic>;
+    return list.map((j) => Course.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  static Future<List<Course>> getSkillCourses({String? category}) async {
+    final path = _pathWithQuery('/learn/skills', {
+      'category': category == 'All' ? null : category,
+    });
+    final list = await ApiClient.get(path) as List<dynamic>;
     return list.map((j) => Course.fromJson(j as Map<String, dynamic>)).toList();
   }
 
@@ -61,6 +103,16 @@ class CourseRepository {
     required String iconName,
     required String colorHex,
     int? categoryId,
+    String courseType = CourseType.skill,
+    String? classLevel,
+    String? subject,
+    String? skillCategory,
+    int? recommendedClassMin,
+    int? recommendedClassMax,
+    bool isPublished = true,
+    String? courseDescription,
+    List<String>? skillTags,
+    List<String>? learnItems,
   }) async {
     final json =
         await ApiClient.post('/courses', {
@@ -70,6 +122,16 @@ class CourseRepository {
               'icon_name': iconName,
               'color_hex': colorHex,
               'category_id': categoryId,
+              'course_type': courseType,
+              'class_level': classLevel,
+              'subject': subject,
+              'skill_category': skillCategory,
+              'recommended_class_min': recommendedClassMin,
+              'recommended_class_max': recommendedClassMax,
+              'is_published': isPublished,
+              'course_description': courseDescription,
+              'skill_tags': skillTags,
+              'learn_items': learnItems,
             })
             as Map<String, dynamic>;
     return Course.fromJson(json);
@@ -83,6 +145,16 @@ class CourseRepository {
     required String iconName,
     required String colorHex,
     int? categoryId,
+    String courseType = CourseType.skill,
+    String? classLevel,
+    String? subject,
+    String? skillCategory,
+    int? recommendedClassMin,
+    int? recommendedClassMax,
+    bool isPublished = true,
+    String? courseDescription,
+    List<String>? skillTags,
+    List<String>? learnItems,
   }) async {
     final json =
         await ApiClient.patch('/courses/$courseId', {
@@ -92,6 +164,16 @@ class CourseRepository {
               'icon_name': iconName,
               'color_hex': colorHex,
               'category_id': categoryId,
+              'course_type': courseType,
+              'class_level': classLevel,
+              'subject': subject,
+              'skill_category': skillCategory,
+              'recommended_class_min': recommendedClassMin,
+              'recommended_class_max': recommendedClassMax,
+              'is_published': isPublished,
+              'course_description': courseDescription,
+              'skill_tags': skillTags,
+              'learn_items': learnItems,
             })
             as Map<String, dynamic>;
     return Course.fromJson(json);
@@ -99,6 +181,14 @@ class CourseRepository {
 
   static Future<void> deleteCourse(int courseId) async {
     await ApiClient.delete('/courses/$courseId');
+  }
+
+  static Future<void> publishCourse(int courseId) async {
+    await ApiClient.post('/courses/$courseId/publish', {});
+  }
+
+  static Future<void> unpublishCourse(int courseId) async {
+    await ApiClient.post('/courses/$courseId/unpublish', {});
   }
 
   static Future<Course> updateCourseSalesInfo(
@@ -157,6 +247,9 @@ class CourseRepository {
     String contentType = 'text',
     String? contentUrl,
     String? contentText,
+    String? classLevel,
+    String? subject,
+    String? chapter,
     int order = 0,
     int? durationMinutes,
     bool isPublished = true,
@@ -168,6 +261,9 @@ class CourseRepository {
               'content_type': contentType,
               'content_url': contentUrl,
               'content_text': contentText,
+              'class_level': classLevel,
+              'subject': subject,
+              'chapter': chapter,
               'order': order,
               'duration_minutes': durationMinutes,
               'is_published': isPublished,
@@ -209,6 +305,56 @@ class CourseRepository {
               fileName: fileName,
             )
             as Map<String, dynamic>;
+    return json['url'] as String;
+  }
+
+  /// Upload a video file securely.
+  ///
+  /// On non-web platforms (Android/iOS), pass [filePath] to stream the file
+  /// directly from disk without loading it into memory — required for large
+  /// videos. On web, pass [bytes] (FilePicker always provides bytes there).
+  /// Returns the authenticated streaming URL (e.g. /video/stream/{uuid}.mp4).
+  static Future<String> uploadVideo({
+    List<int>? bytes,
+    String? filePath,
+    Stream<List<int>>? readStream,
+    int fileSize = 0,
+    required String fileName,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    final Map<String, dynamic> json;
+    // Stream is preferred on every platform:
+    //   Android/iOS — already-open fd, survives Android cache GC
+    //   Web         — 1 MB chunks via FileReader, avoids flat Uint8List OOM
+    // Path-only fallback is used on retry (stream already consumed).
+    final bool hasStream = readStream != null && fileSize > 0;
+    final bool hasPath = !kIsWeb && filePath != null;
+
+    if (hasStream || hasPath) {
+      json =
+          await ApiClient.uploadFileWithProgress(
+                '/upload',
+                filePath: hasStream ? null : filePath,
+                fileStream: hasStream ? readStream : null,
+                fileStreamSize: hasStream ? fileSize : null,
+                fileName: fileName,
+                timeout: AppConfig.videoUploadTimeout,
+                onProgress: onProgress,
+              )
+              as Map<String, dynamic>;
+    } else {
+      // Fallback: raw bytes (only triggered if caller explicitly passed bytes).
+      assert(bytes != null, 'No stream, path, or bytes provided for upload');
+      json =
+          await ApiClient.postMultipart(
+                '/upload',
+                fields: const {},
+                fileBytes: bytes!,
+                fileName: fileName,
+                timeout: AppConfig.videoUploadTimeout,
+              )
+              as Map<String, dynamic>;
+    }
     return json['url'] as String;
   }
 
@@ -274,5 +420,19 @@ class CourseRepository {
     await ApiClient.delete(
       '/courses/$courseId/lessons/$lessonId/resources/$resourceId',
     );
+  }
+
+  static String _pathWithQuery(String path, Map<String, String?> query) {
+    final entries = query.entries.where(
+      (entry) => entry.value != null && entry.value!.trim().isNotEmpty,
+    );
+    if (entries.isEmpty) return path;
+    final params = entries
+        .map(
+          (entry) =>
+              '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value!)}',
+        )
+        .join('&');
+    return '$path?$params';
   }
 }

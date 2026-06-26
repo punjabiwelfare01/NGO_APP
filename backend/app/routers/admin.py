@@ -11,6 +11,7 @@ from ..models.user import User, UserRole
 from ..schemas.user import UserResponse
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+PENDING_STATUSES = ("pending", "pending_verification", "pending_review", "under_review")
 
 
 # ── request bodies ────────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ def get_stats(
 ):
     total    = db.query(User).count()
     active   = db.query(User).filter(User.access_status == "approved").count()
-    pending  = db.query(User).filter(User.access_status == "pending_verification").count()
+    pending  = db.query(User).filter(User.access_status.in_(PENDING_STATUSES)).count()
     blocked  = db.query(User).filter(User.access_status == "deactivated").count()
     rejected = db.query(User).filter(User.access_status == "rejected").count()
 
@@ -62,6 +63,43 @@ def get_stats(
         "blocked_users":  blocked,
         "rejected_users": rejected,
         "role_counts":    role_counts,
+    }
+
+
+@router.get("/dashboard/summary", summary="Pending access summary [admin only]")
+def dashboard_summary(
+    db: Session = Depends(get_db),
+    _: User = Depends(admin_only),
+):
+    pending_users = (
+        db.query(User)
+        .filter(User.access_status.in_(PENDING_STATUSES))
+        .all()
+    )
+    counts = {
+        role: sum(
+            1
+            for user in pending_users
+            if (user.requested_role or "student") == role
+        )
+        for role in (
+            "student",
+            "mentor",
+            "event_manager",
+            "content_creator",
+            "school_partner",
+            "support_staff",
+        )
+    }
+    return {
+        "pending_users_count": len(pending_users),
+        "pending_student_count": counts["student"],
+        "pending_counsellor_count": counts["mentor"],
+        "pending_event_manager_count": counts["event_manager"],
+        "pending_content_creator_count": counts["content_creator"],
+        "pending_school_partner_count": counts["school_partner"],
+        "pending_support_staff_count": counts["support_staff"],
+        "total_pending_actions": len(pending_users),
     }
 
 
@@ -90,7 +128,11 @@ def list_users(
         except ValueError:
             pass
     if status:
-        q = q.filter(User.access_status == status)
+        q = q.filter(
+            User.access_status.in_(PENDING_STATUSES)
+            if status in PENDING_STATUSES
+            else User.access_status == status
+        )
     return q.order_by(User.created_at.desc()).offset(skip).limit(limit).all()
 
 
@@ -102,7 +144,7 @@ def list_pending_users(
 ):
     return (
         db.query(User)
-        .filter(User.access_status == "pending_verification")
+        .filter(User.access_status.in_(PENDING_STATUSES))
         .order_by(User.created_at.desc())
         .all()
     )
@@ -120,6 +162,8 @@ def get_user(
 
 # ── approval actions ──────────────────────────────────────────────────────────
 
+@router.patch("/users/{user_id}/approve", response_model=UserResponse,
+              summary="Approve user and assign final role [admin only]")
 @router.patch("/users/{user_id}/assign-role", response_model=UserResponse,
               summary="Approve user and assign role [admin only]")
 def assign_role(
@@ -129,7 +173,8 @@ def assign_role(
     current_user: User = Depends(admin_only),
 ):
     try:
-        new_role = UserRole(payload.role)
+        role_value = "mentor" if payload.role == "counsellor" else payload.role
+        new_role = UserRole(role_value)
     except ValueError:
         raise HTTPException(status_code=422, detail=f"Invalid role: {payload.role}")
 
@@ -138,7 +183,7 @@ def assign_role(
 
     user = _get_or_404(db, user_id)
     user.role = new_role
-    user.access_status = payload.access_status
+    user.access_status = "approved"
     if payload.verification_note:
         user.verification_note = payload.verification_note
 

@@ -1,5 +1,6 @@
 import '../core/config.dart';
 import '../models/auth_models.dart';
+import '../models/api_models.dart';
 import 'api_client.dart';
 import 'auth0_strategy.dart';
 
@@ -18,7 +19,12 @@ class AuthRepository {
     return TokenResponse.fromJson(json);
   }
 
-  /// General public registration — sets role=student and access_status=pending_verification.
+  static Future<AppUser> getCurrentUser() async {
+    final json = await ApiClient.get('/auth/me') as Map<String, dynamic>;
+    return AppUser.fromJson(json);
+  }
+
+  /// General public registration — creates a pending access request.
   /// requested_role is stored server-side for admin review; it does NOT grant access.
   static Future<TokenResponse> register({
     required String name,
@@ -55,7 +61,7 @@ class AuthRepository {
   }
 
   /// Registers a new user via POST /auth/register.
-  /// Role is always forced to 'student' server-side.
+  /// The provisional role cannot route to a dashboard until admin approval.
   /// requested_role is stored for admin review; it does NOT grant access.
   static Future<TokenResponse> registerStudent({
     required String name,
@@ -91,13 +97,18 @@ class AuthRepository {
     return TokenResponse.fromJson(raw);
   }
 
-  /// Returns the OTP string when the email is registered with a password
-  /// account, null otherwise (backend never reveals non-existent emails).
-  static Future<String?> forgotPassword(String email) async {
-    final json =
-        await ApiClient.post('/auth/forgot-password', {'email': email})
-            as Map<String, dynamic>;
-    return json['reset_token'] as String?;
+  static Future<void> forgotPassword(String email) async {
+    await ApiClient.post('/auth/forgot-password', {'email': email});
+  }
+
+  static Future<void> verifyResetCode({
+    required String email,
+    required String otp,
+  }) async {
+    await ApiClient.post('/auth/verify-reset-code', {
+      'email': email,
+      'otp': otp,
+    });
   }
 
   static Future<void> resetPassword({

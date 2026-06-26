@@ -7,13 +7,8 @@ class AdminRepository {
   // ── User statistics ───────────────────────────────────────────────────────
 
   static Future<AdminStats> getStats() async {
-    try {
-      final json =
-          await ApiClient.get('/admin/stats') as Map<String, dynamic>;
-      return AdminStats.fromJson(json);
-    } catch (_) {
-      return AdminStats.empty();
-    }
+    final json = await ApiClient.get('/admin/stats') as Map<String, dynamic>;
+    return AdminStats.fromJson(json);
   }
 
   // ── All users ─────────────────────────────────────────────────────────────
@@ -32,8 +27,7 @@ class AdminRepository {
     final query = params.isEmpty
         ? ''
         : '?${params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}';
-    final list =
-        await ApiClient.get('/admin/users$query') as List<dynamic>;
+    final list = await ApiClient.get('/admin/users$query') as List<dynamic>;
     return list
         .map((e) => AdminUserItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -76,11 +70,12 @@ class AdminRepository {
     String? verificationNote,
   }) async {
     return await ApiClient.patch('/admin/users/$userId/assign-role', {
-      'role': role,
-      'access_status': accessStatus,
-      if (verificationNote != null && verificationNote.isNotEmpty)
-        'verification_note': verificationNote,
-    }) as Map<String, dynamic>;
+          'role': role,
+          'access_status': accessStatus,
+          if (verificationNote != null && verificationNote.isNotEmpty)
+            'verification_note': verificationNote,
+        })
+        as Map<String, dynamic>;
   }
 
   /// PATCH /admin/users/{id}/reject
@@ -90,26 +85,22 @@ class AdminRepository {
     });
   }
 
-  /// PATCH /admin/users/{id}/deactivate
+  /// PATCH /admin/users/{id}/block
   static Future<void> deactivateUser(int userId) async {
-    await ApiClient.patch('/admin/users/$userId/deactivate', {});
+    await ApiClient.patch('/admin/users/$userId/block', {});
   }
 
   // ── Notifications ─────────────────────────────────────────────────────────
 
   static Future<List<AdminNotification>> getNotifications() async {
-    final list =
-        await ApiClient.get('/admin/notifications') as List<dynamic>;
+    final list = await ApiClient.get('/admin/notifications') as List<dynamic>;
     return list
         .map((e) => AdminNotification.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   static Future<void> markNotificationRead(int notificationId) async {
-    await ApiClient.patch(
-      '/admin/notifications/$notificationId/read',
-      {},
-    );
+    await ApiClient.patch('/admin/notifications/$notificationId/read', {});
   }
 
   static Future<void> markAllNotificationsRead() async {

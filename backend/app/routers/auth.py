@@ -1,8 +1,8 @@
 import logging
-import random
+import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
@@ -35,6 +35,7 @@ from ..schemas.auth import (
     LoginRequest,
     RegisterRequest,
     ResetPasswordRequest,
+    VerifyResetCodeRequest,
     TokenResponse,
 )
 from ..schemas.user import UserResponse
@@ -48,9 +49,11 @@ _bearer = HTTPBearer()
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if get_user_by_email(db, payload.email):
         raise HTTPException(status_code=409, detail="Email already registered")
-    user = register_user(db, payload)
+    user = register_user(db, payload, pending_access=True)
+    token = create_access_token(user)
     return {
-        "message": "Registration successful. Awaiting admin approval.",
+        "message": "Registration successful. Your access request is pending admin approval.",
+        "access_token": token,
         "user": {
             "id": user.id,
             "name": user.name,
@@ -130,49 +133,89 @@ def change_password(
              summary="Request a 6-digit password reset OTP (all roles)")
 def forgot_password(
     payload: ForgotPasswordRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    from hashlib import sha256
+    import secrets
+    from ..config import settings
+    from ..models.platform import PasswordResetToken
+    from ..services.email_service import send_password_reset_code
+    from ..services import audit_service
+
     user = get_user_by_email(db, payload.email.strip().lower())
     if user and user.hashed_password:
-        otp = str(random.randint(100000, 999999))
-        user.reset_token = otp
-        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
-        db.commit()
-        # In production, send otp via email. Returned here for demo only.
-        return {
-            "message": "Reset code generated.",
-            "reset_token": otp,
-            "expires_in_minutes": 15,
-        }
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
+        recent = db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id, PasswordResetToken.created_at >= cutoff.replace(tzinfo=None)).count()
+        if recent >= 3:
+            raise HTTPException(429, "Too many reset requests. Try again later.")
+        otp = f"{secrets.randbelow(1_000_000):06d}"
+        code_hash = sha256(f"{settings.secret_key}:{otp}".encode()).hexdigest()
+        token = PasswordResetToken(user_id=user.id, code_hash=code_hash, expires_at=(datetime.now(timezone.utc) + timedelta(minutes=15)).replace(tzinfo=None), request_ip=request.client.host if request.client else None)
+        db.add(token); db.commit()
+        try:
+            send_password_reset_code(user.email, otp)
+        except Exception:
+            # Never expose the code or account existence through the response.
+            pass
+        audit_service.record(db, user.id, "password_reset_requested", entity_type="user", entity_id=user.id, ip_address=request.client.host if request.client else None)
     # Don't reveal whether the email exists.
     return {
         "message": "If this email is registered with a password account, a reset code has been sent.",
-        "reset_token": None,
+        "expires_in_minutes": 15,
     }
+
+
+@router.post("/verify-reset-code", status_code=200)
+def verify_reset_code(payload: VerifyResetCodeRequest, request: Request, db: Session = Depends(get_db)):
+    from hashlib import sha256
+    from ..config import settings
+    from ..models.platform import PasswordResetToken
+    from ..services import audit_service
+
+    user = get_user_by_email(db, payload.email.strip().lower())
+    if not user:
+        raise HTTPException(400, "Invalid or expired reset code.")
+    token = db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id, PasswordResetToken.consumed_at.is_(None)).order_by(PasswordResetToken.created_at.desc()).first()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if not token or token.expires_at < now or token.attempts >= token.max_attempts:
+        raise HTTPException(400, "Invalid or expired reset code.")
+    token.attempts += 1
+    expected = sha256(f"{settings.secret_key}:{payload.otp.strip()}".encode()).hexdigest()
+    if not secrets.compare_digest(token.code_hash, expected):
+        db.commit()
+        raise HTTPException(400, "Invalid or expired reset code.")
+    token.verified_at = now
+    audit_service.record(db, user.id, "password_reset_code_verified", entity_type="user", entity_id=user.id, ip_address=request.client.host if request.client else None, commit=False)
+    db.commit()
+    return {"message": "Reset code verified."}
 
 
 @router.post("/reset-password", status_code=200,
              summary="Reset password using the OTP (all roles)")
 def reset_password(
     payload: ResetPasswordRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    from hashlib import sha256
+    from ..config import settings
+    from ..models.platform import PasswordResetToken
+    from ..services import audit_service
+
     user = get_user_by_email(db, payload.email.strip().lower())
-    if not user or not user.reset_token:
+    if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired reset code.")
-    if user.reset_token != payload.otp.strip():
-        raise HTTPException(status_code=400, detail="Incorrect reset code.")
-    expires = user.reset_token_expires
-    if expires is None or datetime.now(timezone.utc) > expires.replace(tzinfo=timezone.utc):
-        user.reset_token = None
-        user.reset_token_expires = None
-        db.commit()
-        raise HTTPException(status_code=400, detail="Reset code has expired. Please request a new one.")
+    token = db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id, PasswordResetToken.consumed_at.is_(None)).order_by(PasswordResetToken.created_at.desc()).first()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    expected = sha256(f"{settings.secret_key}:{payload.otp.strip()}".encode()).hexdigest()
+    if not token or not token.verified_at or token.expires_at < now or not secrets.compare_digest(token.code_hash, expected):
+        raise HTTPException(status_code=400, detail="Verify a valid reset code before resetting the password.")
     if len(payload.new_password) < 8:
         raise HTTPException(status_code=422, detail="New password must be at least 8 characters.")
     user.hashed_password = hash_password(payload.new_password)
-    user.reset_token = None
-    user.reset_token_expires = None
+    token.consumed_at = now
+    audit_service.record(db, user.id, "password_reset_completed", entity_type="user", entity_id=user.id, ip_address=request.client.host if request.client else None, commit=False)
     db.commit()
     return {"message": "Password reset successfully. You can now sign in with your new password."}
 

@@ -17,8 +17,11 @@ from .models.user import UserRole
 ROLE_HIERARCHY: list[UserRole] = [
     UserRole.guest,
     UserRole.student,
+    UserRole.school_partner,
+    UserRole.support_staff,
     UserRole.content_creator,
     UserRole.mentor,
+    UserRole.event_manager,
     UserRole.admin,
     UserRole.super_admin,
 ]
@@ -63,6 +66,10 @@ ROLE_PERMISSIONS: dict[UserRole, frozenset] = {
 
     UserRole.student: frozenset(),
 
+    UserRole.school_partner: frozenset(),
+
+    UserRole.support_staff: frozenset(),
+
     UserRole.content_creator: frozenset({
         Permission.CREATE_EVENT,
         Permission.EDIT_EVENT,
@@ -86,6 +93,16 @@ ROLE_PERMISSIONS: dict[UserRole, frozenset] = {
         Permission.CREATE_QUIZ,
         Permission.MANAGE_SAFETY_QUESTIONS,
         Permission.MANAGE_COUNSELLING,
+        Permission.VIEW_ANALYTICS,
+        Permission.AWARD_BADGES,
+        Permission.AWARD_XP,
+    }),
+
+    UserRole.event_manager: frozenset({
+        Permission.CREATE_EVENT,
+        Permission.EDIT_EVENT,
+        Permission.PUBLISH_EVENT,
+        Permission.DELETE_EVENT,
         Permission.VIEW_ANALYTICS,
         Permission.AWARD_BADGES,
         Permission.AWARD_XP,

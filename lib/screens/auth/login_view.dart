@@ -326,23 +326,33 @@ class _Logo extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 72,
-          height: 72,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
-            color: AppColors.primary,
             borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
-          child: const Icon(
-            Icons.school_rounded,
-            color: Colors.white,
-            size: 40,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Image.asset(
+              'assests/ngo_logo.jpeg',
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
+            ),
           ),
         ),
         const SizedBox(height: 16),
         const Text(
-          'CareSkill',
+          'Punjabi Welfare Trust',
           style: TextStyle(
-            fontSize: 28,
+            fontSize: 24,
             fontWeight: FontWeight.w900,
             color: AppColors.ink,
           ),

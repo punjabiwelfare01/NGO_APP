@@ -2,16 +2,27 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/colors.dart';
+import '../../../models/course.dart';
 import '../../../repositories/course_repository.dart';
 
 class CreateLessonScreen extends StatefulWidget {
   const CreateLessonScreen({
     required this.courseId,
+    required this.courseType,
+    this.courseTitle,
+    this.classLevel,
+    this.subject,
+    this.skillCategory,
     this.nextOrder = 0,
     super.key,
   });
 
   final int courseId;
+  final String courseType;
+  final String? courseTitle;
+  final String? classLevel;
+  final String? subject;
+  final String? skillCategory;
   final int nextOrder;
 
   @override
@@ -28,11 +39,26 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
   final _pdfUrlCtrl = TextEditingController();
   final _notesUrlCtrl = TextEditingController();
   final _durationCtrl = TextEditingController();
+  final _orderCtrl = TextEditingController();
+  final _subjectCtrl = TextEditingController();
+  final _chapterCtrl = TextEditingController();
 
   _PickedUpload? _videoUpload;
   _PickedUpload? _notesUpload;
-  bool _isPublished = true;
+  late String _classLevel;
+  late String _subject;
   bool _saving = false;
+
+  bool get _isAcademic => widget.courseType == CourseType.academic;
+
+  @override
+  void initState() {
+    super.initState();
+    _classLevel = widget.classLevel ?? '8';
+    _subject = widget.subject ?? 'Science';
+    _subjectCtrl.text = widget.subject ?? '';
+    _orderCtrl.text = '${widget.nextOrder + 1}';
+  }
 
   @override
   void dispose() {
@@ -43,6 +69,9 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
     _pdfUrlCtrl.dispose();
     _notesUrlCtrl.dispose();
     _durationCtrl.dispose();
+    _orderCtrl.dispose();
+    _subjectCtrl.dispose();
+    _chapterCtrl.dispose();
     super.dispose();
   }
 
@@ -71,20 +100,19 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
     });
   }
 
-  Future<void> _save() async {
+  Future<void> _saveAs({required bool publish}) async {
     if (!_formKey.currentState!.validate()) return;
     if (!_hasAnyContent) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Add a video, PDF, notes file, URL, or learning outcomes.',
+            'Add at least a video, PDF, notes, or learning outcomes.',
           ),
           backgroundColor: AppColors.softRed,
         ),
       );
       return;
     }
-
     setState(() => _saving = true);
     try {
       final uploadedVideoUrl = _videoUpload == null
@@ -100,7 +128,6 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
               fileName: _notesUpload!.name,
             );
       final videoUrl = uploadedVideoUrl ?? _emptyToNull(_videoUrlCtrl.text);
-      final learningOutcomes = _emptyToNull(_learningOutcomesCtrl.text);
 
       final lesson = await CourseRepository.createLesson(
         widget.courseId,
@@ -108,10 +135,13 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
         description: _emptyToNull(_descCtrl.text),
         contentType: 'mixed',
         contentUrl: videoUrl ?? _emptyToNull(_pdfUrlCtrl.text),
-        contentText: learningOutcomes,
-        order: widget.nextOrder,
+        contentText: _emptyToNull(_learningOutcomesCtrl.text),
+        classLevel: null,
+        subject: _emptyToNull(_subjectCtrl.text),
+        chapter: _emptyToNull(_chapterCtrl.text),
+        order: int.tryParse(_orderCtrl.text.trim()) ?? widget.nextOrder,
         durationMinutes: int.tryParse(_durationCtrl.text.trim()),
-        isPublished: _isPublished,
+        isPublished: publish,
       );
 
       await _createResources(
@@ -156,7 +186,7 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
       await CourseRepository.createResource(
         widget.courseId,
         lessonId,
-        type: 'pdf',
+        type: 'pdf_notes',
         title: 'PDF Notes',
         fileUrl: pdfUrl,
       );
@@ -194,6 +224,10 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  String get _appBarSubtitle {
+    return widget.skillCategory ?? 'Free Course';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -202,82 +236,128 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.ink,
         elevation: 0,
-        title: const Text(
-          'New Lesson',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add Lesson',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                color: AppColors.ink,
               ),
-              child: _saving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Save'),
             ),
-          ),
-        ],
+            Text(
+              _appBarSubtitle,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.muted,
+              ),
+            ),
+          ],
+        ),
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           children: [
-            const _SectionTitle(
-              icon: Icons.dynamic_feed_rounded,
-              title: 'Mixed Lesson Content',
+            // ── Course context banner ─────────────────────────────────────
+            _CourseContextCard(
+              courseTitle: widget.courseTitle,
+              courseType: widget.courseType,
+              classLevel: _isAcademic ? _classLevel : null,
+              subject: _isAcademic ? _subject : null,
+              skillCategory: widget.skillCategory,
             ),
-            const SizedBox(height: 16),
-            _SectionLabel('Title'),
+            const SizedBox(height: 20),
+
+            // ── Lesson details ────────────────────────────────────────────
+            _SectionHeader(
+              icon: Icons.edit_note_rounded,
+              title: 'Lesson Details',
+              color: const Color(0xFF2678F4),
+            ),
+            const SizedBox(height: 12),
+            _FieldLabel('Lesson Title *'),
             const SizedBox(height: 6),
             TextFormField(
               controller: _titleCtrl,
-              decoration: _inputDecoration('e.g. Introduction to Variables'),
+              decoration: _inputDeco('e.g. Introduction to Variables'),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Title is required' : null,
             ),
-            const SizedBox(height: 20),
-            _SectionLabel('Description (optional)'),
+            const SizedBox(height: 16),
+            _FieldLabel('Description (optional)'),
             const SizedBox(height: 6),
             TextFormField(
               controller: _descCtrl,
-              decoration: _inputDecoration('Short description of this lesson'),
+              decoration: _inputDeco(
+                'Short description of what this lesson covers',
+              ),
               maxLines: 2,
             ),
+            const SizedBox(height: 16),
+            _FieldLabel('Lesson Order'),
+            const SizedBox(height: 6),
+            TextFormField(
+              controller: _orderCtrl,
+              decoration: _inputDeco('e.g. 1'),
+              keyboardType: TextInputType.number,
+            ),
             const SizedBox(height: 24),
-            const _SectionTitle(
-              icon: Icons.play_circle_outline_rounded,
-              title: 'Video',
+
+            _SectionHeader(
+              icon: Icons.account_tree_rounded,
+              title: 'Subject & Chapter',
+              color: const Color(0xFF6A1B9A),
             ),
             const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _subjectCtrl,
+                    decoration: _inputDeco('Subject, e.g. Mathematics'),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Subject is required'
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextFormField(
+                    controller: _chapterCtrl,
+                    decoration: _inputDeco('Chapter, e.g. Algebra'),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Chapter is required'
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // ── Video content ─────────────────────────────────────────────
+            _SectionHeader(
+              icon: Icons.play_circle_outline_rounded,
+              title: 'Video Lesson',
+              color: const Color(0xFF2FAE65),
+            ),
+            const SizedBox(height: 12),
+            _FieldLabel('Video URL (YouTube, Google Drive, or direct link)'),
+            const SizedBox(height: 6),
             TextFormField(
               controller: _videoUrlCtrl,
-              decoration: _inputDecoration('Video URL'),
+              decoration: _inputDeco('https://...'),
               keyboardType: TextInputType.url,
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 10),
             _UploadField(
               icon: Icons.video_file_outlined,
-              label: _videoUpload?.name ?? 'Upload video from local storage',
+              label: _videoUpload?.name ?? 'Upload video from device',
               selected: _videoUpload != null,
               onPick: _pickVideo,
               onClear: _videoUpload == null
@@ -285,85 +365,82 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
                   : () => setState(() => _videoUpload = null),
             ),
             const SizedBox(height: 24),
-            const _SectionTitle(
-              icon: Icons.sticky_note_2_outlined,
-              title: 'What the student will learn',
+
+            // ── Learning outcomes ─────────────────────────────────────────
+            _SectionHeader(
+              icon: Icons.lightbulb_outline_rounded,
+              title: 'What Students Will Learn',
+              color: const Color(0xFFFF8A00),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _learningOutcomesCtrl,
-              decoration: _inputDecoration(
-                'e.g. Understand variables, write simple code, and complete a mini task',
+              decoration: _inputDeco(
+                'e.g. Understand variables, write simple code, complete a mini task…',
               ),
               minLines: 4,
               maxLines: 8,
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 12),
-            const _SectionTitle(
+            const SizedBox(height: 24),
+
+            // ── PDF notes & resources ─────────────────────────────────────
+            _SectionHeader(
               icon: Icons.note_add_outlined,
-              title: 'Notes & Resources',
+              title: 'PDF Notes & Resources',
+              color: const Color(0xFF7045D9),
             ),
             const SizedBox(height: 12),
+            _FieldLabel('PDF Notes URL'),
+            const SizedBox(height: 6),
             TextFormField(
               controller: _pdfUrlCtrl,
-              decoration: _inputDecoration('PDF notes URL'),
+              decoration: _inputDeco('https://… (direct PDF link)'),
               keyboardType: TextInputType.url,
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            _FieldLabel('Additional Notes Link (optional)'),
+            const SizedBox(height: 6),
             TextFormField(
               controller: _notesUrlCtrl,
-              decoration: _inputDecoration('Notes link URL'),
+              decoration: _inputDeco('https://… (Google Docs, Notion, etc.)'),
               keyboardType: TextInputType.url,
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 10),
             _UploadField(
               icon: Icons.upload_file_rounded,
-              label: _notesUpload?.name ?? 'Upload PDF/TXT/DOCX notes',
+              label: _notesUpload?.name ?? 'Upload PDF / TXT / DOCX file',
               selected: _notesUpload != null,
               onPick: _pickNotesFile,
               onClear: _notesUpload == null
                   ? null
                   : () => setState(() => _notesUpload = null),
             ),
-            const SizedBox(height: 20),
-            _SectionLabel('Duration (minutes, optional)'),
+            const SizedBox(height: 24),
+
+            // ── Duration ─────────────────────────────────────────────────
+            _SectionHeader(
+              icon: Icons.schedule_rounded,
+              title: 'Duration',
+              color: AppColors.muted,
+            ),
+            const SizedBox(height: 12),
+            _FieldLabel('Duration in minutes (optional)'),
             const SizedBox(height: 6),
             TextFormField(
               controller: _durationCtrl,
-              decoration: _inputDecoration('e.g. 15'),
+              decoration: _inputDeco('e.g. 15'),
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppColors.muted.withValues(alpha: 0.15),
-                ),
-              ),
-              child: SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  'Publish immediately',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ink,
-                  ),
-                ),
-                subtitle: const Text(
-                  'Students will see this lesson right away',
-                  style: TextStyle(fontSize: 12, color: AppColors.muted),
-                ),
-                value: _isPublished,
-                activeThumbColor: AppColors.primary,
-                onChanged: (v) => setState(() => _isPublished = v),
-              ),
+            const SizedBox(height: 28),
+
+            // ── Publish actions ───────────────────────────────────────────
+            _PublishActions(
+              saving: _saving,
+              onSaveDraft: () => _saveAs(publish: false),
+              onPublish: () => _saveAs(publish: true),
             ),
           ],
         ),
@@ -371,7 +448,7 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(String hint) => InputDecoration(
+  InputDecoration _inputDeco(String hint) => InputDecoration(
     hintText: hint,
     hintStyle: const TextStyle(color: AppColors.muted, fontSize: 13),
     filled: true,
@@ -392,39 +469,245 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
   );
 }
 
-class _PickedUpload {
-  const _PickedUpload(this.name, this.bytes);
+// ─── Course context card ──────────────────────────────────────────────────────
 
-  final String name;
-  final List<int> bytes;
+class _CourseContextCard extends StatelessWidget {
+  const _CourseContextCard({
+    required this.courseTitle,
+    required this.courseType,
+    required this.classLevel,
+    required this.subject,
+    required this.skillCategory,
+  });
 
-  String get extension {
-    final dot = name.lastIndexOf('.');
-    return dot == -1 ? '' : name.substring(dot + 1).toLowerCase();
+  final String? courseTitle;
+  final String courseType;
+  final String? classLevel;
+  final String? subject;
+  final String? skillCategory;
+
+  bool get _isAcademic => courseType == CourseType.academic;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = _isAcademic
+        ? const Color(0xFF2678F4)
+        : const Color(0xFF2FAE65);
+    final bgColor = _isAcademic
+        ? const Color(0xFFEAF3FF)
+        : const Color(0xFFEDFFF5);
+    final typeLabel = _isAcademic ? 'Academic Course' : 'Skill Course';
+    final contextLabel = _isAcademic
+        ? 'Class $classLevel · $subject'
+        : skillCategory ?? 'Skill Course';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              _isAcademic ? Icons.school_rounded : Icons.star_rounded,
+              color: accentColor,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        typeLabel,
+                        style: TextStyle(
+                          color: accentColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                if (courseTitle != null) ...[
+                  Text(
+                    courseTitle!,
+                    style: const TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                Row(
+                  children: [
+                    Icon(
+                      _isAcademic
+                          ? Icons.menu_book_rounded
+                          : Icons.category_rounded,
+                      size: 14,
+                      color: accentColor,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      contextLabel,
+                      style: TextStyle(
+                        color: accentColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _isAcademic
+                      ? 'This lesson will be visible to Class $classLevel students studying $subject.'
+                      : 'This lesson will be added to the ${skillCategory ?? 'skill'} course.',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
-
-  String get resourceType => extension == 'pdf' ? 'pdf' : 'note';
-
-  String get title =>
-      extension == 'pdf' ? 'Uploaded PDF Notes' : 'Uploaded Notes';
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.icon, required this.title});
+// ─── Publish actions ──────────────────────────────────────────────────────────
+
+class _PublishActions extends StatelessWidget {
+  const _PublishActions({
+    required this.saving,
+    required this.onSaveDraft,
+    required this.onPublish,
+  });
+
+  final bool saving;
+  final VoidCallback onSaveDraft;
+  final VoidCallback onPublish;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          onPressed: saving ? null : onPublish,
+          icon: saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.publish_rounded, size: 18),
+          label: const Text('Publish Lesson'),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF2FAE65),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: saving ? null : onSaveDraft,
+          icon: const Icon(Icons.save_outlined, size: 18),
+          label: const Text('Save as Draft'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: Text(
+            'Draft lessons are not visible to students.',
+            style: TextStyle(
+              color: AppColors.muted.withValues(alpha: 0.7),
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Shared small widgets ─────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    required this.color,
+  });
 
   final IconData icon;
   final String title;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppColors.primary),
-        const SizedBox(width: 8),
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: 10),
         Text(
           title,
           style: const TextStyle(
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: FontWeight.w900,
             color: AppColors.ink,
           ),
@@ -434,8 +717,8 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
 
   final String text;
 
@@ -508,4 +791,21 @@ class _UploadField extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PickedUpload {
+  const _PickedUpload(this.name, this.bytes);
+
+  final String name;
+  final List<int> bytes;
+
+  String get extension {
+    final dot = name.lastIndexOf('.');
+    return dot == -1 ? '' : name.substring(dot + 1).toLowerCase();
+  }
+
+  String get resourceType => extension == 'pdf' ? 'pdf_notes' : 'note';
+
+  String get title =>
+      extension == 'pdf' ? 'Uploaded PDF Notes' : 'Uploaded Notes';
 }

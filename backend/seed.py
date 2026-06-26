@@ -1,10 +1,15 @@
 """
 Seed the database with initial data.
-Drops all tables and recreates them on every run (use only in development).
 
+Normal run — only inserts missing demo users / content, never touches existing data:
     cd backend
     python seed.py
+
+Full reset (drops ALL tables, wipes every row, then re-seeds from scratch):
+    cd backend
+    python seed.py --reset
 """
+import sys
 from datetime import date, datetime, timedelta
 
 from passlib.context import CryptContext
@@ -20,21 +25,29 @@ from app.models.user import UserRole
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+_RESET = "--reset" in sys.argv
+
 
 def _hash(plain: str) -> str:
     return _pwd.hash(plain)
 
 
-# ── reset ──────────────────────────────────────────────────────────────────────
+# ── database setup ─────────────────────────────────────────────────────────────
 
-print("Dropping and recreating all tables...")
-Base.metadata.drop_all(bind=engine)
+if _RESET:
+    print("--reset flag detected: dropping and recreating all tables...")
+    Base.metadata.drop_all(bind=engine)
+
 Base.metadata.create_all(bind=engine)
 
 db = SessionLocal()
 
 
 # ── seed helpers ───────────────────────────────────────────────────────────────
+
+def _user_exists(email: str) -> bool:
+    return db.query(User).filter(User.email == email).first() is not None
+
 
 def seed_categories() -> list[SkillCategory]:
     data = [
@@ -53,7 +66,43 @@ def seed_categories() -> list[SkillCategory]:
 
 def seed_courses(categories: list[SkillCategory]) -> list[Course]:
     cat = {c.title: c.id for c in categories}
+    free_course_examples = [
+        ("NDA Exam Full Course", "NDA", "military_tech_rounded", "#DDEEFF", "24 hours", "Intermediate"),
+        ("NDA Mathematics", "NDA", "calculate_rounded", "#E3F2FD", "12 hours", "Intermediate"),
+        ("NDA English", "NDA", "language_rounded", "#FFF0D8", "8 hours", "Beginner"),
+        ("NDA General Ability Test", "NDA", "quiz_rounded", "#E8E1FF", "10 hours", "Intermediate"),
+        ("Defence Career Guidance", "Career Guidance", "shield_rounded", "#E8F5E9", "4 hours", "Beginner"),
+        ("Spoken English for Students", "Spoken English", "record_voice_over_rounded", "#FFF0D8", "8 hours", "Beginner"),
+        ("Basic Computer Skills", "Computer Basics", "computer_rounded", "#DDF5FF", "6 hours", "Beginner"),
+        ("Career Guidance Program", "Career Guidance", "trending_up_rounded", "#E0F8E8", "5 hours", "Beginner"),
+        ("Cyber Safety Awareness", "Awareness", "security_rounded", "#E0F8E8", "3 hours", "Beginner"),
+        ("Women Safety Awareness", "Awareness", "health_and_safety_rounded", "#FCE4EC", "3 hours", "Beginner"),
+        ("Anti-Drug Awareness", "Awareness", "campaign_rounded", "#FFF3E0", "2 hours", "Beginner"),
+        ("Personality Development", "Career Guidance", "psychology_rounded", "#E8E1FF", "6 hours", "Beginner"),
+        ("NGO Volunteer Training", "Volunteer Training", "volunteer_activism_rounded", "#E8F5E9", "5 hours", "Beginner"),
+        ("Donation Ethics & Reporting", "Volunteer Training", "receipt_long_rounded", "#FFF8E1", "3 hours", "Beginner"),
+    ]
     data = [
+        Course(
+            title=title,
+            duration=duration,
+            level=level,
+            icon_name=icon,
+            color_hex=color,
+            course_type="skill",
+            skill_category=category,
+            is_published=True,
+            course_description=f"Free {title.lower()} videos, notes, guidance, and practice by Punjabi Welfare Trust.",
+            skill_tags=[
+                "creator:NGO Team",
+                "audience:Students",
+                "language:Hindi / English",
+                "notes",
+                "quiz",
+            ],
+        )
+        for title, category, icon, color, duration, level in free_course_examples
+    ] + [
         Course(
             title="Coding Basics for Kids",
             duration="2h 30m",
@@ -61,6 +110,11 @@ def seed_courses(categories: list[SkillCategory]) -> list[Course]:
             icon_name="code_rounded",
             color_hex="#DDF1FF",
             category_id=cat["Digital Literacy"],
+            course_type="skill",
+            skill_category="Programming",
+            recommended_class_min=6,
+            recommended_class_max=12,
+            course_description="Start coding with friendly videos, notes, and practice tasks.",
         ),
         Course(
             title="Speak with Confidence",
@@ -69,6 +123,11 @@ def seed_courses(categories: list[SkillCategory]) -> list[Course]:
             icon_name="campaign_rounded",
             color_hex="#FFE7C8",
             category_id=cat["Communication Skill"],
+            course_type="skill",
+            skill_category="Communication Skills",
+            recommended_class_min=6,
+            recommended_class_max=12,
+            course_description="Build public speaking habits for class, interviews, and daily life.",
         ),
         Course(
             title="Internet Safety Heroes",
@@ -77,6 +136,44 @@ def seed_courses(categories: list[SkillCategory]) -> list[Course]:
             icon_name="security_rounded",
             color_hex="#E0F8E8",
             category_id=cat["Safety Awareness"],
+            course_type="skill",
+            skill_category="Cyber Security",
+            recommended_class_min=6,
+            recommended_class_max=12,
+            course_description="Learn password safety, phishing awareness, and smart internet choices.",
+        ),
+        Course(
+            title="Class 8 Science: Light and Reflection",
+            duration="45m",
+            level="Beginner",
+            icon_name="psychology_rounded",
+            color_hex="#F5E0FF",
+            course_type="academic",
+            class_level="8",
+            subject="Science",
+            course_description="Understand light, reflection, mirrors, and simple ray diagrams.",
+        ),
+        Course(
+            title="Class 8 Mathematics: Linear Equations",
+            duration="50m",
+            level="Beginner",
+            icon_name="grid_view_rounded",
+            color_hex="#D0EDFF",
+            course_type="academic",
+            class_level="8",
+            subject="Mathematics",
+            course_description="Practice solving one-variable equations with step-by-step notes.",
+        ),
+        Course(
+            title="Class 8 English: Writing Clear Paragraphs",
+            duration="35m",
+            level="Beginner",
+            icon_name="language_rounded",
+            color_hex="#FFE7C8",
+            course_type="academic",
+            class_level="8",
+            subject="English",
+            course_description="Learn topic sentences, supporting details, and revision habits.",
         ),
     ]
     db.add_all(data)
@@ -144,6 +241,54 @@ def seed_lessons(courses: list[Course]) -> list[Lesson]:
             ),
             order=0,
             duration_minutes=16,
+            is_published=True,
+        ),
+        Lesson(
+            course_id=course_by_title["Class 8 Science: Light and Reflection"].id,
+            title="Reflection from Plane Mirrors",
+            description="Watch how light reflects and use notes to revise laws of reflection.",
+            content_type="mixed",
+            content_url="https://www.youtube.com/watch?v=vt-SG7Pn8UU",
+            content_text=(
+                "Light travels in straight lines. When it hits a smooth surface, it reflects. "
+                "The angle of incidence is equal to the angle of reflection."
+            ),
+            class_level="8",
+            subject="Science",
+            order=0,
+            duration_minutes=25,
+            is_published=True,
+        ),
+        Lesson(
+            course_id=course_by_title["Class 8 Mathematics: Linear Equations"].id,
+            title="Solving Equations Step by Step",
+            description="Use balance method examples to solve simple linear equations.",
+            content_type="mixed",
+            content_url="https://www.youtube.com/watch?v=NybHckSEQBI",
+            content_text=(
+                "A linear equation has a variable with power one. Keep both sides balanced "
+                "when adding, subtracting, multiplying, or dividing."
+            ),
+            class_level="8",
+            subject="Mathematics",
+            order=0,
+            duration_minutes=28,
+            is_published=True,
+        ),
+        Lesson(
+            course_id=course_by_title["Class 8 English: Writing Clear Paragraphs"].id,
+            title="Topic Sentences and Supporting Details",
+            description="Learn how to write one clear paragraph with examples.",
+            content_type="mixed",
+            content_url="https://www.youtube.com/watch?v=0IFDuhdB2Hk",
+            content_text=(
+                "A strong paragraph begins with one main idea. Supporting details explain, "
+                "prove, or describe that idea. End with a closing sentence."
+            ),
+            class_level="8",
+            subject="English",
+            order=0,
+            duration_minutes=20,
             is_published=True,
         ),
     ]
@@ -303,63 +448,115 @@ def seed_quizzes(admin: User) -> list[Quiz]:
     return quizzes
 
 
-def seed_users() -> tuple[User, User, User, User, User]:
-    # Demo student: Aarav Sharma
-    student = User(
-        name="Aarav Sharma",
-        email="aarav@careskill.demo",
-        hashed_password=_hash("careskill123"),
-        age=12,
-        level=4,
-        xp=2480,
-        role=UserRole.student,
-        parent_email="parent@example.com",
-    )
-    # NGO super-admin (platform owner)
-    super_admin = User(
-        name="Super Admin",
-        email="superadmin@careskill.demo",
-        hashed_password=_hash("superadmin123"),
-        age=40,
-        level=1,
-        xp=0,
-        role=UserRole.super_admin,
-    )
-    # NGO admin account
-    admin = User(
-        name="Admin User",
-        email="admin@careskill.demo",
-        hashed_password=_hash("admin123"),
-        age=30,
-        level=1,
-        xp=0,
-        role=UserRole.admin,
-    )
-    # Demo mentor
-    mentor = User(
-        name="Dr. Meera",
-        email="meera@careskill.demo",
-        hashed_password=_hash("mentor123"),
-        age=35,
-        level=1,
-        xp=0,
-        role=UserRole.mentor,
-    )
-    # Demo content creator
-    content_creator = User(
-        name="Content Creator",
-        email="creator@careskill.demo",
-        hashed_password=_hash("creator123"),
-        age=28,
-        level=1,
-        xp=0,
-        role=UserRole.content_creator,
-    )
-    db.add_all([student, super_admin, admin, mentor, content_creator])
+def seed_users() -> tuple:
+    created = []
+    skipped = []
+
+    demo_users = [
+        {
+            "email": "aarav@careskill.demo",
+            "fields": dict(
+                name="Aarav Sharma",
+                hashed_password=_hash("careskill123"),
+                age=12, level=4, xp=2480,
+                role=UserRole.student,
+                parent_email="parent@example.com",
+                class_name="Class 8",
+            ),
+        },
+        {
+            "email": "superadmin@careskill.demo",
+            "fields": dict(
+                name="Super Admin",
+                hashed_password=_hash("superadmin123"),
+                age=40, level=1, xp=0,
+                role=UserRole.super_admin,
+                access_status="approved",
+            ),
+        },
+        {
+            "email": "admin@careskill.demo",
+            "fields": dict(
+                name="Admin User",
+                hashed_password=_hash("admin123"),
+                age=30, level=1, xp=0,
+                role=UserRole.admin,
+                access_status="approved",
+            ),
+        },
+        {
+            "email": "eventmanager@careskill.demo",
+            "fields": dict(
+                name="Event Manager",
+                hashed_password=_hash("eventmanager123"),
+                age=32, level=1, xp=0,
+                role=UserRole.event_manager,
+                access_status="approved",
+            ),
+        },
+        {
+            "email": "meera@careskill.demo",
+            "fields": dict(
+                name="Dr. Meera",
+                hashed_password=_hash("mentor123"),
+                age=35, level=1, xp=0,
+                role=UserRole.mentor,
+                access_status="approved",
+            ),
+        },
+        {
+            "email": "creator@careskill.demo",
+            "fields": dict(
+                name="Content Creator",
+                hashed_password=_hash("creator123"),
+                age=28, level=1, xp=0,
+                role=UserRole.content_creator,
+                access_status="approved",
+            ),
+        },
+        {
+            "email": "school@careskill.demo",
+            "fields": dict(
+                name="School Partner",
+                hashed_password=_hash("school123"),
+                age=35, level=1, xp=0,
+                role=UserRole.school_partner,
+                school_name="Delhi Public School",
+                location="New Delhi",
+                access_status="approved",
+            ),
+        },
+    ]
+
+    user_objects: dict[str, User] = {}
+    for entry in demo_users:
+        email = entry["email"]
+        existing = db.query(User).filter(User.email == email).first()
+        if existing:
+            skipped.append(email)
+            user_objects[email] = existing
+        else:
+            u = User(email=email, **entry["fields"])
+            db.add(u)
+            db.flush()
+            created.append(email)
+            user_objects[email] = u
+
     db.commit()
-    for u in [student, super_admin, admin, mentor, content_creator]:
+    for u in user_objects.values():
         db.refresh(u)
-    return student, super_admin, admin, mentor, content_creator
+
+    return (
+        user_objects["aarav@careskill.demo"],
+        user_objects["superadmin@careskill.demo"],
+        user_objects["admin@careskill.demo"],
+        user_objects["meera@careskill.demo"],
+        user_objects["creator@careskill.demo"],
+        user_objects["school@careskill.demo"],
+        user_objects["eventmanager@careskill.demo"],
+        created,
+        skipped,
+    )
 
 
 def seed_demo_activity(
@@ -410,22 +607,38 @@ def seed_demo_activity(
 # ── run ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("Seeding database...")
-    cats    = seed_categories();  print(f"  {len(cats)} skill categories")
-    crs     = seed_courses(cats); print(f"  {len(crs)} courses")
-    lessons = seed_lessons(crs);   print(f"  {len(lessons)} demo lessons")
-    bdgs    = seed_badges();      print(f"  {len(bdgs)} badges")
-    student, super_admin, admin, mentor, content_creator = seed_users()
-    print(f"  Users: {student.name} (student), {super_admin.name} (super_admin), "
-          f"{admin.name} (admin), {mentor.name} (mentor), {content_creator.name} (content_creator)")
-    qzs     = seed_quizzes(admin); print(f"  {len(qzs)} quizzes + daily challenge")
-    seed_demo_activity(student, mentor, crs, bdgs)
-    print("  Demo activity seeded")
+    print("Seeding database..." + (" (full reset mode)" if _RESET else " (safe mode — existing data preserved)"))
+
+    if _RESET:
+        cats    = seed_categories();  print(f"  {len(cats)} skill categories")
+        crs     = seed_courses(cats); print(f"  {len(crs)} courses")
+        lessons = seed_lessons(crs);  print(f"  {len(lessons)} demo lessons")
+        bdgs    = seed_badges();      print(f"  {len(bdgs)} badges")
+    else:
+        cats = db.query(SkillCategory).all()
+        crs  = db.query(Course).all()
+        bdgs = db.query(Badge).all()
+        print(f"  Skipping courses/categories/badges (already exist, use --reset to recreate)")
+
+    student, super_admin, admin, mentor, content_creator, school_partner, event_manager, created, skipped = seed_users()
+
+    if created:
+        print(f"  Created {len(created)} demo user(s): {', '.join(created)}")
+    if skipped:
+        print(f"  Skipped {len(skipped)} already-existing user(s): {', '.join(skipped)}")
+
+    if _RESET and crs and bdgs:
+        qzs = seed_quizzes(admin); print(f"  {len(qzs)} quizzes + daily challenge")
+        seed_demo_activity(student, mentor, crs, bdgs)
+        print("  Demo activity seeded")
+
     db.close()
     print("\nDone. Database ready.")
     print("\nDemo credentials:")
-    print(f"  Super Admin      →  superadmin@careskill.demo  /  superadmin123")
-    print(f"  Admin            →  admin@careskill.demo       /  admin123")
-    print(f"  Mentor           →  meera@careskill.demo       /  mentor123")
-    print(f"  Content Creator  →  creator@careskill.demo     /  creator123")
-    print(f"  Student          →  aarav@careskill.demo       /  careskill123")
+    print(f"  Super Admin      →  superadmin@careskill.demo    /  superadmin123")
+    print(f"  Admin            →  admin@careskill.demo         /  admin123")
+    print(f"  Event Manager    →  eventmanager@careskill.demo  /  eventmanager123")
+    print(f"  Mentor           →  meera@careskill.demo         /  mentor123")
+    print(f"  Content Creator  →  creator@careskill.demo       /  creator123")
+    print(f"  School Partner   →  school@careskill.demo        /  school123")
+    print(f"  Student          →  aarav@careskill.demo         /  careskill123")

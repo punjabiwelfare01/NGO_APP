@@ -184,6 +184,7 @@ class _EventManagerHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       padding: const EdgeInsets.all(16),
@@ -195,8 +196,29 @@ class _EventManagerHero extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 520;
+
           final intro = Row(
             children: [
+              if (canPop) ...[
+                InkWell(
+                  onTap: () => Navigator.pop(context),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
               Container(
                 width: 48,
                 height: 48,

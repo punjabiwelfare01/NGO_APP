@@ -9,6 +9,7 @@ class TopHeader extends StatelessWidget {
     this.onActionTap,
     this.actionTooltip = 'Open action',
     this.badgeCount,
+    this.onBack,
     super.key,
   });
 
@@ -21,9 +22,15 @@ class TopHeader extends StatelessWidget {
   /// When non-null and > 0, a red badge is shown on the action icon.
   final int? badgeCount;
 
+  /// Explicit back callback. When provided the back button is always shown
+  /// and calls this instead of Navigator.pop. When null, falls back to
+  /// showing the button only if Navigator.canPop is true.
+  final VoidCallback? onBack;
+
   @override
   Widget build(BuildContext context) {
-    final canPop = Navigator.canPop(context);
+    final canPop = onBack != null || Navigator.canPop(context);
+    final handleBack = onBack ?? () => Navigator.of(context).pop();
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -31,7 +38,7 @@ class TopHeader extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 4),
             child: IconButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: handleBack,
               icon: const Icon(Icons.arrow_back_rounded),
               color: AppColors.ink,
               tooltip: 'Back',

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:url_launcher/url_launcher.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -7,26 +9,40 @@ import '../../app_state.dart';
 import '../../core/colors.dart';
 import '../../models/course.dart';
 import '../../models/event_models.dart';
+import '../../models/impact_post.dart';
 import '../../models/skill_category.dart';
 import '../../viewmodels/admin_viewmodel.dart';
 import '../../viewmodels/home_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
+import '../../models/volunteer_models.dart';
+import '../../viewmodels/volunteer_viewmodel.dart';
+import '../../repositories/impact_repository.dart';
 import '../../utils/navigation_helper.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_scroll_view.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/top_header.dart';
+import '../volunteer/work_submission_screen.dart';
+import '../volunteer/daily_log_screen.dart';
+import '../volunteer/donation_screen.dart';
+import '../volunteer/my_certificates_screen.dart';
+import '../volunteer/activity_list_screen.dart';
 import '../admin/pending_approvals_screen.dart';
 import '../admin/user_management_screen.dart';
 import '../events/admin/event_manager_screen.dart';
-import '../helping_support/admin/counselling_admin_screen.dart';
+import '../admin/volunteer_admin_screen.dart';
+import '../admin/counsellor_admin_screen.dart';
+import '../school_portal/school_partner_portal_screen.dart';
+import '../internship/wall_of_impact_view.dart';
 import '../helping_support/admin/emergency_contacts_admin_screen.dart';
+import '../events/event_detail_pipeline_screen.dart';
 import '../helping_support/student/all_slots_screen.dart';
 import '../home/admin/safety_awareness_manager_screen.dart';
+import '../../models/event_pipeline_models.dart';
+import '../../viewmodels/event_pipeline_viewmodel.dart';
 import 'widgets/counselling_session_card.dart';
 import 'widgets/daily_challenge_card.dart';
 import 'widgets/daily_motivation_card.dart';
-import 'widgets/parent_preview_panel.dart';
 import 'widgets/skill_category_card.dart';
 import 'widgets/upcoming_counselling_banner.dart';
 import 'widgets/welcome_banner.dart';
@@ -43,6 +59,8 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   late final HomeViewModel _vm;
   AdminViewModel? _adminVm;
+  VolunteerViewModel? _volunteerVm;
+  EventPipelineViewModel? _pipelineVm;
   late final TextEditingController _skillSearchCtrl;
   Timer? _notificationTimer;
   bool _bannerShown = false;
@@ -68,13 +86,24 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       _adminVm = AdminViewModel();
       _adminVm!.load();
     }
+    // Students (NGO volunteers) get live impact stats + assignment data
+    if (AppState.role.isStudent) {
+      _volunteerVm = VolunteerViewModel()..load();
+      _volunteerVm!.addListener(_onVolunteerVmChanged);
+      _pipelineVm = EventPipelineViewModel.shared..load();
+      _pipelineVm!.addListener(_onVolunteerVmChanged);
+    }
   }
+
+  void _onVolunteerVmChanged() => setState(() {});
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _vm.load();
       _adminVm?.load();
+      _volunteerVm?.load();
+      _pipelineVm?.load();
     }
   }
 
@@ -88,6 +117,9 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     _vm.removeListener(_onVmChanged);
     _vm.dispose();
     _adminVm?.dispose();
+    _volunteerVm?.removeListener(_onVolunteerVmChanged);
+    _volunteerVm?.dispose();
+    _pipelineVm?.removeListener(_onVolunteerVmChanged);
     super.dispose();
   }
 
@@ -256,7 +288,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                   ),
                   onOpenCounselling: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const CounsellingAdminScreen(),
+                      builder: (_) => const CounsellorAdminScreen(),
                     ),
                   ),
                   onOpenSafety: () => Navigator.of(context).push(
@@ -269,146 +301,187 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                       builder: (_) => const EmergencyContactsAdminScreen(),
                     ),
                   ),
+                  onOpenVolunteer: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const VolunteerAdminScreen(),
+                    ),
+                  ),
                 ),
               ),
 
             // ── Personalised welcome card ──────────────────────────
             WelcomeBanner(student: _vm.studentProfile),
 
-            // ── Upcoming events ────────────────────────────────────
-            UpcomingEventsPanel(
-              events: _vm.upcomingEvents,
-              onEventTap: (event) =>
-                  openEvent(context, event, onRefresh: () => _vm.load()),
-            ),
+            // ── Upcoming events (staff/admin only — NGO volunteers use Work tab) ──
+            if (!AppState.role.isStudent)
+              UpcomingEventsPanel(
+                events: _vm.upcomingEvents,
+                onEventTap: (event) =>
+                    openEvent(context, event, onRefresh: () => _vm.load()),
+              ),
 
-            // ── Next counselling session ───────────────────────────
-            UpcomingCounsellingBanner(
-              upcomingEvent: _vm.upcomingCounsellingEvent,
-              liveSession: _vm.upcomingSession,
-              onEventTap: () => _openCounsellingBooking(context),
-              onJoinTap: () => _openCounsellingSession(context),
-            ),
+            // ── Next counselling session (non-student roles only) ──────────────────
+            if (!AppState.role.isStudent)
+              UpcomingCounsellingBanner(
+                upcomingEvent: _vm.upcomingCounsellingEvent,
+                liveSession: _vm.upcomingSession,
+                onEventTap: () => _openCounsellingBooking(context),
+                onJoinTap: () => _openCounsellingSession(context),
+              ),
 
             const DailyMotivationCard(),
 
-            // ── Continue Learning ──────────────────────────────────
-            const SectionHeader(title: 'Continue Learning'),
-            _ContinueLearningCard(
-              course: _vm.continueLearningCourse,
-              onTap: () => widget.onOpenLearn?.call(null),
-            ),
+            // ── Continue Learning (non-student roles only) ─────────
+            if (!AppState.role.isStudent) ...[
+              const SectionHeader(title: 'Continue Learning'),
+              _ContinueLearningCard(
+                course: _vm.continueLearningCourse,
+                onTap: () => widget.onOpenLearn?.call(null),
+              ),
+            ],
 
-            // ── Skill development ──────────────────────────────────
-            SectionHeader(
-              title: 'Skill Development',
-              action: 'View all',
-              onTap: () => widget.onOpenLearn?.call(null),
-            ),
-            TextField(
-              controller: _skillSearchCtrl,
-              onChanged: (value) => setState(() => _skillQuery = value.trim()),
-              decoration: InputDecoration(
-                hintText: 'Search skills...',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _skillQuery.isEmpty
-                    ? null
-                    : IconButton(
+            // ── Skill development & counselling (non-student roles only) ──────────
+            if (!AppState.role.isStudent) ...[
+              SectionHeader(
+                title: 'Skill Development',
+                action: 'View all',
+                onTap: () => widget.onOpenLearn?.call(null),
+              ),
+              TextField(
+                controller: _skillSearchCtrl,
+                onChanged: (value) =>
+                    setState(() => _skillQuery = value.trim()),
+                decoration: InputDecoration(
+                  hintText: 'Search skills...',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _skillQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          onPressed: () {
+                            _skillSearchCtrl.clear();
+                            setState(() => _skillQuery = '');
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                          tooltip: 'Clear search',
+                        ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (visibleSkills.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.search_off_rounded,
+                        color: AppColors.muted.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'No skill found.',
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      TextButton(
                         onPressed: () {
                           _skillSearchCtrl.clear();
                           setState(() => _skillQuery = '');
                         },
-                        icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Clear search',
+                        child: const Text('Clear'),
                       ),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (visibleSkills.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.search_off_rounded,
-                      color: AppColors.muted.withValues(alpha: 0.7),
+                    ],
+                  ),
+                )
+              else
+                SizedBox(
+                  height: 128,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: visibleSkills.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 12),
+                    itemBuilder: (_, i) => SkillCategoryCard(
+                      item: visibleSkills[i],
+                      onTap: () => widget.onOpenLearn?.call(visibleSkills[i]),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'No skill found.',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        _skillSearchCtrl.clear();
-                        setState(() => _skillQuery = '');
-                      },
-                      child: const Text('Clear'),
-                    ),
-                  ],
-                ),
-              )
-            else
-              SizedBox(
-                height: 128,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: visibleSkills.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => SkillCategoryCard(
-                    item: visibleSkills[i],
-                    onTap: () => widget.onOpenLearn?.call(visibleSkills[i]),
                   ),
                 ),
+              CounsellingSessionCard(
+                upcomingSessions: _vm.allUpcomingSessions,
+                availableSlots: _vm.availableSlots,
+                onViewAll: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AllSlotsScreen()),
+                ),
+                onBook: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AllSlotsScreen()),
+                ),
               ),
+            ],
 
-            // ── Counselling card ───────────────────────────────────
-            CounsellingSessionCard(
-              upcomingSessions: _vm.allUpcomingSessions,
-              availableSlots: _vm.availableSlots,
-              onViewAll: () => Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const AllSlotsScreen())),
-              onBook: () => Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const AllSlotsScreen())),
-            ),
+            // ── Daily Challenge (non-student roles only) ───────────
+            if (!AppState.role.isStudent) ...[
+              const SectionHeader(title: 'School Partner Services'),
+              const _SchoolPartnerPortalCard(),
+              SectionHeader(
+                title: 'Daily Challenge',
+                action: _vm.dailyChallenge == null ? null : 'Start',
+                onTap: _vm.dailyChallenge == null
+                    ? null
+                    : () => _openDailyChallenge(context),
+              ),
+              DailyChallengeCard(
+                challenge: _vm.dailyChallenge,
+                onTap: _vm.dailyChallenge == null
+                    ? null
+                    : () => _openDailyChallenge(context),
+              ),
+            ],
 
-            // ── Daily Challenge ────────────────────────────────────
-            SectionHeader(
-              title: 'Daily Challenge',
-              action: _vm.dailyChallenge == null ? null : 'Start',
-              onTap: _vm.dailyChallenge == null
-                  ? null
-                  : () => _openDailyChallenge(context),
-            ),
-            DailyChallengeCard(
-              challenge: _vm.dailyChallenge,
-              onTap: _vm.dailyChallenge == null
-                  ? null
-                  : () => _openDailyChallenge(context),
-            ),
+            // ── Student NGO volunteer sections ──────────────────────
+            if (AppState.role.isStudent) ...[
+              _NGOImpactSummaryRow(stats: _volunteerVm?.stats),
+              const SectionHeader(title: 'My Assignments'),
+              _NGOAssignmentsSection(
+                assignments: _volunteerVm?.assignments
+                    .where((a) => !['completed', 'certificate_generated', 'rejected'].contains(a.status))
+                    .toList() ?? const [],
+                vm: _volunteerVm,
+                isLoading: _volunteerVm?.state == VolunteerLoadState.loading,
+              ),
+              const SectionHeader(title: 'Open Activities'),
+              _NGOOpenActivitiesCard(
+                activities: _volunteerVm?.activities
+                    .where((a) => a.applicationStatus == null && a.assignmentId == null)
+                    .toList() ?? const [],
+                vm: _volunteerVm,
+                isLoading: _volunteerVm?.state == VolunteerLoadState.loading,
+              ),
+              if (_pipelineVm != null) ...[
+                const SectionHeader(title: 'Active Event'),
+                _ActivePipelineEventCard(vm: _pipelineVm!),
+              ],
+              const SectionHeader(title: 'Quick Actions'),
+              const _NGOQuickActionsGrid(),
+              const SectionHeader(title: 'Wall of Impact'),
+              const _WallOfImpactPreviewCard(),
+            ],
 
             // ── Emergency Help shortcut ────────────────────────────
             const SectionHeader(title: 'Emergency Help'),
             const _EmergencyHelpCard(),
-
-            const ParentPreviewPanel(),
           ],
         );
       },
@@ -484,6 +557,938 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     final day = value.day.toString().padLeft(2, '0');
     final month = value.month.toString().padLeft(2, '0');
     return '$day/$month/${value.year}';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NGO Student Home — Impact Summary Row
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NGOImpactSummaryRow extends StatelessWidget {
+  const _NGOImpactSummaryRow({this.stats});
+
+  final VolunteerStats? stats;
+
+  static String _formatDonation(double amount) {
+    if (amount >= 100000) return '₹${(amount / 100000).toStringAsFixed(1)}L';
+    if (amount >= 1000) return '₹${(amount / 1000).toStringAsFixed(1)}K';
+    return '₹${amount.toStringAsFixed(0)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hrs = stats == null ? '--' : stats!.totalHours.toStringAsFixed(0);
+    final acts = stats == null ? '--' : stats!.activitiesCompleted.toString();
+    final don = stats == null ? '--' : _formatDonation(stats!.donationRaised);
+    final certs = stats == null ? '--' : stats!.certificatesEarned.toString();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'Your Impact'),
+        Row(
+          children: [
+            _ImpactCard(
+              icon: Icons.timer_rounded,
+              value: hrs,
+              unit: 'hrs',
+              label: 'Hours\nServed',
+              color: const Color(0xFF1565C0),
+            ),
+            const SizedBox(width: 10),
+            _ImpactCard(
+              icon: Icons.task_alt_rounded,
+              value: acts,
+              label: 'Activities\nDone',
+              color: const Color(0xFF1A6B3A),
+            ),
+            const SizedBox(width: 10),
+            _ImpactCard(
+              icon: Icons.currency_rupee_rounded,
+              value: don,
+              label: 'Donation\nRaised',
+              color: const Color(0xFFFF8C00),
+            ),
+            const SizedBox(width: 10),
+            _ImpactCard(
+              icon: Icons.workspace_premium_rounded,
+              value: certs,
+              label: 'Certificates\nEarned',
+              color: const Color(0xFF8B5CF6),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ImpactCard extends StatelessWidget {
+  const _ImpactCard({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+    this.unit,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+  final String? unit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.09),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.22)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 17),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                height: 1,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: TextStyle(
+                color: color.withValues(alpha: 0.8),
+                fontSize: 9.5,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Active NGO Assignment Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ActiveNGOActivityCard extends StatelessWidget {
+  const _ActiveNGOActivityCard({this.assignment, this.vm});
+
+  final ActivityAssignment? assignment;
+  final VolunteerViewModel? vm;
+
+  static String _formatDate(DateTime? dt) {
+    if (dt == null) return '';
+    final now = DateTime.now();
+    final diff = dt.difference(DateTime(now.year, now.month, now.day)).inDays;
+    if (diff == 0) return 'Due Today';
+    if (diff == 1) return 'Due Tomorrow';
+    if (diff < 0) return 'Overdue';
+    return 'Due in $diff days';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (assignment == null) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF0FF),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFCFDEFF)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.assignment_outlined, color: Color(0xFF6B8FD6), size: 28),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No active assignment',
+                    style: TextStyle(
+                      color: Color(0xFF1A3A7A),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Check the Work tab to browse and apply for NGO activities.',
+                    style: TextStyle(
+                      color: Color(0xFF4A6099),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final title = assignment!.activity?.title ?? 'NGO Assignment';
+    final category =
+        assignment!.activity?.category.name ?? 'Punjabi Welfare Trust';
+    final location = assignment!.location ?? '';
+    final dueLabel = _formatDate(assignment!.scheduledDate);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0D47A1), Color(0xFF1976D2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0D47A1).withValues(alpha: 0.28),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.circle, color: Color(0xFF69FF8A), size: 8),
+                    SizedBox(width: 5),
+                    Text(
+                      'Assigned',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              if (dueLabel.isNotEmpty)
+                Text(
+                  dueLabel,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 17,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Punjabi Welfare Trust  •  ${_toTitleCase(category)}',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              if (location.isNotEmpty) ...[
+                const Icon(
+                  Icons.location_on_outlined,
+                  color: Colors.white60,
+                  size: 13,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  location,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+              ],
+              const Spacer(),
+              FilledButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => WorkSubmissionScreen(
+                      vm: vm ?? (VolunteerViewModel()..load()),
+                      assignment: assignment,
+                    ),
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF0D47A1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+                child: const Text('Submit Work'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _toTitleCase(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// All Assignments Section (replaces single-assignment card)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NGOAssignmentsSection extends StatelessWidget {
+  const _NGOAssignmentsSection({
+    required this.assignments,
+    required this.vm,
+    required this.isLoading,
+  });
+  final List<ActivityAssignment> assignments;
+  final VolunteerViewModel? vm;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return Container(
+        height: 110,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D47A1).withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (assignments.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF0FF),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFCFDEFF)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.assignment_outlined, color: Color(0xFF6B8FD6), size: 28),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No active assignments',
+                    style: TextStyle(
+                      color: Color(0xFF1A3A7A),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Browse open activities below and apply to participate.',
+                    style: TextStyle(
+                      color: Color(0xFF4A6099),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      children: [
+        for (final a in assignments)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _ActiveNGOActivityCard(assignment: a, vm: vm),
+          ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Open Activities Card — shows activities students can apply for
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NGOOpenActivitiesCard extends StatelessWidget {
+  const _NGOOpenActivitiesCard({
+    required this.activities,
+    required this.vm,
+    required this.isLoading,
+  });
+  final List<VolunteerActivity> activities;
+  final VolunteerViewModel? vm;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return Container(
+        height: 80,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Activities Open for Participation',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+              if (vm != null)
+                TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ActivityListScreen(vm: vm!),
+                    ),
+                  ),
+                  child: const Text('View All'),
+                ),
+            ],
+          ),
+          if (activities.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'No open activities at the moment.',
+                style: TextStyle(color: AppColors.muted, fontSize: 13),
+              ),
+            )
+          else ...[
+            const SizedBox(height: 4),
+            for (final a in activities.take(3))
+              _OpenActivityRow(
+                activity: a,
+                onApply: vm == null
+                    ? null
+                    : () {
+                        vm!.applyForActivity(a.id).then((ok) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(ok
+                                    ? 'Applied for "${a.title}"!'
+                                    : 'Failed to apply. Please try again.'),
+                              ),
+                            );
+                          }
+                        });
+                      },
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _OpenActivityRow extends StatelessWidget {
+  const _OpenActivityRow({required this.activity, this.onApply});
+  final VolunteerActivity activity;
+  final VoidCallback? onApply;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.volunteer_activism_rounded,
+                color: AppColors.primary, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  activity.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: AppColors.ink,
+                  ),
+                ),
+                Text(
+                  '${activity.rewardHours}h reward  •  ${activity.category.displayName}',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: onApply,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              textStyle: const TextStyle(
+                  fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NGO Quick Actions Grid
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SchoolPartnerPortalCard extends StatelessWidget {
+  const _SchoolPartnerPortalCard();
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(18),
+    child: InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SchoolPartnerPortalScreen()),
+      ),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFF1565C0).withValues(alpha: .18),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1565C0).withValues(alpha: .1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.verified_user_rounded,
+                color: Color(0xFF1565C0),
+                size: 27,
+              ),
+            ),
+            const SizedBox(width: 13),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Verified Counsellor Panel',
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 5),
+                      Icon(
+                        Icons.verified_rounded,
+                        color: Color(0xFF2E7D32),
+                        size: 17,
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'School partners can review trusted profiles and request a counsellor.',
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 11,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: AppColors.muted,
+              size: 16,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _NGOQuickActionsGrid extends StatelessWidget {
+  const _NGOQuickActionsGrid();
+
+  void _open(BuildContext context, int index) {
+    final vm = VolunteerViewModel()..load();
+    final screen = switch (index) {
+      0 => WorkSubmissionScreen(vm: vm),
+      1 => DailyLogScreen(vm: vm),
+      2 => DonationScreen(vm: vm),
+      _ => MyCertificatesScreen(vm: vm),
+    };
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
+  }
+
+  static const _actions = [
+    (Icons.upload_file_rounded, 'Submit\nWork', Color(0xFF1565C0)),
+    (Icons.menu_book_rounded, 'Daily\nLogbook', Color(0xFF1A6B3A)),
+    (Icons.attach_money_rounded, 'Donation\nProof', Color(0xFFFF8C00)),
+    (Icons.workspace_premium_rounded, 'View\nCertificates', Color(0xFF8B5CF6)),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(_actions.length, (i) {
+        final (icon, label, color) = _actions[i];
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: i == 0 ? 0 : 5,
+              right: i == _actions.length - 1 ? 0 : 5,
+            ),
+            child: GestureDetector(
+              onTap: () => _open(context, i),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: color.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: color, size: 19),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wall of Impact Preview Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WallOfImpactPreviewCard extends StatefulWidget {
+  const _WallOfImpactPreviewCard();
+
+  @override
+  State<_WallOfImpactPreviewCard> createState() =>
+      _WallOfImpactPreviewCardState();
+}
+
+class _WallOfImpactPreviewCardState extends State<_WallOfImpactPreviewCard> {
+  ImpactPost? _post;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final posts = await ImpactRepository.getPublished();
+      if (mounted) setState(() => _post = posts.firstOrNull);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final post = _post;
+    if (post == null) {
+      return AppCard(
+        child: Row(
+          children: [
+            const Icon(Icons.auto_awesome_outlined, color: AppColors.muted),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Published impact stories will appear here.',
+                style: TextStyle(color: AppColors.muted),
+              ),
+            ),
+            TextButton(onPressed: _load, child: const Text('Refresh')),
+          ],
+        ),
+      );
+    }
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assests/ngo_logo.jpeg',
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, _) => Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.volunteer_activism_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Punjabi Welfare Trust',
+                      style: TextStyle(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.verified_rounded,
+                          size: 12,
+                          color: Color(0xFF18B86D),
+                        ),
+                        SizedBox(width: 3),
+                        Text(
+                          'Verified NGO',
+                          style: TextStyle(
+                            color: Color(0xFF18B86D),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  post.category,
+                  style: TextStyle(
+                    color: Color(0xFF8B5CF6),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            post.title,
+            style: TextStyle(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            post.description,
+            style: TextStyle(color: AppColors.muted, fontSize: 12, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _ImpactPill(
+                '${post.hoursServed.toStringAsFixed(0)} hrs served',
+                const Color(0xFF1565C0),
+              ),
+              const SizedBox(width: 6),
+              _ImpactPill(
+                '${post.peopleReached} reached',
+                const Color(0xFF1A6B3A),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const WallOfImpactView()),
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'View all →',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImpactPill extends StatelessWidget {
+  const _ImpactPill(this.label, this.color);
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
   }
 }
 
@@ -964,74 +1969,180 @@ class _ContinueLearningCard extends StatelessWidget {
 class _EmergencyHelpCard extends StatelessWidget {
   const _EmergencyHelpCard();
 
+  Future<void> _launch(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      color: const Color(0xFFFFF0F0),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFCFE3FF)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0A2B68).withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.softRed.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.emergency_rounded,
-                  color: AppColors.softRed,
-                  size: 20,
-                ),
+          // ── Header banner ────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Emergency Help',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.ink,
-                        fontSize: 15,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assests/ngo_logo.jpeg',
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, _) => Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.volunteer_activism_rounded,
+                        color: Colors.white,
+                        size: 26,
                       ),
                     ),
-                    Text(
-                      'Reach out anytime — we are here for you.',
-                      style: TextStyle(color: AppColors.muted, fontSize: 12),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Punjabi Welfare Trust',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.verified_rounded,
+                            color: Color(0xFF69FF8A),
+                            size: 13,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Registered NGO  •  Visit us for help',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _HelpChip(
-                icon: Icons.phone_rounded,
-                label: 'Emergency Contacts',
-                color: AppColors.softRed,
-                onTap: () {},
-              ),
-              _HelpChip(
-                icon: Icons.shield_rounded,
-                label: 'Safety Help',
-                color: AppColors.accent,
-                onTap: () {},
-              ),
-              _HelpChip(
-                icon: Icons.support_agent_rounded,
-                label: 'Counselling Support',
-                color: AppColors.secondary,
-                onTap: () =>
-                    Navigator.of(context).pushNamed('/helping-support'),
-              ),
-            ],
+
+          // ── Address & contact details ─────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _ContactRow(
+                  icon: Icons.location_on_rounded,
+                  color: const Color(0xFF1565C0),
+                  label: 'Office Address',
+                  value:
+                      'Punjabi Welfare Trust, Near Bus Stand, Fatehgarh Sahib, Punjab – 140406',
+                  onTap: () => _launch(
+                    'https://maps.google.com/?q=Fatehgarh+Sahib+Punjab',
+                  ),
+                  actionLabel: 'Get Directions',
+                ),
+                const _Divider(),
+                _ContactRow(
+                  icon: Icons.phone_rounded,
+                  color: const Color(0xFF1A6B3A),
+                  label: 'Helpline Number',
+                  value: '+91 98765 43210',
+                  onTap: () => _launch('tel:+919876543210'),
+                  actionLabel: 'Call Now',
+                ),
+                const _Divider(),
+                _ContactRow(
+                  icon: Icons.chat_rounded,
+                  color: const Color(0xFF25D366),
+                  label: 'WhatsApp',
+                  value: '+91 98765 43210',
+                  onTap: () => _launch(
+                    'https://wa.me/919876543210?text=Hello%20Punjabi%20Welfare%20Trust%2C%20I%20need%20help.',
+                  ),
+                  actionLabel: 'Message',
+                ),
+                const _Divider(),
+                _ContactRow(
+                  icon: Icons.mail_rounded,
+                  color: const Color(0xFFFF8C00),
+                  label: 'Email',
+                  value: 'help@punjabiwelfaretrust.org',
+                  onTap: () => _launch(
+                    'mailto:help@punjabiwelfaretrust.org?subject=Help%20Request',
+                  ),
+                  actionLabel: 'Send Mail',
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+
+          // ── Office hours footer ───────────────────────────────
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF0F7FF),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+            ),
+            child: const Row(
+              children: [
+                Icon(
+                  Icons.access_time_rounded,
+                  size: 14,
+                  color: AppColors.muted,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  'Office Hours: Mon – Sat, 9:00 AM – 6:00 PM',
+                  style: TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1039,47 +2150,95 @@ class _EmergencyHelpCard extends StatelessWidget {
   }
 }
 
-class _HelpChip extends StatelessWidget {
-  const _HelpChip({
+class _ContactRow extends StatelessWidget {
+  const _ContactRow({
     required this.icon,
-    required this.label,
     required this.color,
+    required this.label,
+    required this.value,
     required this.onTap,
+    required this.actionLabel,
   });
 
   final IconData icon;
-  final String label;
   final Color color;
+  final String label;
+  final String value;
   final VoidCallback onTap;
+  final String actionLabel;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                actionLabel,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0));
   }
 }
 
@@ -1094,6 +2253,7 @@ class _AdminAnalyticsSection extends StatelessWidget {
     required this.onOpenCounselling,
     required this.onOpenSafety,
     required this.onOpenEmergency,
+    required this.onOpenVolunteer,
   });
 
   final AdminViewModel vm;
@@ -1103,6 +2263,7 @@ class _AdminAnalyticsSection extends StatelessWidget {
   final VoidCallback onOpenCounselling;
   final VoidCallback onOpenSafety;
   final VoidCallback onOpenEmergency;
+  final VoidCallback onOpenVolunteer;
 
   @override
   Widget build(BuildContext context) {
@@ -1268,6 +2429,13 @@ class _AdminAnalyticsSection extends StatelessWidget {
                 subtitle: 'Helplines',
                 color: AppColors.ink,
                 onTap: onOpenEmergency,
+              ),
+              _ToolTileHome(
+                icon: Icons.volunteer_activism_rounded,
+                label: 'Volunteer',
+                subtitle: 'Submissions & logs',
+                color: const Color(0xFF0288D1),
+                onTap: onOpenVolunteer,
               ),
             ],
           ),
@@ -1583,5 +2751,232 @@ class _NotificationTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ─── Active Pipeline Event Card ───────────────────────────────────────────────
+
+class _ActivePipelineEventCard extends StatelessWidget {
+  const _ActivePipelineEventCard({required this.vm});
+  final EventPipelineViewModel vm;
+
+  @override
+  Widget build(BuildContext context) {
+    final allAssignments = vm.events
+        .expand((e) => e.allAssignments)
+        .where((a) =>
+            a.status == PipelineAssignmentStatus.assigned ||
+            a.status == PipelineAssignmentStatus.inProgress ||
+            a.status == PipelineAssignmentStatus.resubmissionRequested)
+        .toList();
+
+    if (allAssignments.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.muted.withValues(alpha: 0.15)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.event_outlined, size: 28, color: AppColors.muted.withValues(alpha: 0.4)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('No active event assignment', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.muted)),
+                    Text('Browse events to apply for an activity', style: TextStyle(fontSize: 12, color: AppColors.muted.withValues(alpha: 0.7))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final assignment = allAssignments.first;
+    final event = vm.events.where((e) => e.id == assignment.eventId).firstOrNull;
+    final status = assignment.status;
+    final isResubmission = status == PipelineAssignmentStatus.resubmissionRequested;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: GestureDetector(
+        onTap: event == null
+            ? null
+            : () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EventDetailPipelineScreen(event: event, vm: vm),
+                  ),
+                ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isResubmission
+                  ? const Color(0xFF6A1B9A).withValues(alpha: 0.35)
+                  : AppColors.primary.withValues(alpha: 0.2),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                decoration: BoxDecoration(
+                  color: status.color.withValues(alpha: 0.07),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(status.icon, size: 13, color: status.color),
+                    const SizedBox(width: 5),
+                    Text(status.label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: status.color)),
+                    const Spacer(),
+                    if (event != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(event.category.label, style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(assignment.eventTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF17324D))),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.assignment_ind_rounded, size: 13, color: AppColors.muted),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(assignment.activityTitle, style: TextStyle(fontSize: 12.5, color: AppColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                    ),
+                    if (event != null) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on_outlined, size: 12, color: AppColors.muted),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(event.location, style: TextStyle(fontSize: 12, color: AppColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                          const SizedBox(width: 10),
+                          Icon(Icons.calendar_today_rounded, size: 11, color: AppColors.muted),
+                          const SizedBox(width: 3),
+                          Text(_formatDate(assignment.dueDate), style: TextStyle(fontSize: 11.5, color: AppColors.muted)),
+                        ],
+                      ),
+                    ],
+                    if (isResubmission && assignment.reviewerNotes != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6A1B9A).withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF6A1B9A).withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.replay_rounded, size: 13, color: Color(0xFF6A1B9A)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text('Reviewer: ${assignment.reviewerNotes}', style: const TextStyle(fontSize: 12, color: Color(0xFF6A1B9A))),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: event == null
+                                ? null
+                                : () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (ctx) => EventDetailPipelineScreen(event: event, vm: vm)),
+                                    ),
+                            icon: const Icon(Icons.info_outline_rounded, size: 14),
+                            label: const Text('Details', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: event == null
+                                ? null
+                                : () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (ctx) => EventDetailPipelineScreen(event: event, vm: vm)),
+                                    ),
+                            icon: Icon(isResubmission ? Icons.replay_rounded : Icons.upload_file_rounded, size: 14),
+                            label: Text(
+                              isResubmission ? 'Resubmit' : 'Submit Work',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: isResubmission ? const Color(0xFF6A1B9A) : AppColors.primary,
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (allAssignments.length > 1) ...[
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          '+${allAssignments.length - 1} more active assignment${allAssignments.length > 2 ? 's' : ''}',
+                          style: TextStyle(fontSize: 11.5, color: AppColors.muted),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime d) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${d.day} ${months[d.month - 1]}';
   }
 }

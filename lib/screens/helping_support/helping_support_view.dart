@@ -78,11 +78,13 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
               _AdminPanel(
                 onManageMentors: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                      builder: (_) => const CounsellingAdminScreen()),
+                    builder: (_) => const CounsellingAdminScreen(),
+                  ),
                 ),
                 onManageEmergency: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                      builder: (_) => const EmergencyContactsAdminScreen()),
+                    builder: (_) => const EmergencyContactsAdminScreen(),
+                  ),
                 ),
               ),
               SectionHeader(
@@ -95,8 +97,10 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
               if (_vm.upcomingSessions.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No upcoming bookings.',
-                      style: TextStyle(color: AppColors.muted)),
+                  child: Text(
+                    'No upcoming bookings.',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
                 )
               else
                 ..._vm.upcomingSessions
@@ -114,7 +118,8 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
                   color: AppColors.secondary,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                        builder: (_) => const MentorChatsScreen()),
+                      builder: (_) => const MentorChatsScreen(),
+                    ),
                   ),
                 ),
               ),
@@ -126,7 +131,8 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
                   color: AppColors.primary,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                        builder: (_) => const MentorScheduleScreen()),
+                      builder: (_) => const MentorScheduleScreen(),
+                    ),
                   ),
                 ),
               ),
@@ -140,8 +146,10 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
               if (_vm.upcomingSessions.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No sessions scheduled.',
-                      style: TextStyle(color: AppColors.muted)),
+                  child: Text(
+                    'No sessions scheduled.',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
                 )
               else
                 ..._vm.upcomingSessions
@@ -166,7 +174,8 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
                     color: AppColors.primary,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
-                          builder: (_) => const MentorListScreen()),
+                        builder: (_) => const MentorListScreen(),
+                      ),
                     ),
                   ),
                   WellnessActionCard(
@@ -175,7 +184,8 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
                     color: AppColors.secondary,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
-                          builder: (_) => const MentorListScreen()),
+                        builder: (_) => const MentorListScreen(),
+                      ),
                     ),
                   ),
                   WellnessActionCard(
@@ -184,13 +194,9 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
                     color: AppColors.accent,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
-                          builder: (_) => const MentorListScreen()),
+                        builder: (_) => const MentorListScreen(),
+                      ),
                     ),
-                  ),
-                  const WellnessActionCard(
-                    icon: Icons.video_call_rounded,
-                    title: 'Video Call',
-                    color: AppColors.lavender,
                   ),
                 ],
               ),
@@ -206,8 +212,10 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
               if (_vm.mentors.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No mentors available yet.',
-                      style: TextStyle(color: AppColors.muted)),
+                  child: Text(
+                    'No mentors available yet.',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
                 )
               else
                 ...([..._vm.mentors]
@@ -243,8 +251,10 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
               if (_vm.upcomingSessions.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No upcoming sessions. Book one above!',
-                      style: TextStyle(color: AppColors.muted)),
+                  child: Text(
+                    'No upcoming sessions. Book one above!',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
                 )
               else
                 ..._vm.upcomingSessions
@@ -344,7 +354,10 @@ class _ActionTile extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                  color: color, fontWeight: FontWeight.w700, fontSize: 13),
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -369,8 +382,10 @@ class _ErrorBanner extends StatelessWidget {
           const Icon(Icons.warning_amber_rounded, color: AppColors.accent),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(message,
-                style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+            child: Text(
+              message,
+              style: const TextStyle(color: AppColors.muted, fontSize: 13),
+            ),
           ),
           TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],

@@ -8,7 +8,7 @@ import '../../repositories/creator_repository.dart';
 import '../../widgets/app_card.dart';
 import '../events/admin/create_event/create_event_view.dart';
 import '../events/admin/create_event/quiz/create_quiz_screen.dart';
-import '../learn/admin/create_course_screen.dart';
+import '../learn/admin/create_free_course_screen.dart';
 import '../learn/learn_view.dart';
 import 'content_analytics_view.dart';
 import 'content_creator_content_view.dart';
@@ -262,8 +262,11 @@ class _ErrorCard extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 8),
-          const Icon(Icons.error_outline_rounded,
-              color: AppColors.softRed, size: 36),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.softRed,
+            size: 36,
+          ),
           const SizedBox(height: 10),
           Text(
             message,
@@ -271,10 +274,7 @@ class _ErrorCard extends StatelessWidget {
             style: const TextStyle(color: AppColors.muted, fontSize: 13),
           ),
           const SizedBox(height: 14),
-          FilledButton.tonal(
-            onPressed: onRetry,
-            child: const Text('Retry'),
-          ),
+          FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
           const SizedBox(height: 8),
         ],
       ),
@@ -304,8 +304,11 @@ class _AnalyticsCard extends StatelessWidget {
                   color: AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.trending_up_rounded,
-                    color: AppColors.primary, size: 22),
+                child: const Icon(
+                  Icons.trending_up_rounded,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               const Column(
@@ -452,9 +455,9 @@ class _CreationToolsSection extends StatelessWidget {
   final int drafts;
 
   Future<void> _openScaffold(BuildContext context, Widget screen) =>
-      Navigator.of(context).push<void>(
-        MaterialPageRoute(builder: (_) => screen),
-      );
+      Navigator.of(
+        context,
+      ).push<void>(MaterialPageRoute(builder: (_) => screen));
 
   @override
   Widget build(BuildContext context) {
@@ -471,20 +474,17 @@ class _CreationToolsSection extends StatelessWidget {
       ),
       _ToolEntry(
         icon: Icons.school_outlined,
-        title: 'Add Course',
-        subtitle: 'Course structure',
+        title: 'Create Free Course',
+        subtitle: 'Subjects, chapters & lessons',
         color: const Color(0xFF10B981),
-        onTap: () => _openScaffold(context, const CreateCourseScreen()),
+        onTap: () => _openScaffold(context, const CreateFreeCourseScreen()),
       ),
       _ToolEntry(
         icon: Icons.play_circle_outline_rounded,
         title: 'Add Lesson',
         subtitle: 'Video, PDF, notes',
         color: const Color(0xFF8B5CF6),
-        onTap: () => _openScaffold(
-          context,
-          const Scaffold(body: LearnView()),
-        ),
+        onTap: () => _openScaffold(context, const Scaffold(body: LearnView())),
       ),
       _ToolEntry(
         icon: Icons.help_outline_rounded,
@@ -606,8 +606,11 @@ class _ToolTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.muted, size: 18),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.muted,
+              size: 18,
+            ),
           ],
         ),
       ),
@@ -695,8 +698,11 @@ class _PromoBanner extends StatelessWidget {
                     color: Colors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Icon(Icons.laptop_mac_rounded,
-                      color: Colors.white, size: 38),
+                  child: const Icon(
+                    Icons.laptop_mac_rounded,
+                    color: Colors.white,
+                    size: 38,
+                  ),
                 ),
               ],
             ),
@@ -1015,8 +1021,11 @@ class _TopPerformingItem extends StatelessWidget {
             label: 'Completion',
           ),
           const SizedBox(width: 8),
-          const Icon(Icons.chevron_right_rounded,
-              color: AppColors.muted, size: 20),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.muted,
+            size: 20,
+          ),
         ],
       ),
     );

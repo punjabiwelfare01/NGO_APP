@@ -1,12 +1,25 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_state.dart';
 import '../../core/colors.dart';
+import '../../core/config.dart';
 import '../../models/api_models.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/profile_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
+import '../../models/volunteer_models.dart';
+import '../../viewmodels/volunteer_viewmodel.dart';
 import '../../widgets/app_scroll_view.dart';
+import '../volunteer/daily_log_screen.dart';
+import '../volunteer/donation_screen.dart';
+import '../volunteer/my_certificates_screen.dart';
+import 'profile_notifications_screen.dart';
+import 'profile_reports_screen.dart';
+import 'profile_settings_screen.dart';
 
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
@@ -18,18 +31,27 @@ class ProfileView extends StatefulWidget {
 class _ProfileViewState extends State<ProfileView> {
   late final ProfileViewModel _vm;
   late final AuthViewModel _authVm;
+  VolunteerViewModel? _volunteerVm;
 
   @override
   void initState() {
     super.initState();
     _vm = ProfileViewModel()..load();
     _authVm = AuthViewModel();
+    if (AppState.role.isStudent) {
+      _volunteerVm = VolunteerViewModel()..load();
+      _volunteerVm!.addListener(_onVolunteerChanged);
+    }
   }
+
+  void _onVolunteerChanged() => setState(() {});
 
   @override
   void dispose() {
     _vm.dispose();
     _authVm.dispose();
+    _volunteerVm?.removeListener(_onVolunteerChanged);
+    _volunteerVm?.dispose();
     super.dispose();
   }
 
@@ -72,12 +94,6 @@ class _ProfileViewState extends State<ProfileView> {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
-  void _showComingSoon(String label) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$label will be available soon.')));
-  }
-
   Future<void> _openEditProfile() async {
     final user = _vm.user;
     if (user == null) return;
@@ -97,6 +113,9 @@ class _ProfileViewState extends State<ProfileView> {
               dateOfBirth,
               parentEmail,
               phone,
+              photoBytes,
+              photoPath,
+              photoFileName,
             ) async {
               final ok = await _vm.updateProfile(
                 name: name,
@@ -107,6 +126,9 @@ class _ProfileViewState extends State<ProfileView> {
                 dateOfBirth: dateOfBirth,
                 parentEmail: parentEmail,
                 phone: phone,
+                photoBytes: photoBytes,
+                photoPath: photoPath,
+                photoFileName: photoFileName,
               );
               if (!mounted) return;
               if (ok) {
@@ -149,40 +171,69 @@ class _ProfileViewState extends State<ProfileView> {
         return AppScrollView(
           children: [
             _ProfileHeader(
-              onNotificationTap: () => _showComingSoon('Notifications'),
-              onSettingsTap: () => _showComingSoon('Settings'),
+              onNotificationTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProfileNotificationsScreen(),
+                ),
+              ),
+              onSettingsTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProfileSettingsScreen(),
+                ),
+              ),
             ),
             _StudentSummaryCard(
               user: user,
               stats: stats,
+              volunteerStats: _volunteerVm?.stats,
               badgeCount: _vm.badges.length,
               onEditProfile: _openEditProfile,
             ),
-            _QuickActionBar(
+            if (AppState.role.isStudent) _QuickActionBar(
               actions: [
                 _QuickAction(
-                  icon: Icons.person_outline_rounded,
-                  label: 'My Activity',
+                  icon: Icons.menu_book_rounded,
+                  label: 'My Logbook',
                   color: const Color(0xFF20BF6B),
-                  onTap: () => _showComingSoon('My Activity'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          DailyLogScreen(vm: VolunteerViewModel()..load()),
+                    ),
+                  ),
                 ),
                 _QuickAction(
-                  icon: Icons.bookmark_rounded,
-                  label: 'Saved Lessons',
+                  icon: Icons.workspace_premium_rounded,
+                  label: 'Certificates',
                   color: const Color(0xFF1E6BFF),
-                  onTap: () => _showComingSoon('Saved Lessons'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => MyCertificatesScreen(
+                        vm: VolunteerViewModel()..load(),
+                      ),
+                    ),
+                  ),
                 ),
                 _QuickAction(
-                  icon: Icons.chat_bubble_rounded,
-                  label: 'Messages',
+                  icon: Icons.volunteer_activism_rounded,
+                  label: 'Donations',
                   color: const Color(0xFF8B5CF6),
-                  onTap: () => _showComingSoon('Messages'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          DonationScreen(vm: VolunteerViewModel()..load()),
+                    ),
+                  ),
                 ),
                 _QuickAction(
-                  icon: Icons.calendar_month_rounded,
-                  label: 'My Calendar',
+                  icon: Icons.assignment_rounded,
+                  label: 'Reports',
                   color: const Color(0xFFFF8800),
-                  onTap: () => _showComingSoon('My Calendar'),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ProfileReportsScreen(),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -196,20 +247,22 @@ class _ProfileViewState extends State<ProfileView> {
                   value: _value(user?.name),
                   onTap: _openEditProfile,
                 ),
-                _InfoRowData(
-                  icon: Icons.school_rounded,
-                  tint: const Color(0xFF17B86A),
-                  label: 'Class',
-                  value: _value(user?.className),
-                  onTap: _openEditProfile,
-                ),
-                _InfoRowData(
-                  icon: Icons.account_balance_rounded,
-                  tint: const Color(0xFF8B5CF6),
-                  label: 'School',
-                  value: _value(user?.schoolName),
-                  onTap: _openEditProfile,
-                ),
+                if (!AppState.role.isStudent) ...[
+                  _InfoRowData(
+                    icon: Icons.school_rounded,
+                    tint: const Color(0xFF17B86A),
+                    label: 'Class',
+                    value: _value(user?.className),
+                    onTap: _openEditProfile,
+                  ),
+                  _InfoRowData(
+                    icon: Icons.account_balance_rounded,
+                    tint: const Color(0xFF8B5CF6),
+                    label: 'School',
+                    value: _value(user?.schoolName),
+                    onTap: _openEditProfile,
+                  ),
+                ],
                 _InfoRowData(
                   icon: Icons.location_on_outlined,
                   tint: const Color(0xFFFF8800),
@@ -217,13 +270,14 @@ class _ProfileViewState extends State<ProfileView> {
                   value: _value(user?.location),
                   onTap: _openEditProfile,
                 ),
-                _InfoRowData(
-                  icon: Icons.mail_outline_rounded,
-                  tint: const Color(0xFFFF9800),
-                  label: 'Parent Email',
-                  value: _value(user?.parentEmail),
-                  onTap: _openEditProfile,
-                ),
+                if (!AppState.role.isStudent)
+                  _InfoRowData(
+                    icon: Icons.mail_outline_rounded,
+                    tint: const Color(0xFFFF9800),
+                    label: 'Parent Email',
+                    value: _value(user?.parentEmail),
+                    onTap: _openEditProfile,
+                  ),
                 _InfoRowData(
                   icon: Icons.calendar_month_rounded,
                   tint: const Color(0xFF11B8C9),
@@ -409,14 +463,22 @@ class _StudentSummaryCard extends StatelessWidget {
   const _StudentSummaryCard({
     required this.user,
     required this.stats,
+    this.volunteerStats,
     required this.badgeCount,
     required this.onEditProfile,
   });
 
   final AppUser? user;
   final UserStats? stats;
+  final VolunteerStats? volunteerStats;
   final int badgeCount;
   final VoidCallback onEditProfile;
+
+  static String _formatDonation(double amount) {
+    if (amount >= 100000) return '₹${(amount / 100000).toStringAsFixed(1)}L';
+    if (amount >= 1000) return '₹${(amount / 1000).toStringAsFixed(1)}K';
+    return '₹${amount.toStringAsFixed(0)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -439,7 +501,10 @@ class _StudentSummaryCard extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 460;
-              final details = _ProfileIdentity(user: user);
+              final details = _ProfileIdentity(
+                user: user,
+                onCameraTap: onEditProfile,
+              );
               final editButton = OutlinedButton.icon(
                 onPressed: onEditProfile,
                 icon: const Icon(Icons.edit_outlined, size: 18),
@@ -480,28 +545,36 @@ class _StudentSummaryCard extends StatelessWidget {
           _StatsPanel(
             stats: [
               _StatData(
-                icon: Icons.school_rounded,
-                label: 'Courses Enrolled',
-                value: '${stats?.coursesEnrolled ?? 0}',
+                icon: Icons.timer_rounded,
+                label: 'Hours Served',
+                value: volunteerStats == null
+                    ? '--'
+                    : volunteerStats!.totalHours.toStringAsFixed(0),
+                suffix: 'hrs',
                 color: const Color(0xFF126BFF),
               ),
               _StatData(
-                icon: Icons.check_rounded,
-                label: 'Lessons Completed',
-                value: '${stats?.lessonsCompleted ?? 0}',
+                icon: Icons.task_alt_rounded,
+                label: 'Activities Done',
+                value: volunteerStats == null
+                    ? '--'
+                    : volunteerStats!.activitiesCompleted.toString(),
                 color: const Color(0xFF18B86D),
               ),
               _StatData(
-                icon: Icons.local_fire_department_rounded,
-                label: 'Study Streak',
-                value: '${stats?.studyStreakDays ?? 0}',
-                suffix: 'days',
+                icon: Icons.currency_rupee_rounded,
+                label: 'Donations Raised',
+                value: volunteerStats == null
+                    ? '--'
+                    : _formatDonation(volunteerStats!.donationRaised),
                 color: const Color(0xFFFF7A00),
               ),
               _StatData(
-                icon: Icons.star_rounded,
-                label: 'Badges Earned',
-                value: '$badgeCount',
+                icon: Icons.workspace_premium_rounded,
+                label: 'Certificates',
+                value: volunteerStats == null
+                    ? '--'
+                    : volunteerStats!.certificatesEarned.toString(),
                 color: const Color(0xFF8B5CF6),
               ),
             ],
@@ -513,17 +586,24 @@ class _StudentSummaryCard extends StatelessWidget {
 }
 
 class _ProfileIdentity extends StatelessWidget {
-  const _ProfileIdentity({required this.user});
+  const _ProfileIdentity({required this.user, this.onCameraTap});
 
   final AppUser? user;
+  final VoidCallback? onCameraTap;
 
   @override
   Widget build(BuildContext context) {
-    final classAndSchool = [
-      if (user?.className?.trim().isNotEmpty == true)
-        'Class ${user!.className!.trim()}',
-      if (user?.schoolName?.trim().isNotEmpty == true) user!.schoolName!.trim(),
-    ].join('  •  ');
+    final isVolunteer = AppState.role.isStudent;
+    final subtitle = isVolunteer
+        ? (user?.location?.trim().isNotEmpty == true
+              ? user!.location!.trim()
+              : '')
+        : [
+            if (user?.className?.trim().isNotEmpty == true)
+              'Class ${user!.className!.trim()}',
+            if (user?.schoolName?.trim().isNotEmpty == true)
+              user!.schoolName!.trim(),
+          ].join('  •  ');
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,38 +617,53 @@ class _ProfileIdentity extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 4),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFEAF7FF), Color(0xFF8ED3FF)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
+                gradient: user?.photoUrl == null
+                    ? const LinearGradient(
+                        colors: [Color(0xFFEAF7FF), Color(0xFF8ED3FF)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      )
+                    : null,
+                image: user?.photoUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(
+                          '${AppConfig.apiBaseUrl}${user!.photoUrl!}',
+                        ),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
-              child: Center(
-                child: Text(
-                  _initials(user?.name),
-                  style: const TextStyle(
-                    color: Color(0xFF08164A),
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
+              child: user?.photoUrl == null
+                  ? Center(
+                      child: Text(
+                        _initials(user?.name),
+                        style: const TextStyle(
+                          color: Color(0xFF08164A),
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    )
+                  : null,
             ),
             Positioned(
               right: 0,
               bottom: 8,
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFD8E3F5)),
-                ),
-                child: const Icon(
-                  Icons.photo_camera_outlined,
-                  size: 17,
-                  color: Color(0xFF4A587C),
+              child: GestureDetector(
+                onTap: onCameraTap,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF126BFF),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.photo_camera_rounded,
+                    size: 15,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -588,10 +683,10 @@ class _ProfileIdentity extends StatelessWidget {
                   height: 1.1,
                 ),
               ),
-              if (classAndSchool.isNotEmpty) ...[
+              if (subtitle.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
-                  classAndSchool,
+                  subtitle,
                   style: const TextStyle(
                     color: Color(0xFF4A587C),
                     fontSize: 15,
@@ -599,7 +694,8 @@ class _ProfileIdentity extends StatelessWidget {
                   ),
                 ),
               ],
-              if (user?.parentEmail?.trim().isNotEmpty == true) ...[
+              if (!isVolunteer &&
+                  user?.parentEmail?.trim().isNotEmpty == true) ...[
                 const SizedBox(height: 12),
                 _InlineMeta(
                   icon: Icons.mail_outline_rounded,
@@ -1012,6 +1108,9 @@ class _EditProfileSheet extends StatefulWidget {
     DateTime? dateOfBirth,
     String? parentEmail,
     String? phone,
+    List<int>? photoBytes,
+    String? photoPath,
+    String? photoFileName,
   )
   onSave;
 
@@ -1030,6 +1129,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _phoneCtrl;
   DateTime? _dateOfBirth;
   bool _saving = false;
+  String? _pickedImagePath;
+  Uint8List? _pickedImageBytes;
+  String? _pickedFileName;
 
   @override
   void initState() {
@@ -1057,6 +1159,27 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: true, // always load bytes — avoids null path on Android 12+
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    setState(() {
+      _pickedImageBytes = file.bytes;
+      _pickedImagePath = file.path;
+      _pickedFileName = file.name;
+    });
+  }
+
+  ImageProvider? get _pickedImageProvider {
+    if (_pickedImageBytes != null) return MemoryImage(_pickedImageBytes!);
+    if (_pickedImagePath != null) return FileImage(File(_pickedImagePath!));
+    return null;
+  }
+
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -1082,6 +1205,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       _dateOfBirth,
       _emptyToNull(_parentEmailCtrl.text),
       _emptyToNull(_phoneCtrl.text),
+      _pickedImageBytes?.toList(),
+      kIsWeb ? null : _pickedImagePath,
+      _pickedFileName,
     );
     if (mounted) setState(() => _saving = false);
   }
@@ -1133,15 +1259,81 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Update the details shown on your student profile.',
-                  style: TextStyle(
+                Text(
+                  AppState.role.isStudent
+                      ? 'Update the details shown on your volunteer profile.'
+                      : 'Update the details shown on your profile.',
+                  style: const TextStyle(
                     color: Color(0xFF4A587C),
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 22),
+
+                // ── Profile photo picker ────────────────────────────
+                Center(
+                  child: GestureDetector(
+                    onTap: _saving ? null : _pickImage,
+                    child: Column(
+                      children: [
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            CircleAvatar(
+                              radius: 48,
+                              backgroundColor: const Color(0xFFEAF7FF),
+                              backgroundImage: _pickedImageProvider,
+                              child: _pickedImageProvider == null
+                                  ? Text(
+                                      _initials(widget.user.name),
+                                      style: const TextStyle(
+                                        color: Color(0xFF08164A),
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF126BFF),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt_rounded,
+                                  color: Colors.white,
+                                  size: 15,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _pickedImageProvider == null
+                              ? 'Add Profile Photo'
+                              : 'Change Photo',
+                          style: const TextStyle(
+                            color: Color(0xFF126BFF),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
                 _SheetField(
                   controller: _nameCtrl,
                   label: 'Full Name',
@@ -1152,43 +1344,47 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                       : null,
                 ),
                 const SizedBox(height: 12),
-                _SheetField(
-                  controller: _classCtrl,
-                  label: 'Class',
-                  icon: Icons.school_outlined,
-                  enabled: !_saving,
-                ),
-                const SizedBox(height: 12),
-                _SheetField(
-                  controller: _schoolCtrl,
-                  label: 'School',
-                  icon: Icons.account_balance_outlined,
-                  enabled: !_saving,
-                ),
-                const SizedBox(height: 12),
+                if (!AppState.role.isStudent) ...[
+                  _SheetField(
+                    controller: _classCtrl,
+                    label: 'Class',
+                    icon: Icons.school_outlined,
+                    enabled: !_saving,
+                  ),
+                  const SizedBox(height: 12),
+                  _SheetField(
+                    controller: _schoolCtrl,
+                    label: 'School',
+                    icon: Icons.account_balance_outlined,
+                    enabled: !_saving,
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 _SheetField(
                   controller: _locationCtrl,
                   label: 'Location',
                   icon: Icons.location_on_outlined,
                   enabled: !_saving,
                 ),
-                const SizedBox(height: 12),
-                _SheetField(
-                  controller: _parentEmailCtrl,
-                  label: 'Parent Email',
-                  icon: Icons.mail_outline_rounded,
-                  keyboardType: TextInputType.emailAddress,
-                  enabled: !_saving,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) return null;
-                    if (!RegExp(
-                      r'^[^@]+@[^@]+\.[^@]+$',
-                    ).hasMatch(value.trim())) {
-                      return 'Enter a valid email';
-                    }
-                    return null;
-                  },
-                ),
+                if (!AppState.role.isStudent) ...[
+                  const SizedBox(height: 12),
+                  _SheetField(
+                    controller: _parentEmailCtrl,
+                    label: 'Parent Email',
+                    icon: Icons.mail_outline_rounded,
+                    keyboardType: TextInputType.emailAddress,
+                    enabled: !_saving,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return null;
+                      if (!RegExp(
+                        r'^[^@]+@[^@]+\.[^@]+$',
+                      ).hasMatch(value.trim())) {
+                        return 'Enter a valid email';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
                 const SizedBox(height: 12),
                 _SheetField(
                   controller: _phoneCtrl,
@@ -1425,8 +1621,9 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                   ),
                   onPressed: () => setState(() => _showCurrent = !_showCurrent),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? 'Enter your current password' : null,
+                validator: (v) => v == null || v.isEmpty
+                    ? 'Enter your current password'
+                    : null,
               ),
               const SizedBox(height: 12),
               _SheetField(
@@ -1464,12 +1661,10 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                         : Icons.visibility_outlined,
                     color: const Color(0xFF4A587C),
                   ),
-                  onPressed: () =>
-                      setState(() => _showConfirm = !_showConfirm),
+                  onPressed: () => setState(() => _showConfirm = !_showConfirm),
                 ),
-                validator: (v) => v != _newCtrl.text
-                    ? 'Passwords do not match'
-                    : null,
+                validator: (v) =>
+                    v != _newCtrl.text ? 'Passwords do not match' : null,
               ),
               const SizedBox(height: 24),
               FilledButton(

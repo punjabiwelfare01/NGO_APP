@@ -1,0 +1,163 @@
+ADMIN / EVENT MANAGER
+│
+├─ Creates Event + Activities
+│   └─ Event status: draft → published → registration_open → live → completed
+│
+└─ Publishes Event (status = "published" or "registration_open")
+        │
+        ▼
+STUDENTS
+│
+├─ See event on Home Screen & Learn/Events tab
+│   └─ EventPipelineViewModel pulls /event-manager/dashboard (student sees filtered list)
+│
+├─ Apply to an Activity
+│   └─ ActivityAssignment created → status: "applied"
+│
+└─ Event Manager reviews applicants
+        │
+        ├─ Shortlist → status: "shortlisted"
+        ├─ Assign   → status: "assigned"  ← student gets the task
+        │
+        └─ Student does the work in the real world
+                │
+                └─ Student submits proof (photos, description, hours)
+                        └─ WorkSubmission created → status: "submitted"
+
+
+Work Verification Pipeline
+
+WorkSubmission (status: submitted)
+        │
+        ▼
+EVENT MANAGER reviews submission
+├─ Approves → status: "event_manager_verified"
+└─ Can add reviewer notes / instructions
+        │
+        ▼
+ADMIN final approval
+├─ Approves → status: "admin_approved"
+│
+└─ (Optional) Generate Certificate → status: "certificate_generated"
+        │
+        ▼
+COMPLETED
+├─ Student hours logged
+├─ People reached counted
+├─ Donation collected recorded
+└─ Certificate issued (CertificateStatus.issued)
+
+
+Impact Post Flow (Wall of Impact)
+
+Event Manager
+├─ Creates ImpactPost (standalone via /impact/posts, or from approved assignment)
+├─ Submits for admin approval → status: "pending_review"
+│
+▼
+Admin sees it in Impact tab (EMImpactView)
+├─ Approves & Publishes → status: "published", approved_by = admin.id
+│
+▼
+Published on Wall of Impact (visible to everyone)
+
+
+Student completes volunteer activity
+→ uploads work and service hours
+→ Event Manager/Admin approves submission
+→ Admin generates certificate draft
+→ NGO signs/stamps PDF manually
+→ Admin uploads signed PDF
+→ Certificate becomes Issued
+→ Student receives notification
+→ Student downloads it from My Certificates
+→ Public verification link validates it
+
+
+
+SCHOOL USER
+    │
+    ├─ Opens School Partner Portal
+    ├─ Browses Counsellor Directory (fetched from API)
+    ├─ Taps a counsellor → sees full profile
+    ├─ Taps "Book Session" or "Request Awareness Camp"
+    ├─ Fills booking form (school name, date, topic, student count)
+    └─ Submits → POST /school/counsellor-requests
+           │
+           ├─► Counsellor gets in-app notification
+           │       "New school counselling request — SchoolName: Topic"
+           │
+           └─► Admin gets in-app notification  ← (Step 1 adds this)
+                   "New school counselling request — SchoolName → Topic"
+
+COUNSELLOR
+    ├─ Opens Counsellor Shell → "School Requests" tab
+    ├─ Sees request in "New" tab (already works ✅)
+    ├─ Taps request → opens CounsellorMeetingDetailScreen
+    ├─ Accepts → school user notified "Counsellor accepted"
+    │   or Declines → school user notified "Request declined"
+    │   or Suggests new time → school user notified
+    └─ After session → marks Complete → submits session report
+
+ADMIN
+    ├─ Gets notification (Step 1) 
+    ├─ Opens admin dashboard → School Requests section (Step 5)
+    ├─ Monitors all incoming school booking requests
+    └─ Can see counsellor's accept/decline decisions in real time
+
+All Remaining Issues
+CRITICAL — App-breaking / Data loss
+#	File	Line	Issue
+C1	admin_repository.dart	90	Calls PATCH /admin/users/$id/deactivate — endpoint doesn't exist. Backend route is /admin/users/{id}/block. Every admin "deactivate user" action returns 404.
+C2	counsellor_viewmodel.dart	116–159	load(), submitRequest(), updateRequestStatus(), addCounsellor() all use fake delay + local state only. No API calls at all. School counsellor feature is entirely non-functional.
+C3	counselling_repository.dart	—	submitSchoolRequest() method doesn't exist — needed for school booking form to call POST /school/counsellor-requests.
+HIGH — Feature incomplete / doesn't persist
+#	File	Line	Issue
+H1	em_events_view.dart	1185, 1211	"Create Event" form does Future.delayed(400ms) + vm.addNewEvent(local_event) with id: DateTime.now().millisecondsSinceEpoch. No backend call — event vanishes on restart.
+H2	em_home_view.dart	1873	Same pattern — event creation from home view also mocked.
+H3	counsellor_workspace.py	32	create_request route only notifies the counsellor. Admins get no notification when a school submits a booking request.
+LOW — Code quality / Flutter analyzer (23 issues)
+#	File	Lines	Issue
+L1	course_detail_screen.dart	514, 561	_BuyPlanCard and _BuyPlanSheet declared but never referenced — 2 warnings
+L2	config.dart	149	Missing curly braces in if
+L3	admin_settings_repository.dart	44	Use null-aware ? instead of if (x != null)
+L4	event_manager_repository.dart	39, 40, 49	2× null-aware + 1× curly braces
+L5	admin_settings_module_screen.dart	50, 56	2× curly braces
+L6	event_report_screen.dart	206, 215, 229, 238	4× curly braces
+L7	wall_of_impact_view.dart	186, 197, 203	3× curly braces
+L8	profile_notifications_screen.dart	28, 35	2× curly braces
+L9	profile_reports_screen.dart	26, 33	2× curly braces
+L10	profile_settings_screen.dart	26, 33, 46	3× curly braces
+Fix Plan — 3 Phases
+Phase 1 — Quick Wins (all trivial, ~30 min total)
+P1.1 Fix admin deactivate URL mismatch — change /deactivate → /block in admin_repository.dart:90
+
+P1.2 Delete _BuyPlanCard (line 514) and _BuyPlanSheet (line 561) from course_detail_screen.dart
+
+P1.3 Fix all 23 analyzer issues (curly braces + null-aware) across 9 files — flutter analyze goes from 23 → 0
+
+P1.4 Add admin notification in counsellor_workspace.py:32 — query all admin users and call notification_service.notify() for each when school submits a request
+
+Phase 2 — School Counsellor API Integration (~2–3 hours)
+P2.1 Add submitSchoolRequest() method to counselling_repository.dart — calls POST /school/counsellor-requests
+
+P2.2 Add getCounsellors() method to counselling_repository.dart — maps GET /mentors response to CounsellorProfile model (both systems list PWT-vetted mentors; the models are compatible)
+
+P2.3 Rewrite counsellor_viewmodel.dart:
+
+Replace load() mock with real getCounsellors() + getCounsellorRequests() API calls
+Replace submitRequest() local insert with submitSchoolRequest() API call
+Replace updateRequestStatus() local state with accept/decline/reschedule API calls
+Delete the entire _mockCounsellors and _mockRequests static blocks (~420 lines)
+Phase 3 — Event Manager Create Event API (~1–2 hours)
+P3.1 In em_events_view.dart _EventCreateSheet._submit() (line 1182): replace fake delay + addNewEvent() with a real POST /events API call; use server-assigned ID
+
+P3.2 Same fix in em_home_view.dart (line 1871): wire the home-view create event form to the same endpoint
+
+Want me to start executing Phase 1 now? It unblocks the admin deactivate feature immediately and clears all analyzer noise — ideal starting point before the heavier API wiring in Phases 2 and 3.
+
+
+
+start command
+
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

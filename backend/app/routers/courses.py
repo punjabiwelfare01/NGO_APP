@@ -70,8 +70,74 @@ def delete_category(
 
 
 @router.get("/courses", response_model=list[CourseResponse])
-def list_courses(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return course_crud.get_courses(db, skip=skip, limit=limit)
+def list_courses(
+    skip: int = 0,
+    limit: int = 100,
+    course_type: str | None = None,
+    class_level: str | None = None,
+    subject: str | None = None,
+    skill_category: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return course_crud.get_courses(
+        db,
+        skip=skip,
+        limit=limit,
+        course_type=course_type,
+        class_level=class_level,
+        subject=subject,
+        skill_category=skill_category,
+    )
+
+
+@router.get("/learn/recommended", response_model=list[CourseResponse])
+def recommended_courses(
+    class_level: str,
+    db: Session = Depends(get_db),
+):
+    return course_crud.get_courses(
+        db,
+        course_type="academic",
+        class_level=class_level,
+        published_only=True,
+    )
+
+
+@router.get("/learn/courses", response_model=list[CourseResponse])
+def learn_courses(
+    class_level: str | None = None,
+    subject: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return course_crud.get_courses(
+        db,
+        course_type="academic",
+        class_level=class_level,
+        subject=subject,
+        published_only=True,
+    )
+
+
+@router.get("/learn/academic", response_model=list[CourseResponse])
+def learn_academic(
+    class_level: str | None = None,
+    subject: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return learn_courses(class_level=class_level, subject=subject, db=db)
+
+
+@router.get("/learn/skills", response_model=list[CourseResponse])
+def learn_skills(
+    category: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return course_crud.get_courses(
+        db,
+        course_type="skill",
+        skill_category=category,
+        published_only=True,
+    )
 
 
 @router.post("/courses", response_model=CourseResponse, status_code=201,

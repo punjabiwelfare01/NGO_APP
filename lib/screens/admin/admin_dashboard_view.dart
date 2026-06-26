@@ -8,12 +8,12 @@ import '../../models/api_models.dart';
 import '../../viewmodels/admin_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
 import '../events/admin/event_manager_screen.dart';
-import '../helping_support/admin/counselling_admin_screen.dart';
 import '../helping_support/admin/emergency_contacts_admin_screen.dart';
 import '../home/admin/safety_awareness_manager_screen.dart';
 import 'pending_approvals_screen.dart';
 import 'user_approval_detail_screen.dart';
 import 'user_management_screen.dart';
+import 'counsellor_admin_screen.dart';
 
 class AdminDashboardView extends StatefulWidget {
   const AdminDashboardView({super.key});
@@ -116,7 +116,7 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
                 onOpenPending: _openPendingApprovals,
                 onOpenUsers: _openUserManagement,
                 onOpenEvents: () => _push(const EventManagerScreen()),
-                onOpenCounselling: () => _push(const CounsellingAdminScreen()),
+                onOpenCounselling: () => _push(const CounsellorAdminScreen()),
                 onOpenSafety: () => _push(const SafetyAwarenessManagerScreen()),
                 onOpenEmergency: () =>
                     _push(const EmergencyContactsAdminScreen()),
@@ -168,7 +168,7 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
   void _openPendingApprovals() {
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const PendingApprovalsScreen()));
+    ).push(MaterialPageRoute(builder: (_) => PendingApprovalsScreen(vm: _vm)));
   }
 
   Future<void> _openDetail(AdminUserItem user) async {
@@ -792,10 +792,7 @@ class _UserTableToolbar extends StatelessWidget {
             items: const [
               DropdownMenuItem(value: null, child: Text('All statuses')),
               DropdownMenuItem(value: 'approved', child: Text('Active')),
-              DropdownMenuItem(
-                value: 'pending_verification',
-                child: Text('Pending'),
-              ),
+              DropdownMenuItem(value: 'pending', child: Text('Pending')),
               DropdownMenuItem(value: 'deactivated', child: Text('Blocked')),
             ],
             onChanged: onStatusChanged,
@@ -1579,8 +1576,8 @@ class _ManagementTools extends StatelessWidget {
       ),
       _ToolData(
         icon: Icons.psychology_outlined,
-        label: 'Counselling',
-        subtitle: 'Sessions and schedules',
+        label: 'Counsellor Panel',
+        subtitle: 'Verify profiles and requests',
         color: const Color(0xFF009688),
         onTap: onOpenCounselling,
       ),
@@ -1840,7 +1837,7 @@ Color _roleColor(String role) => switch (role) {
 
 String _statusLabel(String status) => switch (status) {
   'approved' => 'Active',
-  'pending_verification' => 'Pending',
+  'pending' || 'pending_verification' => 'Pending',
   'deactivated' => 'Blocked',
   'rejected' => 'Rejected',
   _ => status,
@@ -1848,7 +1845,7 @@ String _statusLabel(String status) => switch (status) {
 
 Color _statusColor(String status) => switch (status) {
   'approved' => AppColors.secondary,
-  'pending_verification' => AppColors.accent,
+  'pending' || 'pending_verification' => AppColors.accent,
   'deactivated' => AppColors.softRed,
   'rejected' => AppColors.softRed,
   _ => AppColors.muted,
@@ -1856,7 +1853,7 @@ Color _statusColor(String status) => switch (status) {
 
 String _approvalLabel(String status) => switch (status) {
   'approved' => 'Approved',
-  'pending_verification' => 'Waiting Approval',
+  'pending' || 'pending_verification' => 'Waiting Approval',
   'deactivated' => 'Approved',
   'rejected' => 'Rejected',
   _ => status,
@@ -1864,7 +1861,7 @@ String _approvalLabel(String status) => switch (status) {
 
 Color _approvalColor(String status) => switch (status) {
   'approved' => AppColors.secondary,
-  'pending_verification' => AppColors.accent,
+  'pending' || 'pending_verification' => AppColors.accent,
   'deactivated' => AppColors.secondary,
   'rejected' => AppColors.softRed,
   _ => AppColors.muted,

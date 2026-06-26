@@ -12,6 +12,7 @@ class AppUser {
     this.dateOfBirth,
     this.createdAt,
     this.parentEmail,
+    this.classLevel,
     this.className,
     this.schoolName,
     this.location,
@@ -20,6 +21,7 @@ class AppUser {
     this.accessStatus,
     this.requestedRole,
     this.verificationNote,
+    this.photoUrl,
   });
 
   final int id;
@@ -31,6 +33,7 @@ class AppUser {
   final int level;
   final int xp;
   final String? parentEmail;
+  final String? classLevel;
   final String? className;
   final String? schoolName;
   final String? location;
@@ -39,6 +42,7 @@ class AppUser {
   final String? accessStatus;
   final String? requestedRole;
   final String? verificationNote;
+  final String? photoUrl;
 
   AppUser copyWith({
     String? name,
@@ -47,6 +51,7 @@ class AppUser {
     DateTime? dateOfBirth,
     DateTime? createdAt,
     String? parentEmail,
+    String? classLevel,
     String? className,
     String? schoolName,
     String? location,
@@ -55,6 +60,7 @@ class AppUser {
     String? accessStatus,
     String? requestedRole,
     String? verificationNote,
+    String? photoUrl,
   }) => AppUser(
     id: id,
     name: name ?? this.name,
@@ -65,6 +71,7 @@ class AppUser {
     dateOfBirth: dateOfBirth ?? this.dateOfBirth,
     createdAt: createdAt ?? this.createdAt,
     parentEmail: parentEmail ?? this.parentEmail,
+    classLevel: classLevel ?? this.classLevel,
     className: className ?? this.className,
     schoolName: schoolName ?? this.schoolName,
     location: location ?? this.location,
@@ -73,6 +80,7 @@ class AppUser {
     accessStatus: accessStatus ?? this.accessStatus,
     requestedRole: requestedRole ?? this.requestedRole,
     verificationNote: verificationNote ?? this.verificationNote,
+    photoUrl: photoUrl ?? this.photoUrl,
   );
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -89,6 +97,7 @@ class AppUser {
     level: (j['level'] as int?) ?? 1,
     xp: (j['xp'] as int?) ?? 0,
     parentEmail: j['parent_email'] as String?,
+    classLevel: j['class_level'] as String?,
     className: j['class_name'] as String?,
     schoolName: j['school_name'] as String?,
     location: j['location'] as String?,
@@ -97,6 +106,7 @@ class AppUser {
     accessStatus: j['access_status'] as String?,
     requestedRole: j['requested_role'] as String?,
     verificationNote: j['verification_note'] as String?,
+    photoUrl: j['photo_url'] as String?,
   );
 }
 
@@ -133,7 +143,7 @@ class PendingUserItem {
     name: j['name'] as String,
     email: j['email'] as String,
     currentRole: (j['current_role'] ?? j['role'] ?? 'student') as String,
-    accessStatus: (j['access_status'] ?? 'pending_verification') as String,
+    accessStatus: (j['access_status'] ?? 'pending') as String,
     createdAt: DateTime.parse(j['created_at'] as String),
     requestedRole: j['requested_role'] as String?,
     phone: j['phone'] as String?,
@@ -174,7 +184,12 @@ class AdminUserItem {
   final String? verificationNote;
 
   bool get isBlocked => accessStatus == 'deactivated';
-  bool get isPending => accessStatus == 'pending_verification';
+  bool get isPending => const {
+    'pending',
+    'pending_verification',
+    'pending_review',
+    'under_review',
+  }.contains(accessStatus);
   bool get isApproved => accessStatus == 'approved';
   bool get isRejected => accessStatus == 'rejected';
 
@@ -198,7 +213,7 @@ class AdminUserItem {
     name: j['name'] as String,
     email: j['email'] as String,
     role: (j['role'] ?? 'student') as String,
-    accessStatus: (j['access_status'] ?? 'pending_verification') as String,
+    accessStatus: (j['access_status'] ?? 'pending') as String,
     createdAt: DateTime.parse(j['created_at'] as String),
     requestedRole: j['requested_role'] as String?,
     phone: j['phone'] as String?,

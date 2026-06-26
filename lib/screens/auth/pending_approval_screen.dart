@@ -2,12 +2,32 @@ import 'package:flutter/material.dart';
 
 import '../../app_state.dart';
 import '../../core/colors.dart';
+import '../../models/auth_models.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 
 /// Shown when a user logs in or registers and their account is
 /// still pending admin verification.
-class PendingApprovalScreen extends StatelessWidget {
+class PendingApprovalScreen extends StatefulWidget {
   const PendingApprovalScreen({super.key});
+
+  @override
+  State<PendingApprovalScreen> createState() => _PendingApprovalScreenState();
+}
+
+class _PendingApprovalScreenState extends State<PendingApprovalScreen> {
+  late final AuthViewModel _vm;
+
+  @override
+  void initState() {
+    super.initState();
+    _vm = AuthViewModel();
+  }
+
+  @override
+  void dispose() {
+    _vm.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +117,19 @@ class PendingApprovalScreen extends StatelessWidget {
 
               const Spacer(),
 
+              FilledButton.icon(
+                onPressed: _checkApproval,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Check approval status'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
               // ── Sign out ───────────────────────────────────────────────
               OutlinedButton.icon(
                 onPressed: () => _signOut(context),
@@ -131,11 +164,25 @@ class PendingApprovalScreen extends StatelessWidget {
   }
 
   Future<void> _signOut(BuildContext context) async {
-    final vm = AuthViewModel();
-    await vm.logout();
-    vm.dispose();
+    await _vm.logout();
     if (context.mounted) {
       Navigator.of(context).pushReplacementNamed('/login');
+    }
+  }
+
+  Future<void> _checkApproval() async {
+    final status = await _vm.refreshCurrentSession();
+    if (!mounted || status == null) return;
+    switch (status) {
+      case AccessStatus.approved:
+        Navigator.of(context).pushReplacementNamed('/home');
+      case AccessStatus.pendingVerification:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Your request is still under review.')),
+        );
+      case AccessStatus.rejected:
+      case AccessStatus.deactivated:
+        Navigator.of(context).pushReplacementNamed('/rejected');
     }
   }
 }

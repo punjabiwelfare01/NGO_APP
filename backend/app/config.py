@@ -40,5 +40,13 @@ class Settings:
     auth0_domain: str = os.getenv("AUTH0_DOMAIN", "")
     auth0_client_id: str = os.getenv("AUTH0_CLIENT_ID", "")
 
+    # Private password-reset delivery. Configure these in production.
+    smtp_host: str = os.getenv("SMTP_HOST", "")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username: str = os.getenv("SMTP_USERNAME", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "")
+    smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+
 
 settings = Settings()
