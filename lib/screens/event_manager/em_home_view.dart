@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app_state.dart';
 import '../../core/colors.dart';
@@ -9,6 +10,7 @@ import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../../widgets/app_card.dart';
 import 'counsellor_requests_screen.dart';
+import '../events/official_event_report_screen.dart';
 
 class EMHomeView extends StatelessWidget {
   const EMHomeView({
@@ -564,21 +566,17 @@ class _QuickActionsGrid extends StatelessWidget {
     }
     final report = await vm.generateReport(event.id);
     if (!context.mounted) return;
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Event Report Generated'),
-        content: Text(
-          '${report.eventName}\n${report.location}\n'
-          '${report.volunteersParticipated} volunteers • ${report.peopleReached} people reached\n'
-          'Donation: ₹${report.totalDonationCollected.toStringAsFixed(0)}',
+    final assignments =
+        vm.assignments.where((a) => a.event.id == event.id).toList();
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OfficialEventReportScreen(
+          event: event,
+          assignments: assignments,
+          report: report,
+          vm: vm,
         ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Done'),
-          ),
-        ],
       ),
     );
   }
@@ -1343,6 +1341,14 @@ class _SchoolRequestsSection extends StatelessWidget {
 class _DonationCampaignSummary extends StatelessWidget {
   const _DonationCampaignSummary({required this.vm});
   final EventManagerViewModel vm;
+
+  static const _upi     = 'punjabiwelfaretrust@upi';
+  static const _account = '35270101011873';
+  static const _ifsc    = 'UBIN0535273';
+  static const _bank    = 'Union Bank of India';
+  static const _branch  = 'Delhi-Cantonment Branch, South West Delhi – 110010';
+  static const _holder  = 'Punjabi Welfare Trust';
+
   @override
   Widget build(BuildContext context) {
     final drives = vm.events.where((e) => e.donationEligible).length;
@@ -1357,68 +1363,287 @@ class _DonationCampaignSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionHeading(
-          title: 'Donation & Campaign Summary',
+          title: 'Donation & Campaign',
           icon: Icons.volunteer_activism_rounded,
         ),
         const SizedBox(height: 10),
+
+        // ── Campaign stats ────────────────────────────────────────
         AppCard(
+          child: Row(
+            children: [
+              Expanded(
+                child: _MiniMetric(
+                  label: 'Active Drives',
+                  value: '$drives',
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MiniMetric(
+                  label: 'Collected',
+                  value: '₹${collected.toStringAsFixed(0)}',
+                  color: AppColors.secondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MiniMetric(
+                  label: 'Proof Pending',
+                  value: '$pending',
+                  color: AppColors.accent,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // ── Payment details card ──────────────────────────────────
+        Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1565C0), Color(0xFF0288D1)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _MiniMetric(
-                      label: 'Active Drives',
-                      value: '$drives',
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _MiniMetric(
-                      label: 'Collected',
-                      value: '₹${collected.toStringAsFixed(0)}',
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _MiniMetric(
-                      label: 'Proof Pending',
-                      value: '$pending',
-                      color: AppColors.accent,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.verified_user_outlined,
-                    color: Color(0xFF2E7D32),
-                    size: 17,
-                  ),
-                  SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      'Donations are accepted only through official NGO bank/UPI details.',
-                      style: TextStyle(
-                        color: Color(0xFF2E7D32),
-                        fontSize: 10,
-                        height: 1.35,
-                        fontWeight: FontWeight.w700,
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.account_balance_rounded,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Official Donation Account',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified_rounded,
+                              color: Color(0xFF69FF8A), size: 11),
+                          SizedBox(width: 3),
+                          Text('Verified',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // QR code + bank details
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // QR code image
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(5),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.asset(
+                          'assests/new_donation_qr.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, _, _) => const Center(
+                            child: Icon(Icons.qr_code_rounded,
+                                size: 52, color: Color(0xFF1565C0)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Bank details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _EMPayRow('Beneficiary', _holder),
+                          _EMPayRow('Bank', _bank),
+                          _EMPayRow('Branch', _branch),
+                          _EMPayRow('Account No.', _account,
+                              onCopy: () => _copy(context, _account,
+                                  'Account number')),
+                          _EMPayRow('IFSC', _ifsc,
+                              onCopy: () =>
+                                  _copy(context, _ifsc, 'IFSC code')),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // UPI ID row
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      const Icon(Icons.smartphone_rounded,
+                          color: Colors.white70, size: 14),
+                      const SizedBox(width: 6),
+                      const Text('UPI ID: ',
+                          style: TextStyle(
+                              color: Colors.white70, fontSize: 11)),
+                      Expanded(
+                        child: Text(_upi,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 11)),
+                      ),
+                      GestureDetector(
+                        onTap: () => _copy(context, _upi, 'UPI ID'),
+                        child: const Icon(Icons.copy_rounded,
+                            size: 13, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Scan tip
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Center(
+                  child: Text(
+                    'Share this QR with donors — scan with any UPI app',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Warning footer
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.11),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.verified_user_outlined,
+                          color: Color(0xFF69FF8A), size: 14),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Donations are accepted only through these official NGO bank / UPI details. Never use personal accounts.',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  void _copy(BuildContext context, String text, String label) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$label copied')),
+    );
+  }
+}
+
+class _EMPayRow extends StatelessWidget {
+  const _EMPayRow(this.label, this.value, {this.onCopy});
+  final String label;
+  final String value;
+  final VoidCallback? onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$label: ',
+              style: const TextStyle(
+                  color: Colors.white60, fontSize: 10)),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                    height: 1.3)),
+          ),
+          if (onCopy != null)
+            GestureDetector(
+              onTap: onCopy,
+              child: const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Icon(Icons.copy_rounded,
+                    size: 11, color: Colors.white60),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1500,10 +1725,16 @@ class _ReportsPendingSection extends StatelessWidget {
   Future<void> _generate(BuildContext context, NGOEvent event) async {
     final report = await vm.generateReport(event.id);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${report.eventName} report generated • ${report.peopleReached} people reached.',
+    final assignments =
+        vm.assignments.where((a) => a.event.id == event.id).toList();
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OfficialEventReportScreen(
+          event: event,
+          assignments: assignments,
+          report: report,
+          vm: vm,
         ),
       ),
     );

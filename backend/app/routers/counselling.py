@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from ..crud import counselling_crud
 from ..database import get_db
 from ..dependencies import admin_only, get_current_user, mentor_or_above, require_role
+from ..models.counselling import CounsellorWeeklyAvailability
 from ..models.user import User, UserRole
 from ..schemas.counselling import (
     CounsellingAnalyticsResponse,
@@ -12,6 +13,65 @@ from ..schemas.counselling import (
     MentorProfileUpdate,
 )
 from ..schemas.wellness import CounsellingSlotResponse
+
+_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+
+def _fmt_time(t: str) -> str:
+    """Convert '14:30' → '2:30 PM'."""
+    try:
+        h, m = map(int, t.split(':'))
+        period = 'AM' if h < 12 else 'PM'
+        h12 = h % 12 or 12
+        return f"{h12}:{m:02d} {period}"
+    except Exception:
+        return t
+
+
+def _mentor_dict(m, db: Session) -> dict:
+    """Build the full public mentor dict including extended fields and weekly schedule."""
+    photo = m.profile_image_url or (m.user.photo_url if m.user else None)
+    weekly_slots = (
+        db.query(CounsellorWeeklyAvailability)
+        .filter(
+            CounsellorWeeklyAvailability.counsellor_id == m.user_id,
+            CounsellorWeeklyAvailability.is_active == True,  # noqa: E712
+        )
+        .order_by(
+            CounsellorWeeklyAvailability.day_of_week,
+            CounsellorWeeklyAvailability.start_time,
+        )
+        .all()
+    )
+    availability = [
+        f"{_DAYS[s.day_of_week]}: {_fmt_time(s.start_time)} – {_fmt_time(s.end_time)}"
+        f" ({s.mode.capitalize()})"
+        for s in weekly_slots
+    ]
+    return {
+        "id": m.id,
+        "user_id": m.user_id,
+        "display_name": m.display_name,
+        "bio": m.bio,
+        "expertise": m.expertise,
+        "category": m.category,
+        "profile_image_url": photo,
+        "is_active": m.is_active,
+        "rating": m.rating,
+        "session_count": m.session_count,
+        "created_at": m.created_at,
+        # Extended profile fields
+        "qualification": m.qualification,
+        "years_of_experience": m.years_of_experience,
+        "counselling_mode": m.counselling_mode,
+        "languages_known": m.languages_known,
+        "organization": m.organization,
+        # User contact fields
+        "phone": m.user.phone if m.user else None,
+        "location": m.user.location if m.user else None,
+        # Weekly availability as formatted strings
+        "weekly_availability": availability,
+    }
 
 router = APIRouter(prefix="/counselling", tags=["Counselling"])
 
@@ -56,18 +116,17 @@ def update_my_mentor_profile(
         )
     return counselling_crud.update_mentor_profile(db, profile.id, payload)
 
-@router.get("/mentors", response_model=list[MentorProfileResponse],
-            summary="List active mentor profiles [authenticated]")
+@router.get("/mentors", summary="List active mentor profiles [authenticated]")
 def list_mentors(
     category: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return counselling_crud.list_mentors(db, category=category)
+    mentors = counselling_crud.list_mentors(db, category=category)
+    return [_mentor_dict(m, db) for m in mentors]
 
 
-@router.get("/mentors/{mentor_id}", response_model=MentorProfileResponse,
-            summary="Get mentor profile detail [authenticated]")
+@router.get("/mentors/{mentor_id}", summary="Get mentor profile detail [authenticated]")
 def get_mentor(
     mentor_id: int,
     db: Session = Depends(get_db),
@@ -76,7 +135,7 @@ def get_mentor(
     profile = counselling_crud.get_mentor(db, mentor_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Mentor profile not found")
-    return profile
+    return _mentor_dict(profile, db)
 
 
 @router.post("/mentors", response_model=MentorProfileResponse, status_code=201,
@@ -127,6 +186,74 @@ def update_mentor_profile(
         raise HTTPException(status_code=403, detail="Access denied")
     updated = counselling_crud.update_mentor_profile(db, mentor_id, payload)
     return updated
+
+
+# ── Extended profile (qualification, experience, languages, mode) ─────────────
+
+@router.get("/mentors/me/extended",
+            summary="Get current counsellor's extended profile fields")
+def get_extended_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.mentor:
+        raise HTTPException(status_code=403, detail="Counsellor access required")
+    profile = counselling_crud.get_mentor_by_user(db, current_user.id)
+    if not profile:
+        return {}
+    return {
+        "qualification":       profile.qualification,
+        "years_of_experience": profile.years_of_experience,
+        "counselling_mode":    profile.counselling_mode,
+        "languages_known":     profile.languages_known,
+        "organization":        profile.organization,
+        "gender":              profile.gender,
+        "date_of_birth":       profile.date_of_birth,
+        "city":                profile.city,
+        "state":               profile.state,
+        "pin_code":            profile.pin_code,
+    }
+
+
+@router.patch("/mentors/me/extended",
+              summary="Create or update current counsellor's extended profile fields")
+def update_extended_profile(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.mentor:
+        raise HTTPException(status_code=403, detail="Counsellor access required")
+    profile = counselling_crud.get_mentor_by_user(db, current_user.id)
+    if not profile:
+        # Auto-create a minimal mentor profile so extended fields can be saved
+        profile = counselling_crud.create_mentor_profile(
+            db,
+            current_user.id,
+            MentorProfileCreate(display_name=current_user.name),
+        )
+    allowed = {
+        "qualification", "years_of_experience", "counselling_mode",
+        "languages_known", "organization", "gender", "date_of_birth",
+        "city", "state", "pin_code",
+    }
+    for key, value in payload.items():
+        if key in allowed:
+            setattr(profile, key, value)
+    db.commit()
+    db.refresh(profile)
+    return {
+        "qualification":       profile.qualification,
+        "years_of_experience": profile.years_of_experience,
+        "counselling_mode":    profile.counselling_mode,
+        "languages_known":     profile.languages_known,
+        "organization":        profile.organization,
+        "gender":              profile.gender,
+        "date_of_birth":       profile.date_of_birth,
+        "city":                profile.city,
+        "state":               profile.state,
+        "pin_code":            profile.pin_code,
+    }
 
 
 # ── Slots ──────────────────────────────────────────────────────────────────────

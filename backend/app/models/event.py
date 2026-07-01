@@ -19,6 +19,10 @@ class EventType(str, enum.Enum):
     workshop = "workshop"
     competition = "competition"
     cyber_security = "cyber_security"
+    stationery_drive = "stationery_drive"
+    donation_drive = "donation_drive"
+    school_partnership = "school_partnership"
+    community_outreach = "community_outreach"
 
 
 class EventStatus(str, enum.Enum):

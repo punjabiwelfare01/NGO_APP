@@ -74,6 +74,7 @@ class AuthRepository {
     String? parentEmail,
     String? phone,
     String? requestedRole,
+    List<String>? interests,
   }) async {
     final body = <String, dynamic>{
       'name': name,
@@ -91,6 +92,7 @@ class AuthRepository {
     addIfFilled('parent_email', parentEmail);
     addIfFilled('phone', phone);
     addIfFilled('requested_role', requestedRole);
+    if (interests != null && interests.isNotEmpty) body['interests'] = interests;
 
     final raw =
         await ApiClient.post('/auth/register', body) as Map<String, dynamic>;

@@ -229,14 +229,17 @@ class _CreateFreeCourseScreenState extends State<CreateFreeCourseScreen> {
             'What will students learn?',
             lines: 3,
           ),
-          OutlinedButton.icon(
-            onPressed: _pickThumbnail,
-            icon: const Icon(Icons.image_outlined),
-            label: Text(
-              _thumbnailName ??
-                  (_thumbnailUrl == null
-                      ? 'Upload course thumbnail'
-                      : 'Thumbnail uploaded'),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 13),
+            child: OutlinedButton.icon(
+              onPressed: _pickThumbnail,
+              icon: const Icon(Icons.image_outlined),
+              label: Text(
+                _thumbnailName ??
+                    (_thumbnailUrl == null
+                        ? 'Upload course thumbnail'
+                        : 'Thumbnail uploaded'),
+              ),
             ),
           ),
           _field(_creator, 'Created by', 'Content Creator / Mentor / NGO Team'),

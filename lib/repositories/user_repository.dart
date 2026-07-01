@@ -32,6 +32,7 @@ class UserRepository {
     DateTime? dateOfBirth,
     String? parentEmail,
     String? phone,
+    List<String>? interests,
   }) async {
     final body = <String, dynamic>{};
     void addIfPresent(String key, Object? value) {
@@ -49,6 +50,7 @@ class UserRepository {
     );
     addIfPresent('parent_email', parentEmail);
     addIfPresent('phone', phone);
+    if (interests != null) body['interests'] = interests;
     final json =
         await ApiClient.patch('/users/me/profile', body)
             as Map<String, dynamic>;

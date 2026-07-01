@@ -1,0 +1,63 @@
+services:
+
+  # ── PostgreSQL Database ──────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: careskill_db
+    restart: always
+    environment:
+      POSTGRES_DB:       careskill
+      POSTGRES_USER:     careskill_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U careskill_user -d careskill"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── FastAPI Application ──────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: careskill_api
+    restart: always
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://careskill_user:${DB_PASSWORD}@db:5432/careskill
+    volumes:
+      - uploads_data:/app/uploads
+      - videos_data:/app/videos_uploaded
+      - logs_data:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+
+  # ── Nginx Reverse Proxy ──────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: careskill_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ssl_certs:/etc/letsencrypt
+      - ssl_www:/var/www/certbot
+    depends_on:
+      - api
+
+# ── Named Volumes (data survives container restarts) ──────────────────────────
+volumes:
+  postgres_data:
+  uploads_data:
+  videos_data:
+  logs_data:
+  ssl_certs:
+  ssl_www:

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/colors.dart';
 import '../../models/auth_models.dart';
+import '../../repositories/api_client.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
 
@@ -913,6 +914,7 @@ class _StudentVolunteerFormState extends State<_StudentVolunteerForm> {
       location: _locationCtrl.text.trim(),
       phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
       requestedRole: 'student',
+      interests: _interests.toList(),
     );
     if (!mounted || status == null) return;
     if (status == AccessStatus.approved) {
@@ -1658,6 +1660,7 @@ class _CounsellorFormState extends State<_CounsellorForm> {
       name: _nameCtrl.text.trim(),
       email: _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
+      // className stores Designation, schoolName stores Qualifications
       className: _designationCtrl.text.trim(),
       schoolName: _qualCtrl.text.trim(),
       location: _locationCtrl.text.trim(),
@@ -1665,6 +1668,43 @@ class _CounsellorFormState extends State<_CounsellorForm> {
       requestedRole: 'mentor',
     );
     if (!mounted || status == null) return;
+
+    // Persist counsellor-specific fields after registration while token is active
+    try {
+      // Create/update mentor profile with category and expertise
+      await ApiClient.patch('/counselling/mentors/me', {
+        'display_name': _nameCtrl.text.trim(),
+        if (_category != null) 'category': _category,
+        if (_expertiseCtrl.text.trim().isNotEmpty)
+          'expertise': _expertiseCtrl.text.trim(),
+      });
+      // Save extended fields (experience, languages, session mode)
+      final extPayload = <String, dynamic>{};
+      if (_qualCtrl.text.trim().isNotEmpty) {
+        extPayload['qualification'] = _qualCtrl.text.trim();
+      }
+      if (_experienceCtrl.text.trim().isNotEmpty) {
+        final yoe = int.tryParse(_experienceCtrl.text.trim());
+        if (yoe != null) extPayload['years_of_experience'] = yoe;
+      }
+      if (_languagesCtrl.text.trim().isNotEmpty) {
+        extPayload['languages_known'] = _languagesCtrl.text.trim();
+      }
+      if (_sessionPreference != null) {
+        extPayload['counselling_mode'] = _sessionPreference == 'Online'
+            ? 'online'
+            : _sessionPreference == 'Offline'
+            ? 'offline'
+            : 'both';
+      }
+      if (extPayload.isNotEmpty) {
+        await ApiClient.patch('/counselling/mentors/me/extended', extPayload);
+      }
+    } catch (_) {
+      // Non-fatal — profile data can be updated later from the profile screen
+    }
+
+    if (!mounted) return;
     widget.onSuccess();
   }
 

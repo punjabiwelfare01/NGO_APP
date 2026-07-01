@@ -22,6 +22,8 @@ class _CounsellorRequestsViewState extends State<CounsellorRequestsView>
   void initState() {
     super.initState();
     _tabs = TabController(length: 4, vsync: this);
+    // Refresh on every open so new school requests appear without restart
+    widget.vm.refreshRequests();
   }
 
   @override
@@ -137,18 +139,38 @@ class _RequestList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (requests.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return RefreshIndicator(
+        onRefresh: vm.refreshRequests,
+        child: ListView(
           children: [
-            Icon(emptyIcon, size: 56, color: AppColors.muted.withValues(alpha: 0.4)),
-            const SizedBox(height: 12),
-            Text(
-              emptyMessage,
-              style: TextStyle(
-                fontSize: 15,
-                color: AppColors.muted,
-                fontWeight: FontWeight.w500,
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    emptyIcon,
+                    size: 56,
+                    color: AppColors.muted.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    emptyMessage,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Pull down to refresh',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.muted.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -156,12 +178,15 @@ class _RequestList extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: requests.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) =>
-          _RequestCard(request: requests[index], vm: vm),
+    return RefreshIndicator(
+      onRefresh: vm.refreshRequests,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: requests.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) =>
+            _RequestCard(request: requests[index], vm: vm),
+      ),
     );
   }
 }

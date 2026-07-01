@@ -18,13 +18,17 @@ class VolunteerActivityCreate(BaseModel):
     description: Optional[str] = None
     expected_work: Optional[str] = None
     proof_required: Optional[str] = None  # JSON string
+    work_instructions: Optional[str] = None
     reward_hours: float = 0.0
     location: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     duration: Optional[str] = None
     application_deadline: Optional[datetime] = None
     max_students: Optional[int] = None
     certificate_eligible: bool = True
     stipend_amount: Optional[float] = None
+    status: str = "active"
 
 
 class VolunteerActivityUpdate(BaseModel):
@@ -34,15 +38,19 @@ class VolunteerActivityUpdate(BaseModel):
     description: Optional[str] = None
     expected_work: Optional[str] = None
     proof_required: Optional[str] = None
+    work_instructions: Optional[str] = None
     reward_hours: Optional[float] = None
     is_active: Optional[bool] = None
     event_id: Optional[int] = None
     location: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     duration: Optional[str] = None
     application_deadline: Optional[datetime] = None
     max_students: Optional[int] = None
     certificate_eligible: Optional[bool] = None
     stipend_amount: Optional[float] = None
+    status: Optional[str] = None
 
 
 class VolunteerActivityOut(BaseModel):
@@ -54,11 +62,16 @@ class VolunteerActivityOut(BaseModel):
     description: Optional[str]
     expected_work: Optional[str]
     proof_required: Optional[str]
+    work_instructions: Optional[str] = None
     reward_hours: float
     is_active: bool
+    status: str = "active"
     created_by: Optional[int]
     created_at: Optional[datetime]
+    updated_at: Optional[datetime] = None
     location: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     duration: Optional[str] = None
     application_deadline: Optional[datetime] = None
     max_students: Optional[int] = None

@@ -38,7 +38,6 @@ dependencies:
   web: ^1.1.1
   file_picker: ^8.0.0
   auth0_flutter: ^1.4.0
-  web_socket_channel: ^3.0.1
   url_launcher: ^6.3.0
   video_player: ^2.9.2
   dio: ^5.8.0+1
@@ -73,6 +72,7 @@ flutter:
 
   assets:
     - assests/ngo_logo.jpeg
+    - assests/new_donation_qr.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

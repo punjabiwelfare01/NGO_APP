@@ -9,7 +9,6 @@ import '../../../repositories/wellness_repository.dart';
 import '../../../viewmodels/view_state.dart';
 import '../../../widgets/app_card.dart';
 import 'booking_success_screen.dart';
-import 'chat_screen.dart';
 
 class MentorDetailScreen extends StatefulWidget {
   const MentorDetailScreen({required this.mentor, super.key});
@@ -102,31 +101,6 @@ class _MentorDetailScreenState extends State<MentorDetailScreen> {
             style: const TextStyle(
                 color: AppColors.ink, fontWeight: FontWeight.w800)),
         iconTheme: const IconThemeData(color: AppColors.ink),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: FilledButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ChatScreen(
-                    otherUserId: mentor.userId,
-                    otherUserName: mentor.displayName,
-                  ),
-                ),
-              ),
-              icon: const Icon(Icons.chat_rounded, size: 18),
-              label: const Text('Chat'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.secondary,
-                foregroundColor: AppColors.ink,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: _load,

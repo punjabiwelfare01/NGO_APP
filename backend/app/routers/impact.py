@@ -1,14 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+import uuid
+from pathlib import Path
+
+import aiofiles
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import get_current_user, get_optional_user, require_role
+from ..models.impact import ImpactPostMedia
 from ..models.user import User, UserRole
 from ..repositories import impact_repository
 from ..schemas.impact import ImpactMetricsOut, ImpactPostCreate, ImpactPostOut, ImpactPostUpdate, ImpactShareOut
 from ..services import impact_service
 
 router = APIRouter(prefix="/impact", tags=["Impact"])
+
+_IMPACT_MEDIA_DIR = Path(__file__).parent.parent.parent / "uploads" / "impact"
 
 
 def _base(request: Request) -> str:
@@ -48,6 +55,63 @@ def create(data: ImpactPostCreate, request: Request, db: Session = Depends(get_d
     return impact_service.serialize_post(db, item, user.id, _base(request))
 
 
+@router.post("/upload-media", status_code=201)
+async def upload_media(
+    file: UploadFile = File(...),
+    media_type: str = Form(default="image"),
+    user: User = Depends(require_role(UserRole.event_manager, UserRole.admin, UserRole.super_admin)),
+):
+    """Upload an impact media file immediately and return its URL.
+    Pass the URL in the `media` list when creating or updating an impact post.
+    """
+    _IMPACT_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(file.filename or "file").suffix.lower() or ".jpg"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    dest = _IMPACT_MEDIA_DIR / filename
+    async with aiofiles.open(dest, "wb") as out:
+        await out.write(await file.read())
+    return {"url": f"/uploads/impact/{filename}", "media_type": media_type}
+
+
+@router.post("/posts/{post_id}/media", status_code=201)
+async def add_media(
+    post_id: int,
+    file: UploadFile = File(...),
+    caption: str = Form(default=""),
+    is_cover: str = Form(default="false"),
+    display_order: int = Form(default=0),
+    media_type: str = Form(default="image"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.event_manager)),
+):
+    item = impact_repository.get_post(db, post_id)
+    if not item:
+        raise HTTPException(404, "Impact post not found")
+    if user.role == UserRole.event_manager and item.created_by != user.id:
+        raise HTTPException(403, "Access denied")
+
+    _IMPACT_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(file.filename or "file").suffix.lower() or ".jpg"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    dest = _IMPACT_MEDIA_DIR / filename
+
+    async with aiofiles.open(dest, "wb") as out:
+        await out.write(await file.read())
+
+    url = f"/uploads/impact/{filename}"
+    media = ImpactPostMedia(
+        post_id=post_id,
+        media_type=media_type,
+        url=url,
+        caption=caption or None,
+        position=display_order,
+    )
+    db.add(media)
+    db.commit()
+    db.refresh(media)
+    return {"media_url": url, "id": media.id}
+
+
 @router.patch("/posts/{post_id}", response_model=ImpactPostOut)
 def update(post_id: int, data: ImpactPostUpdate, request: Request, db: Session = Depends(get_db), user: User = Depends(require_role(UserRole.event_manager))):
     item = impact_repository.get_post(db, post_id)
@@ -66,6 +130,14 @@ def publish(post_id: int, request: Request, db: Session = Depends(get_db), user:
         raise HTTPException(404, "Impact post not found")
     item = impact_service.publish(db, item, user.id)
     return impact_service.serialize_post(db, item, user.id, _base(request))
+
+
+@router.delete("/posts/{post_id}", status_code=204)
+def delete(post_id: int, db: Session = Depends(get_db), user: User = Depends(require_role(UserRole.admin))):
+    item = impact_repository.get_post(db, post_id)
+    if not item:
+        raise HTTPException(404, "Impact post not found")
+    impact_repository.delete_post(db, item)
 
 
 @router.post("/posts/{post_id}/appreciate", response_model=ImpactPostOut)

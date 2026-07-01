@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import admin_only
+from ..models.course import Course, UserCourseProgress
 from ..models.notification import AdminNotification
 from ..models.user import User, UserRole
 from ..schemas.user import UserResponse
@@ -56,13 +57,20 @@ def get_stats(
     for role in UserRole:
         role_counts[role.value] = db.query(User).filter(User.role == role).count()
 
+    published_courses = db.query(Course).filter(Course.is_published == True).count()  # noqa: E712
+    draft_courses     = db.query(Course).filter(Course.is_published == False).count()  # noqa: E712
+    total_course_learners = db.query(UserCourseProgress.user_id).distinct().count()
+
     return {
-        "total_users":    total,
-        "active_users":   active,
-        "pending_users":  pending,
-        "blocked_users":  blocked,
-        "rejected_users": rejected,
-        "role_counts":    role_counts,
+        "total_users":           total,
+        "active_users":          active,
+        "pending_users":         pending,
+        "blocked_users":         blocked,
+        "rejected_users":        rejected,
+        "role_counts":           role_counts,
+        "published_courses":     published_courses,
+        "draft_courses":         draft_courses,
+        "total_course_learners": total_course_learners,
     }
 
 

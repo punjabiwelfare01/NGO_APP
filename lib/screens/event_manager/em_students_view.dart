@@ -6,6 +6,7 @@ import '../../core/config.dart';
 import '../../models/event_manager_models.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../widgets/app_card.dart';
+import 'em_activity_tracking_screen.dart';
 
 class EMStudentsView extends StatefulWidget {
   const EMStudentsView({required this.vm, this.tabNotifier, super.key});
@@ -23,7 +24,7 @@ class _EMStudentsViewState extends State<EMStudentsView>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     widget.tabNotifier?.addListener(_onExternalTabChange);
   }
 
@@ -102,6 +103,9 @@ class _EMStudentsViewState extends State<EMStudentsView>
                     ],
                   ),
                 ),
+                const Tab(
+                  child: Text('Work Log'),
+                ),
               ],
             ),
             Expanded(
@@ -114,6 +118,8 @@ class _EMStudentsViewState extends State<EMStudentsView>
                       assignments: assigned, vm: widget.vm),
                   _SubmissionsTab(
                       assignments: submitted, vm: widget.vm),
+                  _WorkLogTab(
+                      assignments: widget.vm.assignments),
                 ],
               ),
             ),
@@ -942,7 +948,7 @@ class _ProofFilesGrid extends StatelessWidget {
                     width: 90,
                     height: 90,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       width: 90,
                       height: 90,
                       decoration: BoxDecoration(
@@ -1218,6 +1224,169 @@ class _EmptyTab extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Work Log Tab ─────────────────────────────────────────────────────────────
+
+class _WorkLogTab extends StatelessWidget {
+  const _WorkLogTab({required this.assignments});
+  final List<EMStudentAssignment> assignments;
+
+  @override
+  Widget build(BuildContext context) {
+    // Group assignments by activity id
+    final Map<int, List<EMStudentAssignment>> byActivity = {};
+    for (final a in assignments) {
+      byActivity.putIfAbsent(a.activity.id, () => []).add(a);
+    }
+
+    if (byActivity.isEmpty) {
+      return const _EmptyTab(
+        icon: Icons.bar_chart_rounded,
+        message: 'No activities yet',
+        sub: 'Assigned activities will appear here for tracking',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+      itemCount: byActivity.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, i) {
+        final activityId = byActivity.keys.elementAt(i);
+        final group = byActivity[activityId]!;
+        final activity = group.first.activity;
+
+        final totalAssigned = group.length;
+        final submitted = group
+            .where((a) =>
+                a.status == AssignmentStatus.workSubmitted ||
+                a.status == AssignmentStatus.verified ||
+                a.status == AssignmentStatus.approved ||
+                a.status == AssignmentStatus.certificateEligible)
+            .length;
+        final pending = group
+            .where((a) =>
+                a.status == AssignmentStatus.assigned ||
+                a.status == AssignmentStatus.shortlisted)
+            .length;
+
+        return AppCard(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.assignment_rounded,
+                      color: AppColors.primary, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      activity.title,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _WorkLogChip(
+                    label: '$totalAssigned assigned',
+                    color: const Color(0xFF1565C0),
+                    icon: Icons.people_rounded,
+                  ),
+                  _WorkLogChip(
+                    label: '$submitted submitted',
+                    color: const Color(0xFF2E7D32),
+                    icon: Icons.upload_file_rounded,
+                  ),
+                  _WorkLogChip(
+                    label: '$pending pending',
+                    color: const Color(0xFF757575),
+                    icon: Icons.hourglass_empty_rounded,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => EMActivityTrackingScreen(
+                          activityId: activityId,
+                          activityTitle: activity.title,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.track_changes_rounded, size: 16),
+                  label: const Text(
+                    'Track Students →',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WorkLogChip extends StatelessWidget {
+  const _WorkLogChip({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

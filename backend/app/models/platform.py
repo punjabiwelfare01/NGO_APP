@@ -49,6 +49,7 @@ class NGOProfileSetting(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, default="Punjabi Welfare Trust")
+    tagline = Column(String, nullable=True)
     registration_number = Column(String, nullable=True)
     email = Column(String, nullable=True)
     phone = Column(String, nullable=True)

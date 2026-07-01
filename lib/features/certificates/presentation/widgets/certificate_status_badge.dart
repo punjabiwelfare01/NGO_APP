@@ -44,6 +44,7 @@ class CertificateStatusBadge extends StatelessWidget {
     CertificateStatus.signed    => (AppColors.primary, Icons.draw_rounded),
     CertificateStatus.rejected  => (AppColors.softRed, Icons.cancel_rounded),
     CertificateStatus.revoked   => (AppColors.softRed, Icons.block_rounded),
-    CertificateStatus.draft     => (AppColors.muted, Icons.edit_rounded),
+    CertificateStatus.draft      => (AppColors.muted, Icons.edit_rounded),
+    CertificateStatus.downloaded => (AppColors.secondary, Icons.download_done_rounded),
   };
 }

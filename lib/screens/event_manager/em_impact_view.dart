@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +6,7 @@ import '../../app_state.dart';
 import '../../core/colors.dart';
 import '../../models/event_manager_models.dart';
 import '../../repositories/api_client.dart';
+import '../../repositories/event_manager_repository.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../widgets/app_card.dart';
 
@@ -29,27 +28,50 @@ enum _UploadStatus { pending, uploading, success, failed }
 class _ImpactMedia {
   _ImpactMedia({
     required this.localId,
-    required this.filePath,
     this.bytes,
     required this.fileName,
     required this.mediaType,
     required this.fileSize,
     this.isCover = false,
     required this.displayOrder,
-  });
+    _UploadStatus status = _UploadStatus.pending,
+    String? remoteUrl,
+  })  : status = status,
+        remoteUrl = remoteUrl;
+
+  /// Creates an item pre-populated from a URL that already exists on the server
+  /// (used when editing a draft that already has media).
+  factory _ImpactMedia.existing(String url, int displayOrder) {
+    final lower = url.toLowerCase();
+    final mediaType = lower.endsWith('.mp4') ||
+            lower.endsWith('.mov') ||
+            lower.endsWith('.webm')
+        ? _MediaType.video
+        : lower.endsWith('.pdf')
+            ? _MediaType.document
+            : _MediaType.image;
+    return _ImpactMedia(
+      localId: url,
+      fileName: url.split('/').last,
+      mediaType: mediaType,
+      fileSize: 0,
+      isCover: displayOrder == 0,
+      displayOrder: displayOrder,
+      status: _UploadStatus.success,
+      remoteUrl: url,
+    );
+  }
 
   final String localId;
-  final String filePath;    // local path (non-web)
-  final Uint8List? bytes;   // in-memory bytes (web)
+  final Uint8List? bytes;
   final String fileName;
   final _MediaType mediaType;
   final int fileSize;
-  _UploadStatus status = _UploadStatus.pending;
-  double progress = 0.0;
-  String? caption;
+  _UploadStatus status;
   String? remoteUrl;
   bool isCover;
   int displayOrder;
+  String? caption;
   String? errorMessage;
 
   bool get isImage => mediaType == _MediaType.image;
@@ -63,6 +85,19 @@ class _ImpactMedia {
     }
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
+
+  /// Serialises this item for the `media` list in POST /impact/posts or
+  /// PATCH /impact/posts/{id}.
+  Map<String, dynamic> toApiMap(int position) => {
+        'url': remoteUrl!,
+        'media_type': mediaType == _MediaType.video
+            ? 'video'
+            : mediaType == _MediaType.document
+                ? 'document'
+                : 'image',
+        if (caption != null) 'caption': caption,
+        'position': position,
+      };
 }
 
 // ─── Root view ────────────────────────────────────────────────────────────────
@@ -148,7 +183,7 @@ class _EMImpactViewState extends State<EMImpactView>
                   controller: _tabs,
                   children: [
                     _DraftsTab(posts: drafts, vm: widget.vm),
-                    _PublishedTab(posts: published),
+                    _PublishedTab(posts: published, vm: widget.vm),
                   ],
                 ),
               ),
@@ -268,180 +303,268 @@ class _DraftsTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 100),
       itemCount: posts.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, i) => _DraftPostCard(post: posts[i], vm: vm),
+      itemBuilder: (context, i) => _DraftPostCard(
+        post: posts[i],
+        vm: vm,
+        onEdit: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => _CreateImpactPostSheet(
+            vm: vm,
+            existingPost: posts[i],
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _DraftPostCard extends StatelessWidget {
-  const _DraftPostCard({required this.post, required this.vm});
+// ─── Draft Post Card ──────────────────────────────────────────────────────────
+
+// ─── Draft Post Card ──────────────────────────────────────────────────────────
+
+class _DraftPostCard extends StatefulWidget {
+  const _DraftPostCard({required this.post, required this.vm, this.onEdit});
   final EMImpactPost post;
   final EventManagerViewModel vm;
+  final VoidCallback? onEdit;
+
+  @override
+  State<_DraftPostCard> createState() => _DraftPostCardState();
+}
+
+class _DraftPostCardState extends State<_DraftPostCard> {
+  bool _expanded = false;
+
+  String get _dateLabel {
+    final d = widget.post.date;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final post = widget.post;
+    final vm = widget.vm;
+
     return AppCard(
-      padding: const EdgeInsets.all(0),
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: post.type.color.withValues(alpha: 0.08),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
-              border: Border(
-                bottom: BorderSide(
-                  color: post.type.color.withValues(alpha: 0.15),
-                ),
-              ),
-            ),
+          // ── Category badge + draft status ──────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
             child: Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: post.type.color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+                    color: post.type.color,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child:
-                      Icon(post.type.icon, color: post.type.color, size: 20),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      Icon(post.type.icon,
+                          color: Colors.white, size: 11),
+                      const SizedBox(width: 5),
                       Text(
                         post.type.label,
-                        style: TextStyle(
-                          color: post.type.color,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      Text(
-                        post.title,
                         style: const TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 14,
+                          color: Colors.white,
+                          fontSize: 10,
                           fontWeight: FontWeight.w800,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
+                const Spacer(),
                 _DraftChip(isSubmitted: post.isPublished),
               ],
             ),
           ),
+          // ── Title + date / location ────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
+                Text(
+                  post.title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
                   children: [
-                    _MetaItem(
-                      icon: Icons.location_on_rounded,
-                      label: post.location,
+                    const Icon(Icons.calendar_today_rounded,
+                        size: 12, color: AppColors.muted),
+                    const SizedBox(width: 4),
+                    Text(
+                      _dateLabel,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w500),
                     ),
-                    _MetaItem(
-                      icon: Icons.calendar_today_rounded,
-                      label:
-                          '${post.date.day}/${post.date.month}/${post.date.year}',
+                    const Text('  ·  ',
+                        style: TextStyle(color: AppColors.muted)),
+                    const Icon(Icons.location_on_rounded,
+                        size: 12, color: AppColors.muted),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        post.location,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    if (post.studentName != null)
-                      _MetaItem(
-                        icon: Icons.person_rounded,
-                        label: post.studentName!,
-                      ),
-                    if (post.photoUrls.isNotEmpty)
-                      _MetaItem(
-                        icon: Icons.photo_library_rounded,
-                        label: '${post.photoUrls.length} media',
-                      ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                if (post.studentsHelped != null ||
-                    post.hoursServed != null ||
-                    post.donationRaised != null)
-                  _ImpactNumbers(post: post),
-                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+          // ── Full-width cover image ─────────────────────────────────────
+          if (post.photoUrls.isNotEmpty)
+            _FullWidthCoverImage(photoUrls: post.photoUrls),
+          // ── Description ───────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
                   post.description,
                   style: const TextStyle(
                     color: AppColors.muted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    height: 1.5,
+                    fontSize: 13,
+                    height: 1.55,
                   ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: _expanded ? null : 3,
+                  overflow: _expanded ? null : TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: post.type.color.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.format_quote_rounded,
-                        color: post.type.color.withValues(alpha: 0.5),
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          post.appreciationMessage,
-                          style: TextStyle(
-                            color: post.type.color,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            fontStyle: FontStyle.italic,
-                            height: 1.4,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                if (!_expanded)
+                  GestureDetector(
+                    onTap: () => setState(() => _expanded = true),
+                    child: const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Text(
+                        'Read more',
+                        style: TextStyle(
+                          color: _kPurple,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.verified_rounded,
-                      color: _kPurple,
-                      size: 14,
                     ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Verified by ${post.verifiedByName}',
-                      style: const TextStyle(
-                        color: _kPurple,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                  ),
+              ],
+            ),
+          ),
+          // ── 4-metric grid ─────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            child: _ImpactMetricsGrid(post: post),
+          ),
+          // ── Appreciation message ───────────────────────────────────────
+          if (post.appreciationMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: const Color(0xFF2E7D32)
+                          .withValues(alpha: 0.15)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.favorite_rounded,
+                        color: Color(0xFF2E7D32), size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        post.appreciationMessage,
+                        style: const TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const Divider(height: 1),
-                const SizedBox(height: 10),
+              ),
+            ),
+          // ── Verified by ───────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+            child: Row(
+              children: [
+                const Icon(Icons.verified_rounded,
+                    color: _kPurple, size: 13),
+                const SizedBox(width: 5),
+                Text(
+                  'Verified by ${post.verifiedByName}',
+                  style: const TextStyle(
+                    color: _kPurple,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, indent: 14, endIndent: 14),
+          // ── Action buttons ─────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+            child: Column(
+              children: [
+                if (!post.adminApproved && widget.onEdit != null) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: widget.onEdit,
+                      icon: const Icon(Icons.edit_rounded, size: 15),
+                      label: const Text('Edit Draft',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kPurple,
+                        side: const BorderSide(color: _kPurple),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (AppState.role.isAdmin && !post.adminApproved)
                   SizedBox(
                     width: double.infinity,
@@ -451,14 +574,23 @@ class _DraftPostCard extends StatelessWidget {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text(
-                                  'Impact post approved and published.'),
-                            ),
+                                content: Text(
+                                    'Impact post approved and published.')),
                           );
                         }
                       },
-                      icon: const Icon(Icons.verified_rounded),
-                      label: const Text('Approve & Publish'),
+                      icon: const Icon(Icons.verified_rounded, size: 15),
+                      label: const Text('Approve & Publish',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   )
                 else if (!post.isPublished)
@@ -470,51 +602,49 @@ class _DraftPostCard extends StatelessWidget {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Sent to Admin for approval. It will be published once approved.',
-                            ),
+                                'Sent to Admin for approval.'),
                             backgroundColor: _kPurple,
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
                       },
-                      icon: const Icon(Icons.send_rounded, size: 16),
-                      label: const Text(
-                        'Submit for Admin Approval',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      icon: const Icon(Icons.send_rounded, size: 15),
+                      label: const Text('Submit for Approval',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800)),
                       style: FilledButton.styleFrom(
                         backgroundColor: _kPurple,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   )
                 else
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1565C0).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFF1565C0)
+                          .withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Row(
                       children: [
-                        Icon(
-                          Icons.pending_rounded,
-                          color: Color(0xFF1565C0),
-                          size: 16,
-                        ),
+                        Icon(Icons.pending_rounded,
+                            color: Color(0xFF1565C0), size: 15),
                         SizedBox(width: 8),
-                        Text(
-                          'Sent for Admin Approval — awaiting review',
-                          style: TextStyle(
-                            color: Color(0xFF1565C0),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            'Sent for Admin Approval — awaiting review',
+                            style: TextStyle(
+                              color: Color(0xFF1565C0),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -532,8 +662,9 @@ class _DraftPostCard extends StatelessWidget {
 // ─── Published Tab ────────────────────────────────────────────────────────────
 
 class _PublishedTab extends StatelessWidget {
-  const _PublishedTab({required this.posts});
+  const _PublishedTab({required this.posts, required this.vm});
   final List<EMImpactPost> posts;
+  final EventManagerViewModel vm;
 
   @override
   Widget build(BuildContext context) {
@@ -547,178 +678,240 @@ class _PublishedTab extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 100),
       itemCount: posts.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, i) => _PublishedPostCard(post: posts[i]),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (_, i) => _PublishedPostCard(post: posts[i], vm: vm),
     );
   }
 }
 
-class _PublishedPostCard extends StatelessWidget {
-  const _PublishedPostCard({required this.post});
+// ─── Published Post Card ──────────────────────────────────────────────────────
+
+class _PublishedPostCard extends StatefulWidget {
+  const _PublishedPostCard({required this.post, required this.vm});
   final EMImpactPost post;
+  final EventManagerViewModel vm;
+
+  @override
+  State<_PublishedPostCard> createState() => _PublishedPostCardState();
+}
+
+class _PublishedPostCardState extends State<_PublishedPostCard> {
+  bool _expanded = false;
+  bool _deleting = false;
+
+  String get _dateLabel {
+    final d = widget.post.date;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final post = widget.post;
+
     return AppCard(
-      padding: const EdgeInsets.all(0),
+      padding: EdgeInsets.zero,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  post.type.color,
-                  post.type.color.withValues(alpha: 0.75),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // ── Category badge + PUBLISHED chip ───────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: post.type.color,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(post.type.icon,
+                          color: Colors.white, size: 11),
+                      const SizedBox(width: 5),
+                      Text(
+                        post.type.label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(post.type.icon, color: Colors.white, size: 10),
-                          const SizedBox(width: 4),
-                          Text(
-                            post.type.label,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.verified_rounded,
-                              color: Colors.white, size: 10),
-                          SizedBox(width: 4),
-                          Text(
-                            'PUBLISHED',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  post.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    height: 1.2,
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${post.location} · ${post.date.day}/${post.date.month}/${post.date.year}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: const Color(0xFF2E7D32)
+                            .withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_rounded,
+                          color: Color(0xFF2E7D32), size: 11),
+                      SizedBox(width: 4),
+                      Text(
+                        'PUBLISHED',
+                        style: TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+          // ── Title + date / location ────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (post.photoUrls.isNotEmpty) ...[
-                  SizedBox(
-                    height: 80,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: post.photoUrls.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (context, i) => ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.network(
-                          post.photoUrls[i],
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            width: 80,
-                            height: 80,
-                            color: _kPurple.withValues(alpha: 0.08),
-                            child: const Icon(Icons.image_rounded,
-                                color: _kPurple),
-                          ),
-                        ),
+                Text(
+                  post.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.ink,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today_rounded,
+                        size: 12, color: AppColors.muted),
+                    const SizedBox(width: 4),
+                    Text(
+                      _dateLabel,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w500),
+                    ),
+                    const Text('  ·  ',
+                        style: TextStyle(color: AppColors.muted)),
+                    const Icon(Icons.location_on_rounded,
+                        size: 12, color: AppColors.muted),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        post.location,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                if (post.studentsHelped != null ||
-                    post.hoursServed != null ||
-                    post.donationRaised != null)
-                  _ImpactNumbers(post: post),
-                const SizedBox(height: 10),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // ── Full-width 16:9 cover image with +N More ──────────────────
+          if (post.photoUrls.isNotEmpty)
+            _FullWidthCoverImage(photoUrls: post.photoUrls),
+          // ── Description + Read more ────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
                   post.description,
                   style: const TextStyle(
                     color: AppColors.muted,
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    height: 1.5,
+                    height: 1.55,
                   ),
+                  maxLines: _expanded ? null : 3,
+                  overflow: _expanded ? null : TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  post.appreciationMessage,
-                  style: TextStyle(
-                    color: post.type.color,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    fontStyle: FontStyle.italic,
-                    height: 1.4,
+                if (!_expanded)
+                  GestureDetector(
+                    onTap: () => setState(() => _expanded = true),
+                    child: const Padding(
+                      padding: EdgeInsets.only(top: 3),
+                      child: Text(
+                        'Read more',
+                        style: TextStyle(
+                          color: _kPurple,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
+              ],
+            ),
+          ),
+          // ── 4-metric grid ─────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+            child: _ImpactMetricsGrid(post: post),
+          ),
+          // ── Appreciation message ───────────────────────────────────────
+          if (post.appreciationMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: const Color(0xFF2E7D32)
+                          .withValues(alpha: 0.18)),
                 ),
-                const SizedBox(height: 12),
-                const Divider(height: 1),
-                const SizedBox(height: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.favorite_rounded,
+                        color: Color(0xFF2E7D32), size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        post.appreciationMessage,
+                        style: const TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, indent: 14, endIndent: 14),
+          // ── Share + View Details + Admin Delete ────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+            child: Column(
+              children: [
                 Row(
                   children: [
                     Expanded(
@@ -726,54 +919,84 @@ class _PublishedPostCard extends StatelessWidget {
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Sharing impact post...'),
+                              content: Text('Sharing impact post…'),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
                         },
                         icon: const Icon(Icons.share_rounded, size: 14),
-                        label: const Text(
-                          'Share',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        label: const Text('Share',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700)),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF1565C0),
-                          side: const BorderSide(color: Color(0xFF1565C0)),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          foregroundColor: _kPurple,
+                          side: const BorderSide(color: _kPurple),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Viewing full impact post...'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                        icon:
-                            const Icon(Icons.open_in_new_rounded, size: 14),
-                        label: const Text(
-                          'View Post',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        onPressed: () => showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => _PostDetailSheet(post: post),
                         ),
+                        icon: const Icon(Icons.remove_red_eye_rounded,
+                            size: 14),
+                        label: const Text('View Details',
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700)),
                         style: FilledButton.styleFrom(
-                          backgroundColor: post.type.color,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          backgroundColor: _kPurple,
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ),
                   ],
                 ),
+                // Admin-only delete button
+                if (AppState.role.isAdmin) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _deleting
+                        ? const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Color(0xFFC62828),
+                              ),
+                            ),
+                          )
+                        : OutlinedButton.icon(
+                            onPressed: () => _confirmDelete(context),
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                size: 15),
+                            label: const Text('Delete Post',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFC62828),
+                              side: const BorderSide(
+                                  color: Color(0xFFC62828)),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -781,58 +1004,173 @@ class _PublishedPostCard extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFC62828), size: 22),
+            SizedBox(width: 10),
+            Text('Delete Post?',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+          ],
+        ),
+        content: Text(
+          'This will permanently delete "${widget.post.title}" and all its media. This cannot be undone.',
+          style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.5),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.muted,
+              side: BorderSide(color: AppColors.muted.withValues(alpha: 0.3)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFC62828),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await widget.vm.deleteImpactPost(widget.post.id);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Row(children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+            SizedBox(width: 8),
+            Text('Impact post deleted.',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ]),
+          backgroundColor: Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _deleting = false);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Failed to delete. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 }
 
-// ─── Impact Numbers ───────────────────────────────────────────────────────────
+// ─── Full-width cover image with +N More overlay ──────────────────────────────
 
-class _ImpactNumbers extends StatelessWidget {
-  const _ImpactNumbers({required this.post});
+class _FullWidthCoverImage extends StatelessWidget {
+  const _FullWidthCoverImage({required this.photoUrls});
+  final List<String> photoUrls;
+
+  @override
+  Widget build(BuildContext context) {
+    final extra = photoUrls.length - 1;
+    return Stack(
+      alignment: Alignment.bottomRight,
+      children: [
+        AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Image.network(
+            ApiClient.resolveUrl(photoUrls.first),
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => Container(
+              color: const Color(0xFFF0F0F0),
+              child: const Center(
+                child: Icon(Icons.image_rounded,
+                    size: 48, color: AppColors.muted),
+              ),
+            ),
+          ),
+        ),
+        if (extra > 0)
+          Positioned(
+            bottom: 12,
+            right: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                '+$extra More',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ─── 4-tile impact metrics grid ───────────────────────────────────────────────
+
+class _ImpactMetricsGrid extends StatelessWidget {
+  const _ImpactMetricsGrid({required this.post});
   final EMImpactPost post;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        if (post.studentsHelped != null)
-          Expanded(
-            child: _ImpactNum(
-              icon: Icons.people_rounded,
-              value: '${post.studentsHelped}',
-              label: 'Reached',
-              color: const Color(0xFF1565C0),
-            ),
-          ),
-        if (post.hoursServed != null) ...[
-          if (post.studentsHelped != null) const SizedBox(width: 8),
-          Expanded(
-            child: _ImpactNum(
-              icon: Icons.access_time_rounded,
-              value: '${post.hoursServed!.toStringAsFixed(0)}h',
-              label: 'Hours',
-              color: const Color(0xFFE65100),
-            ),
-          ),
-        ],
-        if (post.donationRaised != null && post.donationRaised! > 0) ...[
-          const SizedBox(width: 8),
-          Expanded(
-            child: _ImpactNum(
-              icon: Icons.payments_rounded,
-              value: post.donationRaised! >= 1000
-                  ? '₹${(post.donationRaised! / 1000).toStringAsFixed(1)}K'
-                  : '₹${post.donationRaised!.toStringAsFixed(0)}',
-              label: 'Raised',
-              color: const Color(0xFF2E7D32),
-            ),
-          ),
-        ],
+        _MetricTile(
+          icon: Icons.group_rounded,
+          value: '0',
+          label: 'Volunteers',
+          color: _kPurple,
+        ),
+        const SizedBox(width: 7),
+        _MetricTile(
+          icon: Icons.people_rounded,
+          value: '${post.studentsHelped ?? 0}',
+          label: 'Children\nHelped',
+          color: const Color(0xFF1565C0),
+        ),
+        const SizedBox(width: 7),
+        _MetricTile(
+          icon: Icons.access_time_rounded,
+          value: post.hoursServed != null
+              ? post.hoursServed!.toStringAsFixed(0)
+              : '0',
+          label: 'Hours',
+          color: const Color(0xFFE65100),
+        ),
+        const SizedBox(width: 7),
+        _MetricTile(
+          icon: Icons.workspace_premium_rounded,
+          value: '0',
+          label: 'Certificates',
+          color: const Color(0xFF2E7D32),
+        ),
       ],
     );
   }
 }
 
-class _ImpactNum extends StatelessWidget {
-  const _ImpactNum({
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
     required this.icon,
     required this.value,
     required this.label,
@@ -845,33 +1183,36 @@ class _ImpactNum extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 3),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -903,31 +1244,6 @@ class _DraftChip extends StatelessWidget {
           fontWeight: FontWeight.w800,
         ),
       ),
-    );
-  }
-}
-
-class _MetaItem extends StatelessWidget {
-  const _MetaItem({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: AppColors.muted, size: 12),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.muted,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1002,261 +1318,279 @@ class _EmptyTab extends StatelessWidget {
   }
 }
 
-// ─── Create Impact Post Sheet ─────────────────────────────────────────────────
+// ─── Create Impact Post — 4-step wizard ──────────────────────────────────────
 
 class _CreateImpactPostSheet extends StatefulWidget {
-  const _CreateImpactPostSheet({required this.vm});
+  const _CreateImpactPostSheet({required this.vm, this.existingPost});
   final EventManagerViewModel vm;
+  final EMImpactPost? existingPost;
 
   @override
   State<_CreateImpactPostSheet> createState() => _CreateImpactPostSheetState();
 }
 
-class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
-  final _titleCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  final _appreciationCtrl = TextEditingController();
+// Step labels used in the progress indicator
+const _kStepLabels = ['Basic Info', 'Media', 'Story', 'Review'];
 
-  EMImpactPostType _type = EMImpactPostType.eventSuccessReport;
+class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
+  // ── Controllers ──────────────────────────────────────────────────────────
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _descCtrl;
+  late final TextEditingController _appreciationCtrl;
+  late final TextEditingController _summaryCtrl;
+  late final PageController _pageCtrl;
+
+  // ── Step state ────────────────────────────────────────────────────────────
+  int _step = 0;
+
+  // ── Step 1: Basic Info ────────────────────────────────────────────────────
+  late EMImpactPostType _type;
   NGOEvent? _selectedEvent;
 
+  // ── Step 2: Media ─────────────────────────────────────────────────────────
   final List<_ImpactMedia> _mediaItems = [];
   bool _isUploading = false;
-  bool _draftCreated = false;
-  int? _draftPostId;
 
   int get _imageCount => _mediaItems.where((m) => m.isImage).length;
   int get _videoCount => _mediaItems.where((m) => m.isVideo).length;
 
-  bool get _hasPendingUploads => _mediaItems.any(
-        (m) =>
-            m.status == _UploadStatus.pending ||
-            m.status == _UploadStatus.failed,
-      );
 
-  bool get _allUploaded =>
-      _mediaItems.isNotEmpty &&
-      _mediaItems.every((m) => m.status == _UploadStatus.success);
+  List<Map<String, dynamic>> get _uploadedMediaList {
+    final uploaded =
+        _mediaItems.where((m) => m.remoteUrl != null).toList();
+    return List.generate(uploaded.length, (i) => uploaded[i].toApiMap(i));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pageCtrl = PageController();
+    final p = widget.existingPost;
+    _titleCtrl = TextEditingController(text: p?.title ?? '');
+    _descCtrl = TextEditingController(text: p?.description ?? '');
+    _appreciationCtrl = TextEditingController(text: p?.appreciationMessage ?? '');
+    _summaryCtrl = TextEditingController(
+      text: p != null
+          ? 'We reached ${p.studentsHelped ?? 0} beneficiaries in ${p.hoursServed?.toStringAsFixed(0) ?? '0'} hours.'
+          : '',
+    );
+    _type = p?.type ?? EMImpactPostType.eventSuccessReport;
+    if (p != null) {
+      for (var i = 0; i < p.photoUrls.length; i++) {
+        _mediaItems.add(_ImpactMedia.existing(p.photoUrls[i], i));
+      }
+    }
+  }
 
   @override
   void dispose() {
+    _pageCtrl.dispose();
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _appreciationCtrl.dispose();
+    _summaryCtrl.dispose();
     super.dispose();
   }
 
-  // ── File picking ──────────────────────────────────────────────────────────
+  EMImpactPost _buildPost(int id) => EMImpactPost(
+        id: id,
+        type: _type,
+        title: _titleCtrl.text.trim(),
+        eventName: _selectedEvent?.title ?? 'NGO Event',
+        location: _selectedEvent?.location ?? '',
+        date: DateTime.now(),
+        description: _descCtrl.text.trim(),
+        appreciationMessage: _appreciationCtrl.text.trim().isEmpty
+            ? 'Thank you to everyone who made this impact possible.'
+            : _appreciationCtrl.text.trim(),
+        isPublished: false,
+        adminApproved: false,
+        verifiedByName: AppState.studentName ?? 'Event Manager',
+      );
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
+
+  bool _canGoNext() {
+    if (_step == 0) return _titleCtrl.text.trim().isNotEmpty;
+    if (_step == 2) return _descCtrl.text.trim().isNotEmpty;
+    return true;
+  }
+
+  void _next() {
+    if (!_canGoNext()) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please complete all required fields.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    if (_step < 3) {
+      _pageCtrl.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      setState(() => _step++);
+    }
+  }
+
+  void _back() {
+    if (_step > 0) {
+      _pageCtrl.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      setState(() => _step--);
+    }
+  }
+
+  // ── File picking ─────────────────────────────────────────────────────────
 
   Future<void> _pickMedia() async {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: [
-        'jpg', 'jpeg', 'png', 'webp',
-        'mp4', 'mov', 'webm',
-        'pdf',
-      ],
-      withData: kIsWeb,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov', 'webm', 'pdf'],
+      withData: true,
     );
 
     if (!mounted || result == null || result.files.isEmpty) return;
 
     final errors = <String>[];
+    final newItems = <_ImpactMedia>[];
 
     for (final file in result.files) {
+      if (file.bytes == null) continue;
       final ext = (file.extension ?? '').toLowerCase();
       final isImg = ['jpg', 'jpeg', 'png', 'webp'].contains(ext);
       final isVid = ['mp4', 'mov', 'webm'].contains(ext);
       final isDoc = ext == 'pdf';
 
       if (!isImg && !isVid && !isDoc) {
-        errors.add('${file.name}: unsupported file type');
+        errors.add('${file.name}: unsupported type');
         continue;
       }
-
-      if (isImg && _imageCount >= _kMaxImages) {
+      if (isImg && _imageCount + newItems.where((m) => m.isImage).length >= _kMaxImages) {
         errors.add('Max $_kMaxImages images — ${file.name} skipped');
         continue;
       }
-      if (isVid && _videoCount >= _kMaxVideos) {
+      if (isVid && _videoCount + newItems.where((m) => m.isVideo).length >= _kMaxVideos) {
         errors.add('Max $_kMaxVideos videos — ${file.name} skipped');
         continue;
       }
-
-      final maxBytes = isVid
-          ? _kMaxVideoBytes
-          : isDoc
-              ? _kMaxDocBytes
-              : _kMaxImageBytes;
+      final maxBytes = isVid ? _kMaxVideoBytes : isDoc ? _kMaxDocBytes : _kMaxImageBytes;
       if (file.size > maxBytes) {
-        final mb = (maxBytes / (1024 * 1024)).toStringAsFixed(0);
-        errors.add('${file.name}: exceeds $mb MB limit');
+        errors.add('${file.name}: exceeds ${(maxBytes / (1024 * 1024)).toStringAsFixed(0)} MB limit');
         continue;
       }
 
-      final type = isImg
-          ? _MediaType.image
-          : isVid
-              ? _MediaType.video
-              : _MediaType.document;
-
-      final isFirstMedia = _mediaItems.isEmpty && isImg;
-
-      setState(() {
-        _mediaItems.add(
-          _ImpactMedia(
-            localId:
-                '${DateTime.now().microsecondsSinceEpoch}_${_mediaItems.length}',
-            filePath: file.path ?? '',
-            bytes: file.bytes,
-            fileName: file.name,
-            mediaType: type,
-            fileSize: file.size,
-            isCover: isFirstMedia,
-            displayOrder: _mediaItems.length,
-          ),
-        );
-      });
+      final type = isImg ? _MediaType.image : isVid ? _MediaType.video : _MediaType.document;
+      final isCover = _mediaItems.isEmpty && newItems.isEmpty && isImg;
+      newItems.add(_ImpactMedia(
+        localId: '${DateTime.now().microsecondsSinceEpoch}_${_mediaItems.length + newItems.length}',
+        bytes: file.bytes,
+        fileName: file.name,
+        mediaType: type,
+        fileSize: file.size,
+        isCover: isCover,
+        displayOrder: _mediaItems.length + newItems.length,
+      ));
     }
 
     if (errors.isNotEmpty && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            errors.join('\n'),
-            style: const TextStyle(fontSize: 12),
-          ),
-          backgroundColor: const Color(0xFFC62828),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(errors.join('\n'), style: const TextStyle(fontSize: 12)),
+        backgroundColor: const Color(0xFFC62828),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+
+    if (newItems.isEmpty) return;
+
+    setState(() => _mediaItems.addAll(newItems));
+
+    // Upload immediately (like Submit Work) — one file at a time.
+    setState(() => _isUploading = true);
+    for (final item in newItems) {
+      if (!mounted) break;
+      await _uploadSingleItem(item);
+    }
+    if (mounted) setState(() => _isUploading = false);
+
+    if (!mounted) return;
+    final failed = newItems.where((m) => m.status == _UploadStatus.failed).length;
+    final ok = newItems.where((m) => m.status == _UploadStatus.success).length;
+    if (failed > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('$ok uploaded · $failed failed — tap Retry on failed files'),
+        backgroundColor: const Color(0xFFC62828),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Text('$ok file${ok == 1 ? '' : 's'} uploaded',
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+        ]),
+        backgroundColor: const Color(0xFF2E7D32),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ));
     }
   }
 
   // ── Upload ────────────────────────────────────────────────────────────────
 
-  Future<void> _uploadSingleItem(_ImpactMedia item, int postId) async {
+  /// Upload one item to the generic /impact/upload-media endpoint immediately
+  /// (no post ID required). Sets remoteUrl on success, errorMessage on failure.
+  Future<void> _uploadSingleItem(_ImpactMedia item) async {
     if (item.status == _UploadStatus.success) return;
+    if (item.bytes == null) {
+      setState(() {
+        item.status = _UploadStatus.failed;
+        item.errorMessage = 'No file data';
+      });
+      return;
+    }
 
     setState(() {
       item.status = _UploadStatus.uploading;
-      item.progress = 0.0;
       item.errorMessage = null;
     });
 
     try {
-      dynamic result;
-
-      if (kIsWeb && item.bytes != null) {
-        result = await ApiClient.postMultipart(
-          '/impact/posts/$postId/media',
-          fields: {
-            'caption': item.caption ?? '',
-            'is_cover': item.isCover.toString(),
-            'display_order': item.displayOrder.toString(),
-            'media_type': item.mediaType.name,
-            if (_selectedEvent != null)
-              'event_id': _selectedEvent!.id.toString(),
-          },
-          fileBytes: item.bytes!,
-          fileName: item.fileName,
-        );
-        if (mounted) setState(() => item.progress = 1.0);
-      } else if (item.filePath.isNotEmpty) {
-        result = await ApiClient.uploadFileWithProgress(
-          '/impact/posts/$postId/media',
-          filePath: item.filePath,
-          fileName: item.fileName,
-          fields: {
-            'caption': item.caption ?? '',
-            'is_cover': item.isCover.toString(),
-            'display_order': item.displayOrder.toString(),
-            'media_type': item.mediaType.name,
-            if (_selectedEvent != null)
-              'event_id': _selectedEvent!.id.toString(),
-          },
-          onProgress: (sent, total) {
-            if (!mounted) return;
-            setState(() {
-              item.progress = total > 0 ? sent / total : 0.5;
-            });
-          },
-        );
-      } else {
-        throw Exception('No file data available for upload');
-      }
-
+      final mediaTypeStr = item.mediaType == _MediaType.video
+          ? 'video'
+          : item.mediaType == _MediaType.document
+              ? 'document'
+              : 'image';
+      final url = await EventManagerRepository.uploadImpactMedia(
+        bytes: item.bytes!,
+        fileName: item.fileName,
+        mediaType: mediaTypeStr,
+      );
       if (!mounted) return;
       setState(() {
-        item.remoteUrl =
-            result is Map ? result['media_url'] as String? : null;
+        item.remoteUrl = url;
         item.status = _UploadStatus.success;
-        item.progress = 1.0;
       });
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString();
+      final shortMsg = msg.length > 80 ? '${msg.substring(0, 80)}…' : msg;
       setState(() {
         item.status = _UploadStatus.failed;
-        item.errorMessage =
-            (msg.contains('404') || msg.contains('SocketException'))
-                ? 'Media endpoint unavailable — tap Retry when connected'
-                : 'Upload failed — tap Retry';
+        item.errorMessage = msg.contains('404')
+            ? 'Endpoint not found (404)'
+            : msg.contains('SocketException') || msg.contains('Connection refused')
+                ? 'Cannot reach server'
+                : msg.contains('TimeoutException') || msg.contains('timed out')
+                    ? 'Timed out — tap Retry'
+                    : 'Failed: $shortMsg';
       });
     }
-  }
-
-  Future<void> _uploadAllPending(int postId) async {
-    final pending = _mediaItems
-        .where(
-          (m) =>
-              m.status == _UploadStatus.pending ||
-              m.status == _UploadStatus.failed,
-        )
-        .toList();
-    if (pending.isEmpty) return;
-
-    setState(() => _isUploading = true);
-    for (final item in pending) {
-      await _uploadSingleItem(item, postId);
-      if (!mounted) return;
-    }
-    setState(() => _isUploading = false);
-  }
-
-  Future<void> _onUploadMediaPressed() async {
-    if (_isUploading) return;
-    final postId = _ensureDraft();
-    await _uploadAllPending(postId);
-  }
-
-  // ── Draft management ──────────────────────────────────────────────────────
-
-  int _ensureDraft() {
-    if (_draftCreated && _draftPostId != null) return _draftPostId!;
-
-    _draftPostId = DateTime.now().millisecondsSinceEpoch;
-    _draftCreated = true;
-
-    widget.vm.addImpactPost(
-      EMImpactPost(
-        id: _draftPostId!,
-        type: _type,
-        title: _titleCtrl.text.trim().isEmpty
-            ? 'Untitled Draft'
-            : _titleCtrl.text.trim(),
-        eventName: _selectedEvent?.title ?? 'NGO Event',
-        location: _selectedEvent?.location ?? '',
-        date: DateTime.now(),
-        description: _descCtrl.text.trim(),
-        appreciationMessage: _appreciationCtrl.text.trim(),
-        isPublished: false,
-        adminApproved: false,
-        verifiedByName: AppState.studentName ?? 'Event Manager',
-      ),
-    );
-    return _draftPostId!;
   }
 
   // ── Media list operations ─────────────────────────────────────────────────
@@ -1307,7 +1641,7 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
 
   // ── Save / Submit ─────────────────────────────────────────────────────────
 
-  void _saveDraft(BuildContext ctx) {
+  Future<void> _saveDraft(BuildContext ctx) async {
     if (_titleCtrl.text.trim().isEmpty || _descCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(ctx).showSnackBar(
         const SnackBar(
@@ -1318,50 +1652,107 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
       return;
     }
 
-    _ensureDraft();
-
-    final uploaded =
-        _mediaItems.where((m) => m.status == _UploadStatus.success).length;
-    final total = _mediaItems.length;
-
-    Navigator.pop(ctx);
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(
-        content: Text(
-          total == 0
-              ? 'Impact post saved as Draft'
-              : 'Draft saved — $uploaded/$total files uploaded',
-        ),
-        backgroundColor: _kPurple,
+    // If any uploads are still in progress, wait for them.
+    if (_isUploading) {
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        content: Text('Please wait for uploads to finish…'),
         behavior: SnackBarBehavior.floating,
-      ),
-    );
+      ));
+      return;
+    }
+
+    final media = _uploadedMediaList;
+    if (widget.existingPost != null) {
+      await widget.vm.updateImpactPost(
+        widget.existingPost!.id,
+        _buildPost(widget.existingPost!.id),
+        mediaList: media,
+      );
+    } else {
+      await widget.vm.addImpactPost(_buildPost(0), mediaList: media);
+    }
+
+    if (!ctx.mounted) return;
+    final failed = _mediaItems.where((m) => m.status == _UploadStatus.failed).length;
+    if (failed > 0) {
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+        content: Text(
+          'Draft saved — $failed file${failed == 1 ? '' : 's'} still failed. Tap Retry then save again.',
+        ),
+        backgroundColor: const Color(0xFFC62828),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+      ));
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(ctx);
+    Navigator.pop(ctx);
+    messenger.showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            widget.existingPost != null ? 'Impact post updated' : 'Impact post saved as Draft',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ]),
+      backgroundColor: _kPurple,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 3),
+    ));
   }
 
-  void _submitForApproval(BuildContext ctx) {
+  Future<void> _submitForApproval(BuildContext ctx) async {
     if (_titleCtrl.text.trim().isEmpty || _descCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in title and description'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        content: Text('Please fill in title and description'),
+        behavior: SnackBarBehavior.floating,
+      ));
       return;
     }
 
-    final postId = _ensureDraft();
-    widget.vm.submitImpactPostForApproval(postId);
-
-    Navigator.pop(ctx);
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Sent to Admin for approval. It will be published once approved.',
-        ),
-        backgroundColor: _kPurple,
+    if (_isUploading) {
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        content: Text('Please wait for uploads to finish…'),
         behavior: SnackBarBehavior.floating,
-      ),
-    );
+      ));
+      return;
+    }
+
+    final failed = _mediaItems.where((m) => m.status == _UploadStatus.failed).length;
+    if (failed > 0) {
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+        content: Text(
+          '$failed file${failed == 1 ? '' : 's'} failed — tap Retry before submitting.',
+        ),
+        backgroundColor: const Color(0xFFC62828),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+      ));
+      return;
+    }
+
+    final media = _uploadedMediaList;
+    int postId;
+    if (widget.existingPost != null) {
+      postId = widget.existingPost!.id;
+      await widget.vm.updateImpactPost(postId, _buildPost(postId), mediaList: media);
+    } else {
+      postId = await widget.vm.addImpactPost(_buildPost(0), mediaList: media);
+    }
+    if (!ctx.mounted) return;
+
+    widget.vm.submitImpactPostForApproval(postId);
+    final messenger = ScaffoldMessenger.of(ctx);
+    Navigator.pop(ctx);
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Sent to Admin for approval. It will be published once approved.'),
+      backgroundColor: _kPurple,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -1370,7 +1761,1504 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.90,
+      initialChildSize: 0.95,
+      maxChildSize: 0.97,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF8F9FA),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            const SizedBox(height: 10),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.muted.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Sheet header
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(18, 12, 8, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: _kPurple.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.auto_awesome_rounded,
+                        color: _kPurple, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.existingPost != null
+                              ? 'Edit Impact Post'
+                              : 'Create Impact Post',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                        Text(
+                          'Step ${_step + 1} of 4 · ${_kStepLabels[_step]}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    color: AppColors.muted,
+                  ),
+                ],
+              ),
+            ),
+            // Step progress indicator
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
+              child: Row(
+                children: List.generate(_kStepLabels.length * 2 - 1, (i) {
+                  if (i.isOdd) {
+                    final stepIdx = i ~/ 2;
+                    return Expanded(
+                      child: Container(
+                        height: 2,
+                        color: stepIdx < _step
+                            ? _kPurple
+                            : AppColors.muted.withValues(alpha: 0.2),
+                      ),
+                    );
+                  }
+                  final stepIdx = i ~/ 2;
+                  final done = stepIdx < _step;
+                  final active = stepIdx == _step;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: done || active ? _kPurple : Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: done || active
+                            ? _kPurple
+                            : AppColors.muted.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: done
+                          ? const Icon(Icons.check, size: 13, color: Colors.white)
+                          : Text(
+                              '${stepIdx + 1}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: active ? Colors.white : AppColors.muted,
+                              ),
+                            ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+            const Divider(height: 1),
+            // Step pages
+            Expanded(
+              child: PageView(
+                controller: _pageCtrl,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildStep1(scrollCtrl),
+                  _buildStep2(scrollCtrl),
+                  _buildStep3(scrollCtrl),
+                  _buildStep4(scrollCtrl),
+                ],
+              ),
+            ),
+            // Bottom navigation bar
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+              child: Row(
+                children: [
+                  if (_step > 0)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _back,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _kPurple,
+                          side: const BorderSide(color: _kPurple),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Back',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  if (_step > 0) const SizedBox(width: 12),
+                  if (_step < 3)
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _next,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _kPurple,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Continue',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    )
+                  else ...[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _saveDraft(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _kPurple,
+                          side: const BorderSide(color: _kPurple),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Save Draft',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => _submitForApproval(context),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _kPurple,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Submit',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Step 1: Basic Info ──────────────────────────────────────────────────────
+
+  Widget _buildStep1(ScrollController ctrl) {
+    return ListView(
+      controller: ctrl,
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+      children: [
+        _StepSectionTitle(
+          icon: Icons.category_outlined,
+          title: 'Post Category',
+          subtitle: 'Choose the type of impact story',
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: EMImpactPostType.values.map((t) {
+            final selected = _type == t;
+            return GestureDetector(
+              onTap: () => setState(() => _type = t),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? t.color.withValues(alpha: 0.12)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: selected
+                        ? t.color
+                        : AppColors.muted.withValues(alpha: 0.25),
+                    width: selected ? 1.5 : 1,
+                  ),
+                  boxShadow: [
+                    if (!selected)
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(t.icon,
+                        size: 14,
+                        color: selected ? t.color : AppColors.muted),
+                    const SizedBox(width: 6),
+                    Text(
+                      t.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight:
+                            selected ? FontWeight.w800 : FontWeight.w500,
+                        color: selected ? t.color : AppColors.ink,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 24),
+        _StepSectionTitle(
+          icon: Icons.title_rounded,
+          title: 'Post Title *',
+          subtitle: 'A compelling headline for the story',
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _titleCtrl,
+          onChanged: (_) => setState(() {}),
+          decoration:
+              _inputDecoration('e.g. 50 Students Receive Career Counselling'),
+          style:
+              const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+          maxLines: 2,
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        const SizedBox(height: 24),
+        _StepSectionTitle(
+          icon: Icons.event_rounded,
+          title: 'Linked Event',
+          subtitle: 'Link an event to auto-fill metrics',
+        ),
+        const SizedBox(height: 10),
+        ListenableBuilder(
+          listenable: widget.vm,
+          builder: (context, _) {
+            final events = widget.vm.events;
+            if (events.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: AppColors.muted.withValues(alpha: 0.2)),
+                ),
+                child: const Text(
+                  'No events available to link.',
+                  style: TextStyle(color: AppColors.muted, fontSize: 13),
+                ),
+              );
+            }
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppColors.muted.withValues(alpha: 0.25)),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<NGOEvent?>(
+                  value: _selectedEvent,
+                  isExpanded: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  borderRadius: BorderRadius.circular(12),
+                  hint: const Text('Select event (optional)',
+                      style: TextStyle(
+                          color: AppColors.muted, fontSize: 13)),
+                  items: [
+                    const DropdownMenuItem<NGOEvent?>(
+                      value: null,
+                      child: Text('None',
+                          style: TextStyle(color: AppColors.muted)),
+                    ),
+                    ...events.map((e) => DropdownMenuItem<NGOEvent?>(
+                          value: e,
+                          child: Text(e.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              )),
+                        )),
+                  ],
+                  onChanged: (v) {
+                    setState(() {
+                      _selectedEvent = v;
+                      if (v != null) {
+                        _summaryCtrl.text =
+                            'We reached ${v.maxVolunteers} volunteers at ${v.location}.';
+                      }
+                    });
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+        if (_selectedEvent != null) ...[
+          const SizedBox(height: 12),
+          _AutoFillBanner(event: _selectedEvent!),
+        ],
+      ],
+    );
+  }
+
+  // ── Step 2: Media Upload ────────────────────────────────────────────────────
+
+  Widget _buildStep2(ScrollController ctrl) {
+    final images = _mediaItems.where((m) => m.isImage).toList();
+    final others = _mediaItems.where((m) => !m.isImage).toList();
+    final uploadedCount =
+        _mediaItems.where((m) => m.status == _UploadStatus.success).length;
+    final totalCount = _mediaItems.length;
+    final progress =
+        totalCount == 0 ? 0.0 : uploadedCount / totalCount;
+
+    return ListView(
+      controller: ctrl,
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+      children: [
+        _StepSectionTitle(
+          icon: Icons.photo_library_rounded,
+          title: 'Upload Photos & Videos',
+          subtitle:
+              'First image becomes the cover. Up to $_kMaxImages photos.',
+        ),
+        const SizedBox(height: 14),
+        // Upload zone
+        GestureDetector(
+          onTap: _pickMedia,
+          child: Container(
+            height: 130,
+            decoration: BoxDecoration(
+              color: _kPurple.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _kPurple.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: _kPurple.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.add_photo_alternate_rounded,
+                    color: _kPurple,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Tap to add photos or videos',
+                  style: TextStyle(
+                    color: _kPurple,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'JPG, PNG, WEBP (max 5 MB) · MP4, MOV (max 50 MB)',
+                  style: TextStyle(
+                    color: AppColors.muted.withValues(alpha: 0.7),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Overall upload progress
+        if (_isUploading ||
+            (totalCount > 0 && uploadedCount < totalCount)) ...[
+          const SizedBox(height: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.upload_rounded,
+                      size: 14, color: _kPurple),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Uploaded $uploadedCount of $totalCount',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _kPurple,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  color: _kPurple,
+                  backgroundColor: _kPurple.withValues(alpha: 0.1),
+                  minHeight: 6,
+                ),
+              ),
+            ],
+          ),
+        ],
+        // Image grid
+        if (images.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Text(
+            'Photos (${images.length})',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 10),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: images.length,
+            gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 1,
+            ),
+            itemBuilder: (_, i) {
+              final item = images[i];
+              final globalIdx = _mediaItems.indexOf(item);
+              return _ImageThumb(
+                item: item,
+                onSetCover: () => _setCover(item.localId),
+                onRemove: () => _removeMedia(item.localId),
+                onMoveUp: globalIdx > 0 ? () => _moveUp(globalIdx) : null,
+                onMoveDown: globalIdx < _mediaItems.length - 1
+                    ? () => _moveDown(globalIdx)
+                    : null,
+                onRetry: item.status == _UploadStatus.failed
+                    ? () {
+                        setState(
+                            () => item.status = _UploadStatus.pending);
+                        _uploadSingleItem(item);
+                      }
+                    : null,
+              );
+            },
+          ),
+        ],
+        // Non-image files list
+        if (others.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Text(
+            'Videos & Documents (${others.length})',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...others.map((item) => _FileListTile(
+                item: item,
+                onRemove: () => _removeMedia(item.localId),
+                onRetry: item.status == _UploadStatus.failed
+                    ? () {
+                        setState(
+                            () => item.status = _UploadStatus.pending);
+                        _uploadSingleItem(item);
+                      }
+                    : null,
+              )),
+        ],
+        if (_mediaItems.isEmpty) ...[
+          const SizedBox(height: 10),
+          Center(
+            child: Text(
+              'No media yet — photos make posts 3× more engaging.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.muted.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Step 3: Impact Story ────────────────────────────────────────────────────
+
+  Widget _buildStep3(ScrollController ctrl) {
+    return ListView(
+      controller: ctrl,
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+      children: [
+        _StepSectionTitle(
+          icon: Icons.auto_stories_rounded,
+          title: 'Impact Description *',
+          subtitle: 'Tell the story of what happened',
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _descCtrl,
+          decoration: _inputDecoration(
+            'Describe the event, who was helped, and what was achieved…',
+            maxLines: 6,
+          ),
+          maxLines: 6,
+          textCapitalization: TextCapitalization.sentences,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 24),
+        _StepSectionTitle(
+          icon: Icons.bar_chart_rounded,
+          title: 'Impact Summary',
+          subtitle: 'One-line headline metric statement',
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _summaryCtrl,
+          decoration: _inputDecoration(
+              'e.g. We reached 200 students in 3 hours'),
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        const SizedBox(height: 24),
+        _StepSectionTitle(
+          icon: Icons.favorite_outline_rounded,
+          title: 'Appreciation Message',
+          subtitle: 'Thank volunteers, sponsors, or the school',
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _appreciationCtrl,
+          decoration: _inputDecoration(
+            'e.g. Thank you to all our volunteers who made this possible.',
+            maxLines: 3,
+          ),
+          maxLines: 3,
+          textCapitalization: TextCapitalization.sentences,
+        ),
+      ],
+    );
+  }
+
+  // ── Step 4: Review & Submit ─────────────────────────────────────────────────
+
+  Widget _buildStep4(ScrollController ctrl) {
+    final images = _mediaItems
+        .where((m) => m.isImage && m.remoteUrl != null)
+        .toList();
+
+    return ListView(
+      controller: ctrl,
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+      children: [
+        _StepSectionTitle(
+          icon: Icons.preview_rounded,
+          title: 'Review Your Post',
+          subtitle: 'This is how it will look on the Wall of Impact',
+        ),
+        const SizedBox(height: 16),
+        // Preview card
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.07),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: _kPurple.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.asset(
+                          'assests/ngo_logo.jpeg',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.volunteer_activism_rounded,
+                            color: _kPurple,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Punjabi Welfare Trust',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12)),
+                          Text(
+                            'Just now',
+                            style: const TextStyle(
+                                fontSize: 10, color: AppColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _type.color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: _type.color.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        _type.label,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: _type.color,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                child: Text(
+                  _titleCtrl.text.isNotEmpty
+                      ? _titleCtrl.text
+                      : '(No title)',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+              // Cover image preview
+              if (images.isNotEmpty)
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: images.first.bytes != null
+                      ? Image.memory(images.first.bytes!,
+                          fit: BoxFit.cover)
+                      : images.first.remoteUrl != null
+                          ? Image.network(
+                              ApiClient.resolveUrl(
+                                  images.first.remoteUrl!),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => Container(
+                                color: const Color(0xFFF0F0F0),
+                                child: const Center(
+                                  child: Icon(Icons.image_rounded,
+                                      size: 40,
+                                      color: AppColors.muted),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: const Color(0xFFF0F0F0),
+                              child: const Center(
+                                child: Icon(Icons.image_rounded,
+                                    size: 40, color: AppColors.muted),
+                              ),
+                            ),
+                )
+              else
+                Container(
+                  height: 100,
+                  color: const Color(0xFFF0F0F0),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_photo_alternate_rounded,
+                            size: 30,
+                            color: AppColors.muted.withValues(alpha: 0.5)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'No photos uploaded',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.muted.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                child: Text(
+                  _descCtrl.text.isNotEmpty
+                      ? _descCtrl.text
+                      : '(No description)',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 12,
+                    height: 1.5,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (_summaryCtrl.text.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: _kPurple.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.bar_chart_rounded,
+                            size: 14, color: _kPurple),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            _summaryCtrl.text,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _kPurple,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              if (_appreciationCtrl.text.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E7D32).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFF2E7D32)
+                            .withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.format_quote_rounded,
+                            size: 14, color: Color(0xFF2E7D32)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            _appreciationCtrl.text,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFF2E7D32),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              const Divider(height: 1),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: null,
+                      icon: const Icon(Icons.favorite_border_rounded,
+                          size: 16),
+                      label: const Text('Appreciate'),
+                      style: TextButton.styleFrom(
+                          foregroundColor: AppColors.muted),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: null,
+                      icon: const Icon(Icons.share_rounded, size: 16),
+                      label: const Text('Share'),
+                      style: TextButton.styleFrom(
+                          foregroundColor: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _ReviewChecklist(
+          hasTitle: _titleCtrl.text.trim().isNotEmpty,
+          hasMedia:
+              _mediaItems.any((m) => m.status == _UploadStatus.success),
+          hasDesc: _descCtrl.text.trim().isNotEmpty,
+          uploading: _isUploading,
+        ),
+      ],
+    );
+  }
+}
+
+// ── Helper: input decoration ──────────────────────────────────────────────────
+
+InputDecoration _inputDecoration(String hint, {int maxLines = 1}) =>
+    InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: AppColors.muted, fontSize: 13),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide:
+            BorderSide(color: AppColors.muted.withValues(alpha: 0.25)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide:
+            BorderSide(color: AppColors.muted.withValues(alpha: 0.25)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: _kPurple, width: 1.5),
+      ),
+    );
+
+// ── Step section title ────────────────────────────────────────────────────────
+
+class _StepSectionTitle extends StatelessWidget {
+  const _StepSectionTitle({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: _kPurple.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(icon, color: _kPurple, size: 17),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  )),
+              Text(subtitle,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w500,
+                  )),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Auto-fill banner when event is linked ─────────────────────────────────────
+
+class _AutoFillBanner extends StatelessWidget {
+  const _AutoFillBanner({required this.event});
+  final NGOEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2E7D32).withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border:
+            Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.auto_fix_high_rounded,
+                  size: 14, color: Color(0xFF2E7D32)),
+              SizedBox(width: 6),
+              Text(
+                'Auto-filled from event',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF2E7D32),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _AutoChip(Icons.people_rounded,
+                  '${event.maxVolunteers} volunteers'),
+              _AutoChip(Icons.location_on_rounded, event.location),
+              if (event.certificateEligible)
+                _AutoChip(Icons.workspace_premium_rounded,
+                    'Certificate eligible'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AutoChip extends StatelessWidget {
+  const _AutoChip(this.icon, this.label);
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: const Color(0xFF2E7D32).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: const Color(0xFF2E7D32)),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF2E7D32),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Image thumbnail grid item ─────────────────────────────────────────────────
+
+class _ImageThumb extends StatelessWidget {
+  const _ImageThumb({
+    required this.item,
+    required this.onSetCover,
+    required this.onRemove,
+    this.onMoveUp,
+    this.onMoveDown,
+    this.onRetry,
+  });
+  final _ImpactMedia item;
+  final VoidCallback onSetCover;
+  final VoidCallback onRemove;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: item.bytes != null
+              ? Image.memory(item.bytes!, fit: BoxFit.cover)
+              : item.remoteUrl != null
+                  ? Image.network(
+                      ApiClient.resolveUrl(item.remoteUrl!),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        color: const Color(0xFFF0F0F0),
+                        child: const Icon(Icons.broken_image_rounded,
+                            color: AppColors.muted),
+                      ),
+                    )
+                  : Container(
+                      color: const Color(0xFFF0F0F0),
+                      child: const Icon(Icons.image_rounded,
+                          color: AppColors.muted),
+                    ),
+        ),
+        if (item.status == _UploadStatus.uploading)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.45),
+              child: const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (item.status == _UploadStatus.failed)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: const Color(0xFFC62828).withValues(alpha: 0.7),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_rounded,
+                      color: Colors.white, size: 22),
+                  const SizedBox(height: 4),
+                  if (onRetry != null)
+                    GestureDetector(
+                      onTap: onRetry,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text('Retry',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        if (item.isCover)
+          Positioned(
+            top: 5,
+            left: 5,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: _kPurple,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text('COVER',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5)),
+            ),
+          ),
+        if (item.status == _UploadStatus.success && !item.isCover)
+          Positioned(
+            top: 5,
+            right: 5,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: const BoxDecoration(
+                color: Color(0xFF2E7D32),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check, size: 11, color: Colors.white),
+            ),
+          ),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(12)),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.6),
+                ],
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                if (!item.isCover)
+                  _ThumbBtn(
+                    icon: Icons.star_rounded,
+                    tooltip: 'Set as cover',
+                    onTap: onSetCover,
+                  ),
+                if (onMoveUp != null)
+                  _ThumbBtn(
+                    icon: Icons.arrow_back_rounded,
+                    tooltip: 'Move left',
+                    onTap: onMoveUp!,
+                  ),
+                if (onMoveDown != null)
+                  _ThumbBtn(
+                    icon: Icons.arrow_forward_rounded,
+                    tooltip: 'Move right',
+                    onTap: onMoveDown!,
+                  ),
+                _ThumbBtn(
+                  icon: Icons.close_rounded,
+                  tooltip: 'Remove',
+                  onTap: onRemove,
+                  destructive: true,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ThumbBtn extends StatelessWidget {
+  const _ThumbBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.destructive = false,
+  });
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Tooltip(
+        message: tooltip,
+        child: Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: destructive
+                ? const Color(0xFFC62828).withValues(alpha: 0.8)
+                : Colors.white.withValues(alpha: 0.25),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 13, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+// ── File list tile for videos / docs ─────────────────────────────────────────
+
+class _FileListTile extends StatelessWidget {
+  const _FileListTile(
+      {required this.item, required this.onRemove, this.onRetry});
+  final _ImpactMedia item;
+  final VoidCallback onRemove;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final isOk = item.status == _UploadStatus.success;
+    final isFail = item.status == _UploadStatus.failed;
+    final isUp = item.status == _UploadStatus.uploading;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isFail
+              ? const Color(0xFFC62828).withValues(alpha: 0.4)
+              : isOk
+                  ? const Color(0xFF2E7D32).withValues(alpha: 0.3)
+                  : AppColors.muted.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            item.isVideo
+                ? Icons.videocam_rounded
+                : Icons.picture_as_pdf_rounded,
+            color: isOk
+                ? const Color(0xFF2E7D32)
+                : isFail
+                    ? const Color(0xFFC62828)
+                    : AppColors.muted,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.fileName,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  isOk
+                      ? 'Uploaded · ${item.sizeLabel}'
+                      : isFail
+                          ? item.errorMessage ?? 'Upload failed'
+                          : isUp
+                              ? 'Uploading…'
+                              : item.sizeLabel,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isOk
+                        ? const Color(0xFF2E7D32)
+                        : isFail
+                            ? const Color(0xFFC62828)
+                            : AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isUp)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: _kPurple),
+            )
+          else if (isFail && onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFC62828),
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(40, 30),
+              ),
+              child: const Text('Retry',
+                  style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w700)),
+            ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: const Icon(Icons.close_rounded,
+                size: 18, color: AppColors.muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Review checklist ──────────────────────────────────────────────────────────
+
+class _ReviewChecklist extends StatelessWidget {
+  const _ReviewChecklist({
+    required this.hasTitle,
+    required this.hasMedia,
+    required this.hasDesc,
+    required this.uploading,
+  });
+  final bool hasTitle;
+  final bool hasMedia;
+  final bool hasDesc;
+  final bool uploading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border:
+            Border.all(color: AppColors.muted.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Ready to submit?',
+            style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: AppColors.ink),
+          ),
+          const SizedBox(height: 10),
+          _CheckRow(label: 'Title added', done: hasTitle),
+          const SizedBox(height: 6),
+          _CheckRow(label: 'Description written', done: hasDesc),
+          const SizedBox(height: 6),
+          _CheckRow(label: 'Photos uploaded', done: hasMedia),
+          const SizedBox(height: 6),
+          _CheckRow(
+            label: uploading
+                ? 'Waiting for uploads to finish…'
+                : 'All uploads complete',
+            done: !uploading && hasMedia,
+            warning: uploading,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckRow extends StatelessWidget {
+  const _CheckRow(
+      {required this.label, required this.done, this.warning = false});
+  final String label;
+  final bool done;
+  final bool warning;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = warning
+        ? AppColors.accent
+        : done
+            ? const Color(0xFF2E7D32)
+            : AppColors.muted;
+    return Row(
+      children: [
+        Icon(
+          warning
+              ? Icons.hourglass_top_rounded
+              : done
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight:
+                done || warning ? FontWeight.w700 : FontWeight.w400,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Post detail bottom sheet ──────────────────────────────────────────────────
+
+class _PostDetailSheet extends StatelessWidget {
+  const _PostDetailSheet({required this.post});
+  final EMImpactPost post;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.85,
       maxChildSize: 0.97,
       builder: (_, ctrl) => Container(
         decoration: const BoxDecoration(
@@ -1379,55 +3267,24 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
         ),
         child: Column(
           children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.muted.withValues(alpha: 0.30),
-                borderRadius: BorderRadius.circular(4),
+            const SizedBox(height: 10),
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.muted.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              padding: const EdgeInsets.fromLTRB(18, 14, 8, 10),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _kPurple.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.auto_awesome_rounded,
-                      color: _kPurple,
-                      size: 18,
-                    ),
+                  Expanded(
+                    child: Text(post.title,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.ink)),
                   ),
-                  const SizedBox(width: 10),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Create Impact Post',
-                        style: TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        'Punjabi Welfare Trust · Wall of Impact',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close_rounded),
@@ -1440,1266 +3297,114 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
             Expanded(
               child: ListView(
                 controller: ctrl,
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 32),
                 children: [
-                  // ── Post category ──────────────────────────────────────
-                  _SheetLabel(
-                    icon: Icons.category_outlined,
-                    text: 'Post Category *',
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: EMImpactPostType.values
-                        .map(
-                          (t) => ChoiceChip(
-                            label: Text(
-                              t.label,
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            selected: _type == t,
-                            onSelected: (_) => setState(() => _type = t),
-                            avatar: Icon(t.icon, size: 12),
-                            selectedColor: _kPurple.withValues(alpha: 0.15),
-                            labelStyle: TextStyle(
-                              color: _type == t ? _kPurple : AppColors.muted,
-                              fontWeight: FontWeight.w600,
-                            ),
+                  if (post.photoUrls.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Image.network(
+                          ApiClient.resolveUrl(post.photoUrls.first),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            color: const Color(0xFFF0F0F0),
+                            child: const Center(child: Icon(Icons.image_rounded, size: 40, color: AppColors.muted)),
                           ),
-                        )
-                        .toList(),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Post title ─────────────────────────────────────────
-                  _SheetLabel(icon: Icons.title_rounded, text: 'Post Title *'),
-                  const SizedBox(height: 8),
-                  _sheetField(
-                    _titleCtrl,
-                    'e.g. Stationery Drive — 150 Kits Distributed',
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Linked event ───────────────────────────────────────
-                  _SheetLabel(
-                    icon: Icons.event_rounded,
-                    text: 'Linked Event',
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<NGOEvent>(
-                    initialValue: _selectedEvent,
-                    hint: const Text(
-                      'Select event (optional)',
-                      style: TextStyle(fontSize: 13),
+                        ),
+                      ),
                     ),
-                    items: widget.vm.events
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e,
-                            child: Text(
-                              e.title,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setState(() => _selectedEvent = v),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFFF8F9FA),
-                      border: OutlineInputBorder(
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: post.type.color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: post.type.color.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(post.type.icon, size: 13, color: post.type.color),
+                        const SizedBox(width: 6),
+                        Text(post.type.label,
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: post.type.color)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(post.description,
+                      style: const TextStyle(color: AppColors.muted, fontSize: 14, height: 1.6)),
+                  if (post.appreciationMessage.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E7D32).withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.2)),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ── Upload Photos & Videos ─────────────────────────────
-                  _MediaUploadSectionHeader(
-                    imageCount: _imageCount,
-                    videoCount: _videoCount,
-                  ),
-                  const SizedBox(height: 10),
-                  _UploadZone(
-                    onTap: _pickMedia,
-                    compact: _mediaItems.isNotEmpty,
-                  ),
-
-                  // Media preview cards
-                  if (_mediaItems.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    ...List.generate(_mediaItems.length, (i) {
-                      final item = _mediaItems[i];
-                      return _MediaPreviewCard(
-                        key: ValueKey(item.localId),
-                        item: item,
-                        index: i,
-                        total: _mediaItems.length,
-                        onRemove: () => _removeMedia(item.localId),
-                        onCover: () => _setCover(item.localId),
-                        onMoveUp: () => _moveUp(i),
-                        onMoveDown: () => _moveDown(i),
-                        onRetry: () {
-                          final pid = _draftPostId;
-                          if (pid != null) _uploadSingleItem(item, pid);
-                        },
-                      );
-                    }),
-                    const SizedBox(height: 4),
-
-                    // Overall upload progress
-                    if (_isUploading)
-                      _OverallProgressBar(mediaItems: _mediaItems),
-
-                    // Upload Media button
-                    if (_hasPendingUploads || _isUploading) ...[
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed:
-                              _isUploading ? null : _onUploadMediaPressed,
-                          icon: _isUploading
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: _kPurple,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.cloud_upload_rounded,
-                                  size: 16,
-                                ),
-                          label: Text(
-                            _isUploading ? 'Uploading…' : 'Upload Media',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: _kPurple,
-                            side: const BorderSide(color: _kPurple),
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ] else if (_allUploaded) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2E7D32).withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFF2E7D32)
-                                .withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.check_circle_rounded,
-                              color: Color(0xFF2E7D32),
-                              size: 16,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'All ${_mediaItems.length} file${_mediaItems.length == 1 ? '' : 's'} uploaded successfully',
-                              style: const TextStyle(
-                                color: Color(0xFF2E7D32),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                  const SizedBox(height: 20),
-
-                  // ── Description ────────────────────────────────────────
-                  _SheetLabel(
-                    icon: Icons.description_outlined,
-                    text: 'Description *',
-                  ),
-                  const SizedBox(height: 8),
-                  _sheetField(
-                    _descCtrl,
-                    'Describe what happened and the impact made…',
-                    maxLines: 4,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Appreciation message ───────────────────────────────
-                  _SheetLabel(
-                    icon: Icons.format_quote_rounded,
-                    text: 'Appreciation Message *',
-                  ),
-                  const SizedBox(height: 8),
-                  _sheetField(
-                    _appreciationCtrl,
-                    'e.g. Punjabi Welfare Trust salutes the dedication…',
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // ── Action buttons ─────────────────────────────────────
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _saveDraft(context),
-                      icon: const Icon(Icons.save_rounded, size: 16),
-                      label: const Text(
-                        'Save as Draft',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.ink,
-                        side: BorderSide(
-                          color: AppColors.muted.withValues(alpha: 0.4),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () => _submitForApproval(context),
-                      icon: const Icon(Icons.send_rounded, size: 16),
-                      label: const Text(
-                        'Submit for Admin Approval',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _kPurple,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _sheetField(
-    TextEditingController ctrl,
-    String hint, {
-    int maxLines = 1,
-  }) =>
-      TextFormField(
-        controller: ctrl,
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(
-            color: AppColors.muted.withValues(alpha: 0.6),
-            fontSize: 13,
-          ),
-          filled: true,
-          fillColor: const Color(0xFFF8F9FA),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:
-                BorderSide(color: AppColors.muted.withValues(alpha: 0.4)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide:
-                BorderSide(color: AppColors.muted.withValues(alpha: 0.3)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: _kPurple, width: 1.5),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        ),
-      );
-}
-
-// ─── Media section header ─────────────────────────────────────────────────────
-
-class _MediaUploadSectionHeader extends StatelessWidget {
-  const _MediaUploadSectionHeader({
-    required this.imageCount,
-    required this.videoCount,
-  });
-
-  final int imageCount;
-  final int videoCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: _kPurple.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: const Icon(
-                Icons.photo_library_rounded,
-                color: _kPurple,
-                size: 15,
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'Upload Photos & Videos',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.muted.withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: AppColors.muted.withValues(alpha: 0.18)),
-              ),
-              child: Text(
-                '$imageCount/$_kMaxImages photos · $videoCount/$_kMaxVideos videos',
-                style: const TextStyle(
-                  color: AppColors.muted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 5),
-        const Padding(
-          padding: EdgeInsets.only(left: 30),
-          child: Text(
-            'Add verified activity photos, certificate images, appreciation\n'
-            'letters, or short videos to support this impact post.',
-            style: TextStyle(
-              color: AppColors.muted,
-              fontSize: 11.5,
-              height: 1.5,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Upload zone ──────────────────────────────────────────────────────────────
-
-class _UploadZone extends StatelessWidget {
-  const _UploadZone({
-    required this.onTap,
-    this.compact = false,
-  });
-
-  final VoidCallback onTap;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    if (compact) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 16),
-          decoration: BoxDecoration(
-            color: _kPurple.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _kPurple.withValues(alpha: 0.22),
-            ),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add_photo_alternate_rounded,
-                  color: _kPurple, size: 17),
-              SizedBox(width: 8),
-              Text(
-                'Add more photos or videos',
-                style: TextStyle(
-                  color: _kPurple,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 18),
-        decoration: BoxDecoration(
-          color: _kPurple.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _kPurple.withValues(alpha: 0.28),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: _kPurple.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.cloud_upload_rounded,
-                color: _kPurple,
-                size: 36,
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Tap to upload photos or videos',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 5),
-            const Text(
-              'JPG, PNG, WEBP, MP4, MOV, WEBM, PDF supported',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 14,
-              runSpacing: 10,
-              children: [
-                _UploadHint(
-                  icon: Icons.photo_library_rounded,
-                  label: 'Gallery',
-                ),
-                _UploadHint(
-                  icon: Icons.folder_open_rounded,
-                  label: 'Browse Files',
-                ),
-                if (!kIsWeb)
-                  _UploadHint(
-                    icon: Icons.camera_alt_rounded,
-                    label: 'Camera',
-                  ),
-                if (kIsWeb)
-                  _UploadHint(
-                    icon: Icons.drag_indicator_rounded,
-                    label: 'Drag & Drop',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 14,
-              runSpacing: 6,
-              children: const [
-                _LimitChip(label: '10 photos max · 5 MB each'),
-                _LimitChip(label: '2 videos max · 50 MB each'),
-                _LimitChip(label: 'PDF proof supported · 10 MB'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _UploadHint extends StatelessWidget {
-  const _UploadHint({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: _kPurple.withValues(alpha: 0.10),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Icon(icon, color: _kPurple, size: 20),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.muted,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LimitChip extends StatelessWidget {
-  const _LimitChip({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 4,
-          height: 4,
-          decoration: const BoxDecoration(
-            color: AppColors.muted,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.muted,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Overall upload progress bar ──────────────────────────────────────────────
-
-class _OverallProgressBar extends StatelessWidget {
-  const _OverallProgressBar({required this.mediaItems});
-  final List<_ImpactMedia> mediaItems;
-
-  @override
-  Widget build(BuildContext context) {
-    final total = mediaItems.length;
-    final done =
-        mediaItems.where((m) => m.status == _UploadStatus.success).length;
-    final avgPct = total == 0
-        ? 0.0
-        : mediaItems.fold(0.0, (sum, m) => sum + m.progress) / total;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Uploading — $done/$total done',
-                style: const TextStyle(
-                  color: _kPurple,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${(avgPct * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(
-                  color: _kPurple,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: avgPct,
-              backgroundColor: _kPurple.withValues(alpha: 0.12),
-              valueColor: const AlwaysStoppedAnimation(_kPurple),
-              minHeight: 5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Media preview card ───────────────────────────────────────────────────────
-
-class _MediaPreviewCard extends StatefulWidget {
-  const _MediaPreviewCard({
-    required this.item,
-    required this.index,
-    required this.total,
-    required this.onRemove,
-    required this.onCover,
-    required this.onMoveUp,
-    required this.onMoveDown,
-    required this.onRetry,
-    super.key,
-  });
-
-  final _ImpactMedia item;
-  final int index;
-  final int total;
-  final VoidCallback onRemove;
-  final VoidCallback onCover;
-  final VoidCallback onMoveUp;
-  final VoidCallback onMoveDown;
-  final VoidCallback onRetry;
-
-  @override
-  State<_MediaPreviewCard> createState() => _MediaPreviewCardState();
-}
-
-class _MediaPreviewCardState extends State<_MediaPreviewCard> {
-  late final TextEditingController _captionCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _captionCtrl = TextEditingController(text: widget.item.caption);
-  }
-
-  @override
-  void dispose() {
-    _captionCtrl.dispose();
-    super.dispose();
-  }
-
-  Color get _borderColor {
-    return switch (widget.item.status) {
-      _UploadStatus.pending => AppColors.muted.withValues(alpha: 0.22),
-      _UploadStatus.uploading => _kPurple.withValues(alpha: 0.45),
-      _UploadStatus.success =>
-        const Color(0xFF2E7D32).withValues(alpha: 0.4),
-      _UploadStatus.failed =>
-        AppColors.softRed.withValues(alpha: 0.45),
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final item = widget.item;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _borderColor, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header row ────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _MediaThumbnail(item: item),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (item.isCover) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: _kPurple,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'COVER',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          Expanded(
-                            child: Text(
-                              item.fileName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12.5,
-                                color: AppColors.ink,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          _MediaTypeBadge(item.mediaType),
+                          const Icon(Icons.format_quote_rounded, size: 18, color: Color(0xFF2E7D32)),
                           const SizedBox(width: 8),
-                          Text(
-                            item.sizeLabel,
-                            style: const TextStyle(
-                                color: AppColors.muted, fontSize: 11),
+                          Expanded(
+                            child: Text(post.appreciationMessage,
+                              style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic,
+                                  color: Color(0xFF2E7D32), fontWeight: FontWeight.w600)),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      _ItemUploadStatus(
-                        item: item,
-                        onRetry: widget.onRetry,
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  color: AppColors.muted,
-                  onPressed: widget.onRemove,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Per-item progress bar ──────────────────────────────────────
-          if (item.status == _UploadStatus.uploading) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${(item.progress * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(
-                      color: _kPurple,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: item.progress,
-                      backgroundColor: _kPurple.withValues(alpha: 0.12),
-                      valueColor:
-                          const AlwaysStoppedAnimation(_kPurple),
-                      minHeight: 4,
+                  ],
+                  if (post.studentsHelped != null || post.hoursServed != null || post.donationRaised != null) ...[
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8, runSpacing: 8,
+                      children: [
+                        if (post.studentsHelped != null)
+                          _DetailChip(icon: Icons.people_rounded, label: "${post.studentsHelped} helped", color: _kPurple),
+                        if (post.hoursServed != null)
+                          _DetailChip(icon: Icons.schedule_rounded, label: "${post.hoursServed!.toStringAsFixed(0)} hours", color: AppColors.primary),
+                        if (post.donationRaised != null)
+                          _DetailChip(icon: Icons.currency_rupee_rounded, label: "\u20b9${post.donationRaised!.toStringAsFixed(0)} raised", color: const Color(0xFF2E7D32)),
+                      ],
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
           ],
-
-          Divider(
-            height: 1,
-            color: AppColors.muted.withValues(alpha: 0.09),
-          ),
-
-          // ── Caption + action row ───────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _captionCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Add caption (optional)',
-                    hintStyle: TextStyle(
-                      color: AppColors.muted.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 9),
-                    filled: true,
-                    fillColor: const Color(0xFFF8F9FA),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: _kPurple, width: 1.2),
-                    ),
-                  ),
-                  style: const TextStyle(fontSize: 12.5),
-                  onChanged: (v) => widget.item.caption = v,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    // Order controls
-                    if (widget.total > 1) ...[
-                      _OrderBtn(
-                        icon: Icons.arrow_upward_rounded,
-                        enabled: widget.index > 0,
-                        onTap: widget.onMoveUp,
-                        tooltip: 'Move up',
-                      ),
-                      const SizedBox(width: 4),
-                      _OrderBtn(
-                        icon: Icons.arrow_downward_rounded,
-                        enabled: widget.index < widget.total - 1,
-                        onTap: widget.onMoveDown,
-                        tooltip: 'Move down',
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    // Cover toggle (images only)
-                    if (item.isImage)
-                      Expanded(
-                        child: item.isCover
-                            ? Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 7),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: _kPurple.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: _kPurple.withValues(alpha: 0.25),
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.star_rounded,
-                                        size: 13, color: _kPurple),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      'Cover Image',
-                                      style: TextStyle(
-                                        color: _kPurple,
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : OutlinedButton.icon(
-                                onPressed: widget.onCover,
-                                icon: const Icon(
-                                    Icons.star_outline_rounded,
-                                    size: 13),
-                                label: const Text(
-                                  'Set as Cover',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: _kPurple,
-                                  side:
-                                      const BorderSide(color: _kPurple),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 6),
-                                ),
-                              ),
-                      )
-                    else
-                      const Spacer(),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed: widget.onRemove,
-                      icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          size: 14),
-                      label: const Text(
-                        'Remove',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.softRed,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 6),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-// ─── Media thumbnail ──────────────────────────────────────────────────────────
-
-class _MediaThumbnail extends StatelessWidget {
-  const _MediaThumbnail({required this.item});
-  final _ImpactMedia item;
-
-  static const double _sz = 60;
-  static final _radius = BorderRadius.circular(10);
+class _DetailChip extends StatelessWidget {
+  const _DetailChip({required this.icon, required this.label, required this.color});
+  final IconData icon;
+  final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    if (item.isDocument) {
-      return _shell(
-        const Color(0xFFFFF3E0),
-        const Icon(Icons.picture_as_pdf_rounded,
-            color: Color(0xFFBF360C), size: 28),
-      );
-    }
-
-    if (item.isVideo) {
-      return Stack(
-        children: [
-          _shell(
-            AppColors.ink.withValues(alpha: 0.08),
-            const Icon(Icons.videocam_rounded,
-                color: AppColors.muted, size: 28),
-          ),
-          Positioned.fill(
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(5),
-                decoration: const BoxDecoration(
-                  color: Colors.black54,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.play_arrow_rounded,
-                    color: Colors.white, size: 14),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    // Image preview
-    if (kIsWeb && item.bytes != null) {
-      return ClipRRect(
-        borderRadius: _radius,
-        child: Image.memory(
-          item.bytes!,
-          width: _sz,
-          height: _sz,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _shell(
-            _kPurple.withValues(alpha: 0.08),
-            const Icon(Icons.broken_image_rounded,
-                color: _kPurple, size: 24),
-          ),
-        ),
-      );
-    }
-
-    if (!kIsWeb && item.filePath.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: _radius,
-        child: Image.file(
-          File(item.filePath),
-          width: _sz,
-          height: _sz,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _shell(
-            _kPurple.withValues(alpha: 0.08),
-            const Icon(Icons.broken_image_rounded,
-                color: _kPurple, size: 24),
-          ),
-        ),
-      );
-    }
-
-    return _shell(
-      _kPurple.withValues(alpha: 0.08),
-      const Icon(Icons.image_rounded, color: _kPurple, size: 28),
-    );
-  }
-
-  Widget _shell(Color bg, Widget child) => Container(
-        width: _sz,
-        height: _sz,
-        decoration: BoxDecoration(color: bg, borderRadius: _radius),
-        child: Center(child: child),
-      );
-}
-
-// ─── Item upload status ───────────────────────────────────────────────────────
-
-class _ItemUploadStatus extends StatelessWidget {
-  const _ItemUploadStatus({required this.item, required this.onRetry});
-  final _ImpactMedia item;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return switch (item.status) {
-      _UploadStatus.pending => const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.schedule_rounded, size: 12, color: AppColors.muted),
-            SizedBox(width: 4),
-            Text(
-              'Ready to upload',
-              style: TextStyle(color: AppColors.muted, fontSize: 11.5),
-            ),
-          ],
-        ),
-      _UploadStatus.uploading => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: _kPurple,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Uploading — ${(item.progress * 100).toStringAsFixed(0)}%',
-              style: const TextStyle(
-                color: _kPurple,
-                fontWeight: FontWeight.w700,
-                fontSize: 11.5,
-              ),
-            ),
-          ],
-        ),
-      _UploadStatus.success => const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle_rounded,
-                size: 13, color: Color(0xFF2E7D32)),
-            SizedBox(width: 5),
-            Text(
-              'Uploaded successfully',
-              style: TextStyle(
-                color: Color(0xFF2E7D32),
-                fontWeight: FontWeight.w700,
-                fontSize: 11.5,
-              ),
-            ),
-          ],
-        ),
-      _UploadStatus.failed => GestureDetector(
-          onTap: onRetry,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_rounded,
-                  size: 13, color: AppColors.softRed),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  item.errorMessage ?? 'Upload failed',
-                  style: const TextStyle(
-                      color: AppColors.softRed, fontSize: 11),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _kPurple.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  'Retry',
-                  style: TextStyle(
-                    color: _kPurple,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-    };
-  }
-}
-
-// ─── Media type badge ─────────────────────────────────────────────────────────
-
-class _MediaTypeBadge extends StatelessWidget {
-  const _MediaTypeBadge(this.type);
-  final _MediaType type;
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (type) {
-      _MediaType.image => ('IMAGE', const Color(0xFF1565C0)),
-      _MediaType.video => ('VIDEO', const Color(0xFFBF360C)),
-      _MediaType.document => ('PDF', const Color(0xFF2E7D32)),
-    };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.3,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+        ],
       ),
-    );
-  }
-}
-
-// ─── Order button ─────────────────────────────────────────────────────────────
-
-class _OrderBtn extends StatelessWidget {
-  const _OrderBtn({
-    required this.icon,
-    required this.enabled,
-    required this.onTap,
-    required this.tooltip,
-  });
-
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback onTap;
-  final String tooltip;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(7),
-        onTap: enabled ? onTap : null,
-        child: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: enabled
-                ? AppColors.ink.withValues(alpha: 0.07)
-                : AppColors.muted.withValues(alpha: 0.04),
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: Icon(
-            icon,
-            size: 14,
-            color: enabled
-                ? AppColors.ink
-                : AppColors.muted.withValues(alpha: 0.3),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Sheet section label ──────────────────────────────────────────────────────
-
-class _SheetLabel extends StatelessWidget {
-  const _SheetLabel({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: _kPurple),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: const TextStyle(
-            color: AppColors.ink,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
     );
   }
 }

@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -133,6 +134,7 @@ def register_user(
         location=data.location,
         phone=data.phone,
         requested_role=requested_role if pending_access else data.requested_role,
+        interests=json.dumps(data.interests) if data.interests else None,
     )
     db.add(user)
     db.flush()

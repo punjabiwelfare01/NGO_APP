@@ -5,6 +5,7 @@ import '../../core/colors.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../profile/profile_view.dart';
+import 'em_activities_view.dart';
 import 'em_home_view.dart';
 import 'em_events_view.dart';
 import 'em_students_view.dart';
@@ -38,7 +39,7 @@ class _EventManagerShellState extends State<EventManagerShell> {
 
   void _navigateToStudents(int subTabIndex) {
     _studentsTabNotifier.value = subTabIndex;
-    setState(() => _selectedIndex = 2);
+    setState(() => _selectedIndex = 3); // Students is now index 3
   }
 
   @override
@@ -48,6 +49,7 @@ class _EventManagerShellState extends State<EventManagerShell> {
     final pages = [
       EMHomeView(vm: _vm, managerName: name, onNavigateToStudents: _navigateToStudents),
       EMEventsView(vm: _vm),
+      EMActivitiesView(vm: _vm),
       EMStudentsView(vm: _vm, tabNotifier: _studentsTabNotifier),
       EMImpactView(vm: _vm),
       const ProfileView(),
@@ -89,7 +91,17 @@ class _EventManagerShellState extends State<EventManagerShell> {
               NavigationDestination(
                 icon: Badge(
                   isLabelVisible:
-                      _vm.appliedStudents.isNotEmpty && _selectedIndex != 2,
+                      _vm.stats.pendingSubmissions > 0 && _selectedIndex != 2,
+                  label: Text('${_vm.stats.pendingSubmissions}'),
+                  child: const Icon(Icons.assignment_outlined),
+                ),
+                selectedIcon: const Icon(Icons.assignment_rounded),
+                label: 'Activities',
+              ),
+              NavigationDestination(
+                icon: Badge(
+                  isLabelVisible:
+                      _vm.appliedStudents.isNotEmpty && _selectedIndex != 3,
                   label: Text('${_vm.appliedStudents.length}'),
                   child: const Icon(Icons.people_outline_rounded),
                 ),
@@ -99,7 +111,7 @@ class _EventManagerShellState extends State<EventManagerShell> {
               NavigationDestination(
                 icon: Badge(
                   isLabelVisible:
-                      _vm.draftPosts.isNotEmpty && _selectedIndex != 3,
+                      _vm.draftPosts.isNotEmpty && _selectedIndex != 4,
                   label: Text('${_vm.draftPosts.length}'),
                   child: const Icon(Icons.emoji_events_outlined),
                 ),

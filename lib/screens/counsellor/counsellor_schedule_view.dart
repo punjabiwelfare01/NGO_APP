@@ -16,16 +16,83 @@ class CounsellorScheduleView extends StatefulWidget {
 
 class _CounsellorScheduleViewState extends State<CounsellorScheduleView> {
   late DateTime _selectedDate;
-  final List<DateTime> _weekDays = [];
+  int _weekOffset = 0; // weeks offset from the current week's Monday
+
+  // The Monday of the base week (this week).
+  DateTime get _thisWeekMonday {
+    final today = DateTime.now();
+    final d = DateTime(today.year, today.month, today.day);
+    return d.subtract(Duration(days: d.weekday - 1));
+  }
+
+  List<DateTime> get _weekDays {
+    final monday = _thisWeekMonday.add(Duration(days: 7 * _weekOffset));
+    return List.generate(7, (i) => monday.add(Duration(days: i)));
+  }
+
+  String get _weekLabel {
+    final days = _weekDays;
+    final first = days.first;
+    final last = days.last;
+    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (first.month == last.month) {
+      return '${first.day}–${last.day} ${months[first.month]} ${first.year}';
+    }
+    return '${first.day} ${months[first.month]} – ${last.day} ${months[last.month]} ${last.year}';
+  }
+
+  void _goWeek(int delta) {
+    setState(() {
+      _weekOffset += delta;
+      // Keep selected date within the new week if possible; otherwise pick first day.
+      final days = _weekDays;
+      final stillInWeek = days.any(
+        (d) => d.year == _selectedDate.year && d.month == _selectedDate.month && d.day == _selectedDate.day,
+      );
+      if (!stillInWeek) _selectedDate = days.first;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     final today = DateTime.now();
     _selectedDate = DateTime(today.year, today.month, today.day);
-    for (var i = 0; i < 7; i++) {
-      _weekDays.add(_selectedDate.add(Duration(days: i)));
-    }
+    // Refresh so newly accepted requests appear without restarting the app.
+    widget.vm.refreshRequests().then((_) {
+      if (mounted) _jumpToNearestSession();
+    });
+  }
+
+  /// If today has no sessions, move the calendar to the nearest upcoming one.
+  void _jumpToNearestSession() {
+    final today = _selectedDate;
+    final hasToday = widget.vm.calendarRequests.any(
+          (r) =>
+              r.effectiveDate.year == today.year &&
+              r.effectiveDate.month == today.month &&
+              r.effectiveDate.day == today.day,
+        ) ||
+        widget.vm.slotsForDate(today).isNotEmpty;
+    if (hasToday) return;
+
+    final upcoming = widget.vm.calendarRequests
+        .where((r) => !r.effectiveDate.isBefore(today))
+        .toList()
+      ..sort((a, b) => a.effectiveDate.compareTo(b.effectiveDate));
+    if (upcoming.isEmpty) return;
+
+    final nearest = DateTime(
+      upcoming.first.effectiveDate.year,
+      upcoming.first.effectiveDate.month,
+      upcoming.first.effectiveDate.day,
+    );
+    final weeksOffset =
+        nearest.difference(_thisWeekMonday).inDays ~/ 7;
+    setState(() {
+      _selectedDate = nearest;
+      _weekOffset = weeksOffset;
+    });
   }
 
   @override
@@ -35,13 +102,35 @@ class _CounsellorScheduleViewState extends State<CounsellorScheduleView> {
       builder: (context, _) {
         final vm = widget.vm;
         final daySlots = vm.slotsForDate(_selectedDate);
-        final dayMeetings = vm.upcomingMeetings
+        // All non-declined/cancelled requests on the selected date
+        final allDayRequests = vm.calendarRequests
             .where(
               (r) =>
                   r.effectiveDate.year == _selectedDate.year &&
                   r.effectiveDate.month == _selectedDate.month &&
                   r.effectiveDate.day == _selectedDate.day,
             )
+            .toList();
+
+        // Split into pending/awaiting and confirmed/scheduled
+        final pendingRequests = allDayRequests
+            .where(
+              (r) =>
+                  r.status == SchoolRequestStatus.newRequest ||
+                  r.status == SchoolRequestStatus.accepted ||
+                  r.status == SchoolRequestStatus.pendingConfirmation ||
+                  r.status == SchoolRequestStatus.rescheduled,
+            )
+            .toList();
+        final confirmedRequests = allDayRequests
+            .where(
+              (r) =>
+                  r.status == SchoolRequestStatus.confirmed ||
+                  r.status == SchoolRequestStatus.scheduled,
+            )
+            .toList();
+        final completedRequests = allDayRequests
+            .where((r) => r.status == SchoolRequestStatus.completed)
             .toList();
 
         return Scaffold(
@@ -72,6 +161,38 @@ class _CounsellorScheduleViewState extends State<CounsellorScheduleView> {
           ),
           body: Column(
             children: [
+              // Week navigation header
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left_rounded, size: 22),
+                      color: const Color(0xFF1565C0),
+                      tooltip: 'Previous week',
+                      onPressed: () => _goWeek(-1),
+                    ),
+                    Expanded(
+                      child: Text(
+                        _weekLabel,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF0A1F44),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right_rounded, size: 22),
+                      color: const Color(0xFF1565C0),
+                      tooltip: 'Next week',
+                      onPressed: () => _goWeek(1),
+                    ),
+                  ],
+                ),
+              ),
               _WeekStrip(
                 days: _weekDays,
                 selected: _selectedDate,
@@ -82,18 +203,52 @@ class _CounsellorScheduleViewState extends State<CounsellorScheduleView> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // Confirmed meetings for this day
-                    if (dayMeetings.isNotEmpty) ...[
+                    // Pending / awaiting confirmation sessions
+                    if (pendingRequests.isNotEmpty) ...[
                       _SectionLabel(
-                        'Confirmed Meetings',
+                        'Pending Sessions',
+                        Icons.pending_actions_rounded,
+                        const Color(0xFFF57F17),
+                      ),
+                      const SizedBox(height: 8),
+                      ...pendingRequests.map(
+                        (r) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _MeetingCard(request: r, vm: vm),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Confirmed / scheduled sessions
+                    if (confirmedRequests.isNotEmpty) ...[
+                      _SectionLabel(
+                        'Confirmed Sessions',
                         Icons.event_available_rounded,
                         const Color(0xFF1565C0),
                       ),
                       const SizedBox(height: 8),
-                      ...dayMeetings.map(
-                        (m) => Padding(
+                      ...confirmedRequests.map(
+                        (r) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: _MeetingCard(request: m, vm: vm),
+                          child: _MeetingCard(request: r, vm: vm),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Completed sessions
+                    if (completedRequests.isNotEmpty) ...[
+                      _SectionLabel(
+                        'Completed',
+                        Icons.task_alt_rounded,
+                        const Color(0xFF2E7D32),
+                      ),
+                      const SizedBox(height: 8),
+                      ...completedRequests.map(
+                        (r) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _MeetingCard(request: r, vm: vm),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -113,7 +268,7 @@ class _CounsellorScheduleViewState extends State<CounsellorScheduleView> {
                           child: _SlotCard(slot: s, vm: vm),
                         ),
                       ),
-                    ] else if (dayMeetings.isEmpty) ...[
+                    ] else if (allDayRequests.isEmpty) ...[
                       const SizedBox(height: 60),
                       Center(
                         child: Column(
@@ -365,9 +520,11 @@ class _WeekStrip extends StatelessWidget {
         children: days.map((d) {
           final isSelected = d.day == selected.day && d.month == selected.month;
           final hasSlot = vm.slotsForDate(d).isNotEmpty;
-          final hasMeeting = vm.upcomingMeetings.any(
+          final hasMeeting = vm.calendarRequests.any(
             (r) =>
-                r.effectiveDate.day == d.day && r.effectiveDate.month == d.month,
+                r.effectiveDate.year == d.year &&
+                r.effectiveDate.month == d.month &&
+                r.effectiveDate.day == d.day,
           );
           const dayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
@@ -559,6 +716,8 @@ class _MeetingCard extends StatelessWidget {
     final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
     final m = t.minute.toString().padLeft(2, '0');
     final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    final status = request.status;
+    final accentColor = status.color;
 
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -570,62 +729,202 @@ class _MeetingCard extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFE3F2FD),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFF1565C0).withValues(alpha: 0.3),
-          ),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1565C0).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.videocam_rounded,
-                color: Color(0xFF1565C0),
-                size: 18,
-              ),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.ink.withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ],
+          border: Border.all(color: accentColor.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header: school name + status chip ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.07),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(15)),
+              ),
+              child: Row(
                 children: [
-                  Text(
-                    request.schoolName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: Color(0xFF0D47A1),
+                  Icon(Icons.school_rounded, size: 16, color: accentColor),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      request.schoolName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: AppColors.ink,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    '$h:$m $period  ·  ${request.expectedStudents} students',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF1565C0),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border:
+                          Border.all(color: accentColor.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(status.icon, size: 11, color: accentColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          status.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: accentColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF1565C0),
-              size: 20,
+
+            // ── Body: topic, chips, coordinator ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    request.topic,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 4,
+                    children: [
+                      _InfoChip(
+                        icon: Icons.schedule_rounded,
+                        label: '$h:$m $period',
+                        color: accentColor,
+                      ),
+                      _InfoChip(
+                        icon: Icons.people_rounded,
+                        label: '${request.expectedStudents} students',
+                        color: accentColor,
+                      ),
+                      _InfoChip(
+                        icon: request.mode == SessionMode.online
+                            ? Icons.videocam_rounded
+                            : Icons.location_on_rounded,
+                        label: request.mode == SessionMode.online
+                            ? 'Online'
+                            : 'Offline',
+                        color: accentColor,
+                      ),
+                      if (request.classGroup.isNotEmpty)
+                        _InfoChip(
+                          icon: Icons.school_rounded,
+                          label: request.classGroup,
+                          color: accentColor,
+                        ),
+                    ],
+                  ),
+                  if (request.coordinatorName.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline_rounded,
+                          size: 13,
+                          color: AppColors.muted,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            request.coordinatorName,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 18,
+                          color: AppColors.muted,
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 12, color: color),
+      const SizedBox(width: 3),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    ],
+  );
 }
 
 // ─── Repeating Section ────────────────────────────────────────────────────────

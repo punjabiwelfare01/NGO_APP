@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/colors.dart';
 import '../../models/counsellor_models.dart';
+import '../../repositories/api_client.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../../widgets/app_card.dart';
 import 'counsellor_profile_screen.dart';
@@ -1164,7 +1165,7 @@ class _Avatar extends StatelessWidget {
     if (counsellor.photoUrl != null) {
       return CircleAvatar(
         radius: radius,
-        backgroundImage: NetworkImage(counsellor.photoUrl!),
+        backgroundImage: NetworkImage(ApiClient.resolveUrl(counsellor.photoUrl!)),
       );
     }
     return CircleAvatar(

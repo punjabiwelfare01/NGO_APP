@@ -21,6 +21,15 @@ router = APIRouter(prefix="/volunteer", tags=["Volunteer"])
 
 # ── Activities (public listing, admin creates) ────────────────────────────────
 
+@router.get("/activities/my", response_model=List[VolunteerActivityOut])
+def my_activities(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.event_manager, UserRole.admin, UserRole.super_admin)),
+):
+    """Activities created by the logged-in Event Manager."""
+    return volunteer_crud.get_activities_by_creator(db, current_user.id)
+
+
 @router.get("/activities", response_model=List[VolunteerActivityOut])
 def list_activities(
     category: Optional[ActivityCategory] = None,
@@ -56,12 +65,15 @@ def update_activity(
     activity_id: int,
     data: VolunteerActivityUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role(UserRole.admin, UserRole.super_admin)),
+    current_user: User = Depends(require_role(UserRole.event_manager, UserRole.admin, UserRole.super_admin)),
 ):
-    obj = volunteer_crud.update_activity(db, activity_id, data)
+    obj = volunteer_crud.get_activity(db, activity_id)
     if not obj:
         raise HTTPException(404, "Activity not found")
-    return obj
+    if current_user.role == UserRole.event_manager and obj.created_by != current_user.id:
+        raise HTTPException(403, "You can only edit activities you created")
+    updated = volunteer_crud.update_activity(db, activity_id, data)
+    return updated
 
 
 # ── Assignments ───────────────────────────────────────────────────────────────

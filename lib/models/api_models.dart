@@ -22,6 +22,7 @@ class AppUser {
     this.requestedRole,
     this.verificationNote,
     this.photoUrl,
+    this.interests = const [],
   });
 
   final int id;
@@ -43,6 +44,7 @@ class AppUser {
   final String? requestedRole;
   final String? verificationNote;
   final String? photoUrl;
+  final List<String> interests;
 
   AppUser copyWith({
     String? name,
@@ -61,6 +63,7 @@ class AppUser {
     String? requestedRole,
     String? verificationNote,
     String? photoUrl,
+    List<String>? interests,
   }) => AppUser(
     id: id,
     name: name ?? this.name,
@@ -81,6 +84,7 @@ class AppUser {
     requestedRole: requestedRole ?? this.requestedRole,
     verificationNote: verificationNote ?? this.verificationNote,
     photoUrl: photoUrl ?? this.photoUrl,
+    interests: interests ?? this.interests,
   );
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -107,6 +111,10 @@ class AppUser {
     requestedRole: j['requested_role'] as String?,
     verificationNote: j['verification_note'] as String?,
     photoUrl: j['photo_url'] as String?,
+    interests: (j['interests'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        const [],
   );
 }
 
@@ -233,6 +241,9 @@ class AdminStats {
     required this.blockedUsers,
     required this.rejectedUsers,
     this.roleCounts = const {},
+    this.publishedCourses = 0,
+    this.draftCourses = 0,
+    this.totalCourseLearners = 0,
   });
 
   final int totalUsers;
@@ -241,6 +252,9 @@ class AdminStats {
   final int blockedUsers;
   final int rejectedUsers;
   final Map<String, int> roleCounts;
+  final int publishedCourses;
+  final int draftCourses;
+  final int totalCourseLearners;
 
   factory AdminStats.fromJson(Map<String, dynamic> j) => AdminStats(
     totalUsers: (j['total_users'] as int?) ?? 0,
@@ -253,6 +267,9 @@ class AdminStats {
           (k, v) => MapEntry(k, (v as int?) ?? 0),
         ) ??
         const {},
+    publishedCourses: (j['published_courses'] as int?) ?? 0,
+    draftCourses: (j['draft_courses'] as int?) ?? 0,
+    totalCourseLearners: (j['total_course_learners'] as int?) ?? 0,
   );
 
   factory AdminStats.empty() => const AdminStats(

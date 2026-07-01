@@ -138,6 +138,8 @@ class CounsellorProfile {
     required this.studentsGuided,
     required this.recognitionProof,
     required this.verificationStatus,
+    this.phone,
+    this.location,
     this.photoUrl,
     this.isRetired = false,
     this.showRetiredStatus = false,
@@ -153,6 +155,8 @@ class CounsellorProfile {
   final String ngoVerificationId;
   final String name;
   final String? photoUrl;
+  final String? phone;
+  final String? location;
   final CounsellorCategory category;
   final String designation;
   final String serviceBackground;
@@ -183,6 +187,8 @@ class CounsellorProfile {
 
   CounsellorProfile copyWith({
     String? photoUrl,
+    String? phone,
+    String? location,
     CounsellorCategory? category,
     String? designation,
     String? serviceBackground,
@@ -204,6 +210,8 @@ class CounsellorProfile {
     ngoVerificationId: ngoVerificationId,
     name: name,
     photoUrl: photoUrl ?? this.photoUrl,
+    phone: phone ?? this.phone,
+    location: location ?? this.location,
     category: category ?? this.category,
     designation: designation ?? this.designation,
     serviceBackground: serviceBackground ?? this.serviceBackground,
@@ -237,28 +245,45 @@ class CounsellorProfile {
     final expertise = json['expertise'] as String? ?? '';
     final isActive = json['is_active'] as bool? ?? true;
     final sessionCount = json['session_count'] as int? ?? 0;
+
+    // Extended fields returned from the enriched mentor endpoint
+    final qualification = json['qualification'] as String? ?? '';
+    final yoe = (json['years_of_experience'] as num?)?.toInt() ?? 0;
+    final counsellingMode = json['counselling_mode'] as String? ?? 'both';
+    final languagesKnown = json['languages_known'] as String? ?? '';
+    final weeklyAvailability =
+        (json['weekly_availability'] as List<dynamic>?)
+            ?.cast<String>() ??
+        const [];
+
+    List<String> splitCsv(String raw) => raw
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    final qualList = qualification.isNotEmpty ? splitCsv(qualification) : const <String>[];
+    final expertiseList = expertise.isNotEmpty ? splitCsv(expertise) : const <String>[];
+    final langList = languagesKnown.isNotEmpty ? splitCsv(languagesKnown) : const <String>[];
+
     return CounsellorProfile(
       id: userId,
       ngoVerificationId: 'PWT-COUN-$userId',
       name: json['display_name'] as String? ?? 'PWT Counsellor',
       photoUrl: json['profile_image_url'] as String?,
+      phone: json['phone'] as String?,
+      location: json['location'] as String?,
       category: category,
       designation: category.label,
       serviceBackground: bio,
       shortBio: bio,
-      qualifications: const [],
-      expertiseAreas: expertise.isNotEmpty
-          ? expertise
-              .split(',')
-              .map((e) => e.trim())
-              .where((e) => e.isNotEmpty)
-              .toList()
-          : const [],
+      qualifications: qualList,
+      expertiseAreas: expertiseList,
       sessionTopics: const [],
-      languages: const ['English', 'Punjabi'],
-      sessionMode: SessionMode.both,
-      availableSlots: const [],
-      yearsOfExperience: 0,
+      languages: langList.isNotEmpty ? langList : const ['English'],
+      sessionMode: SessionMode.fromString(counsellingMode),
+      availableSlots: weeklyAvailability,
+      yearsOfExperience: yoe,
       schoolSessionsCompleted: sessionCount,
       studentsGuided: sessionCount * 30,
       recognitionProof: const [],
@@ -270,7 +295,7 @@ class CounsellorProfile {
       isFeatured: false,
       isRetired: false,
       showRetiredStatus: false,
-      availableThisWeek: false,
+      availableThisWeek: weeklyAvailability.isNotEmpty,
     );
   }
 

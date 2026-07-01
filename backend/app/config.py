@@ -10,8 +10,8 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 class Settings:
     app_name: str = "CareSkill API"
     version: str = "1.0.0"
-    debug: bool = True
-    database_url: str = "sqlite:///./careskill.db"
+    debug: bool = os.getenv("DEBUG", "false").lower() == "true"
+    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./careskill.db")
 
     # XP thresholds per level  (level = xp // xp_per_level + 1)
     xp_per_level: int = 500
@@ -47,6 +47,18 @@ class Settings:
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "")
     smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+
+    # Hostinger SFTP — remote storage for images/videos/documents.
+    # Postgres only ever stores metadata + the public URL, never file bytes.
+    hostinger_host: str = os.getenv("HOSTINGER_HOST", "")
+    hostinger_port: int = int(os.getenv("HOSTINGER_PORT", "22"))
+    hostinger_username: str = os.getenv("HOSTINGER_USERNAME", "")
+    hostinger_password: str = os.getenv("HOSTINGER_PASSWORD", "")
+    # Absolute remote path uploads are written under, e.g.
+    # /home/u123456/domains/example.com/public_html/uploads
+    hostinger_upload_root: str = os.getenv("HOSTINGER_UPLOAD_ROOT", "/public_html/uploads")
+    # Public base URL that maps to hostinger_upload_root, e.g. https://cdn.example.com/uploads
+    hostinger_public_base_url: str = os.getenv("HOSTINGER_PUBLIC_BASE_URL", "")
 
 
 settings = Settings()

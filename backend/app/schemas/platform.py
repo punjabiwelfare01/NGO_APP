@@ -56,6 +56,7 @@ class ProfileReportOut(BaseModel):
 
 class NGOProfileData(BaseModel):
     name: str = "Punjabi Welfare Trust"
+    tagline: Optional[str] = "Empowering Communities Through Service"
     registration_number: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None

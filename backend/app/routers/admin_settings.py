@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..dependencies import require_role
+from ..dependencies import get_current_user, require_role
 from ..models.platform import Announcement, AppSetting, BankSetting, NGOProfileSetting, RolePermissionSetting, AdminAuditLog
 from ..models.user import User, UserRole
 from ..permissions import ROLE_PERMISSIONS
@@ -20,6 +20,13 @@ def _admin(user: User = Depends(require_role(UserRole.admin))) -> User:
 
 def _ip(request: Request) -> str | None:
     return request.client.host if request.client else None
+
+
+@router.get("/settings/ngo-profile/public", response_model=NGOProfileData)
+def get_ngo_profile_public(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Any authenticated user can fetch NGO branding for certificate display."""
+    item = db.query(NGOProfileSetting).first()
+    return item if item else NGOProfileData()
 
 
 @router.get("/settings/ngo-profile", response_model=NGOProfileData)

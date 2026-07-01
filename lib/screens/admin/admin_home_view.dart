@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app_state.dart';
 import '../../core/colors.dart';
 import '../../models/api_models.dart';
+import '../../models/counsellor_session_models.dart';
 import '../../models/certificate_models.dart';
 import '../../models/course.dart';
 import '../../models/donation_models.dart';
@@ -17,6 +18,7 @@ import '../event_manager/counsellor_requests_screen.dart';
 import '../events/admin/event_manager_screen.dart';
 import '../learn/admin/create_free_course_screen.dart';
 import 'admin_manage_view.dart';
+import 'admin_org_report_screen.dart';
 import 'counsellor_admin_screen.dart';
 import 'pending_approvals_screen.dart';
 import 'user_approval_detail_screen.dart';
@@ -48,6 +50,8 @@ class _AdminHomeViewState extends State<AdminHomeView> {
   }
 
   Future<void> _loadModuleData() async {
+    // Load school counsellor requests for admin in parallel (non-fatal).
+    CounsellorViewModel.shared.loadAllAdminRequests();
     try {
       final result = await Future.wait([
         DonationRepository.getAllDonations(),
@@ -75,7 +79,12 @@ class _AdminHomeViewState extends State<AdminHomeView> {
       final events = widget.eventVm;
       return RefreshIndicator(
         onRefresh: () async {
-          await Future.wait([admin.load(), events.load(), _loadModuleData()]);
+          await Future.wait([
+            admin.load(),
+            events.load(),
+            _loadModuleData(),
+            CounsellorViewModel.shared.loadAllAdminRequests(),
+          ]);
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
@@ -219,7 +228,9 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     final pendingCertificates = _certificates
         .where((c) => c.status == CertificateStatus.pending)
         .length;
-    final school = CounsellorViewModel.shared.pendingRequests.length;
+    final school = CounsellorViewModel.shared.allAdminRequests
+        .where((r) => r.status == SchoolRequestStatus.newRequest)
+        .length;
     return Container(
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
@@ -564,7 +575,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
   }
 
   Widget _schoolRequests() {
-    final requests = CounsellorViewModel.shared.requests.take(2).toList();
+    final requests = CounsellorViewModel.shared.allAdminRequests.take(2).toList();
     return _previewSection(
       'School Counselling Requests',
       Icons.school_rounded,
@@ -574,7 +585,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
                 .map(
                   (r) => _previewCard(
                     r.schoolName,
-                    '${r.topic} • ${r.studentCount} students',
+                    '${r.topic} • ${r.expectedStudents} students',
                     'Review Request',
                     () => _push(const CounsellorRequestsScreen()),
                     badge: r.status.label,
@@ -643,18 +654,14 @@ class _AdminHomeViewState extends State<AdminHomeView> {
   );
 
   Widget _courseReview() {
-    final published = _courses.where((c) => c.isPublished).length;
-    final drafts = _courses.where((c) => !c.isPublished).length;
+    final stats = widget.adminVm.stats;
     return _centerSummary(
       'Learning Course Review',
       Icons.menu_book_rounded,
       [
-        ('Published', '$published'),
-        ('Drafts', '$drafts'),
-        (
-          'Total Learners',
-          '${widget.adminVm.stats.roleCounts['student'] ?? 0}',
-        ),
+        ('Published', '${stats.publishedCourses}'),
+        ('Drafts', '${stats.draftCourses}'),
+        ('Total Learners', '${stats.totalCourseLearners}'),
       ],
       'Create Free Course',
       () => _push(const CreateFreeCourseScreen()),
@@ -677,27 +684,40 @@ class _AdminHomeViewState extends State<AdminHomeView> {
             _reportRow(
               'Monthly NGO Impact Report',
               '${events.events.length} events • ${events.publishedPosts.length} posts',
+              onTap: () => _openOrgReport(admin, events),
             ),
             const Divider(),
             _reportRow(
               'Volunteer Performance Report',
               '${admin.stats.activeUsers} active users',
+              onTap: () => _openOrgReport(admin, events),
             ),
             const Divider(),
             _reportRow(
               'School Partnership Report',
-              '${CounsellorViewModel.shared.requests.length} counselling requests',
+              '${CounsellorViewModel.shared.allAdminRequests.length} counselling requests',
+              onTap: () => _openOrgReport(admin, events),
             ),
             const Divider(),
             _reportRow(
               'Course Learning Report',
               '${_courses.length} free courses',
+              onTap: () => _openOrgReport(admin, events),
             ),
           ],
         ),
       ),
     ],
   );
+
+  void _openOrgReport(AdminViewModel admin, EventManagerViewModel em) {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdminOrgReportScreen(admin: admin, em: em),
+      ),
+    );
+  }
 
   Widget _recentActivity(AdminViewModel admin, EventManagerViewModel events) {
     final items = [
@@ -762,7 +782,9 @@ class _AdminHomeViewState extends State<AdminHomeView> {
       _donations.where((d) => d.status == DonationStatus.pending).length +
       _certificates.where((c) => c.status == CertificateStatus.pending).length +
       widget.eventVm.draftPosts.length +
-      CounsellorViewModel.shared.pendingRequests.length;
+      CounsellorViewModel.shared.allAdminRequests
+          .where((r) => r.status == SchoolRequestStatus.newRequest)
+          .length;
 
   Widget _alert(String text) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
@@ -999,7 +1021,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
       ],
     ),
   );
-  Widget _reportRow(String title, String subtitle) => Row(
+  Widget _reportRow(String title, String subtitle, {VoidCallback? onTap}) => Row(
     children: [
       const Icon(Icons.description_outlined, color: AppColors.primary),
       const SizedBox(width: 9),
@@ -1023,9 +1045,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
         ),
       ),
       TextButton(
-        onPressed: () => ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$title generated.'))),
+        onPressed: onTap,
         child: const Text('Generate'),
       ),
     ],

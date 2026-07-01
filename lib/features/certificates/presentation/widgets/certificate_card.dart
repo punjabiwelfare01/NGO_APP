@@ -203,7 +203,8 @@ class CertificateCard extends StatelessWidget {
     CertificateStatus.signed    => const Color(0xFF6A1B9A),
     CertificateStatus.rejected  => const Color(0xFFC62828),
     CertificateStatus.revoked   => const Color(0xFF616161),
-    CertificateStatus.draft     => AppColors.muted,
+    CertificateStatus.downloaded => const Color(0xFF00695C),
+    CertificateStatus.draft      => AppColors.muted,
   };
 
   String _formatDate(DateTime d) =>

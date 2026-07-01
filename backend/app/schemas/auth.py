@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -19,6 +19,7 @@ class RegisterRequest(BaseModel):
     location: Optional[str] = None
     phone: Optional[str] = None
     requested_role: Optional[str] = None
+    interests: Optional[List[str]] = None
 
 
 class LoginRequest(BaseModel):

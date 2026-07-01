@@ -1,7 +1,8 @@
+import json
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from ..models.user import UserRole
 
@@ -27,6 +28,7 @@ class UserUpdate(BaseModel):
     school_name: Optional[str] = None
     location: Optional[str] = None
     phone: Optional[str] = None
+    interests: Optional[List[str]] = None
 
 
 class UserRoleUpdate(BaseModel):
@@ -62,6 +64,17 @@ class UserResponse(BaseModel):
     verification_note: Optional[str] = None
     photo_url: Optional[str] = None
     created_at: datetime
+    interests: Optional[List[str]] = None
+
+    @field_validator("interests", mode="before")
+    @classmethod
+    def parse_interests(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                return []
+        return v
 
     model_config = {"from_attributes": True}
 

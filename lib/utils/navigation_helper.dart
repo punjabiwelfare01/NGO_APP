@@ -12,6 +12,10 @@ void openEvent(BuildContext context, EventModel event, {VoidCallback? onRefresh}
     EventType.talentHunt => '/talent-hunt/${event.id}',
     EventType.awarenessCampaign => '/awareness-campaign/${event.id}',
     EventType.cyberSecurity => '/cyber-security/${event.id}',
+    EventType.stationeryDrive ||
+    EventType.donationDrive ||
+    EventType.schoolPartnership ||
+    EventType.communityOutreach => '/event/${event.id}',
   };
   Navigator.of(context).pushNamed(routeName).then((_) {
     if (onRefresh != null) {

@@ -1,12 +1,31 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..models.counselling import CounsellingNotification, MentorProfile
+from ..models.user import User, UserRole
 from ..models.wellness import CounsellingAvailability, CounsellingSession
 from ..schemas.counselling import MentorProfileCreate, MentorProfileUpdate
 
 
+def _ensure_mentor_profiles(db: Session) -> None:
+    """Auto-create MentorProfile rows for any approved mentor User who lacks one."""
+    mentor_users = (
+        db.query(User)
+        .filter(User.role == UserRole.mentor, User.access_status == "approved")
+        .all()
+    )
+    changed = False
+    for u in mentor_users:
+        existing = db.query(MentorProfile).filter(MentorProfile.user_id == u.id).first()
+        if not existing:
+            db.add(MentorProfile(user_id=u.id, display_name=u.name, is_active=True))
+            changed = True
+    if changed:
+        db.commit()
+
+
 def list_mentors(db: Session, category: str | None = None, active_only: bool = True):
-    q = db.query(MentorProfile)
+    _ensure_mentor_profiles(db)
+    q = db.query(MentorProfile).options(joinedload(MentorProfile.user))
     if active_only:
         q = q.filter(MentorProfile.is_active == True)  # noqa: E712
     if category:
@@ -15,7 +34,12 @@ def list_mentors(db: Session, category: str | None = None, active_only: bool = T
 
 
 def get_mentor(db: Session, mentor_id: int):
-    return db.query(MentorProfile).filter(MentorProfile.id == mentor_id).first()
+    return (
+        db.query(MentorProfile)
+        .options(joinedload(MentorProfile.user))
+        .filter(MentorProfile.id == mentor_id)
+        .first()
+    )
 
 
 def get_mentor_by_user(db: Session, user_id: int):
@@ -73,6 +97,7 @@ def list_all_available_slots(db: Session, category: str | None = None):
 
 
 def get_analytics(db: Session) -> dict:
+    _ensure_mentor_profiles(db)
     total_mentors = db.query(MentorProfile).count()
     active_mentors = db.query(MentorProfile).filter(MentorProfile.is_active == True).count()  # noqa: E712
     total_bookings = db.query(CounsellingSession).count()

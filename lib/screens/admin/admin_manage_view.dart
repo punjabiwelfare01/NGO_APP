@@ -14,6 +14,8 @@ import '../events/event_pipeline_screen.dart';
 import '../helping_support/admin/emergency_contacts_admin_screen.dart';
 import '../home/admin/safety_awareness_manager_screen.dart';
 import '../learn/management/learning_management_view.dart';
+import '../../features/certificates/presentation/screens/admin_certificate_approval_screen.dart';
+import 'admin_activities_screen.dart';
 import 'counsellor_admin_screen.dart';
 import 'pending_approvals_screen.dart';
 import 'volunteer_admin_screen.dart';
@@ -30,6 +32,13 @@ class AdminManageView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tools = <_ManageTool>[
+      _ManageTool(
+        Icons.assignment_rounded,
+        'Activity Management',
+        'View, track and manage all activities across Event Managers',
+        const Color(0xFF0277BD),
+        const AdminActivitiesScreen(),
+      ),
       _ManageTool(
         Icons.event_rounded,
         'Events & Activities',
@@ -84,7 +93,7 @@ class AdminManageView extends StatelessWidget {
         'Certificates',
         'Generate, approve, issue and verify',
         const Color(0xFF6A1B9A),
-        const AdminFinanceCenter(initialTab: 1),
+        const AdminCertificateApprovalScreen(),
       ),
       _ManageTool(
         Icons.pending_actions_rounded,

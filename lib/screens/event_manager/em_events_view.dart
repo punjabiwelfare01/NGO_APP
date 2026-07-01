@@ -5,6 +5,8 @@ import '../../models/event_manager_models.dart';
 import '../../repositories/event_repository.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../widgets/app_card.dart';
+import '../events/official_event_report_screen.dart';
+import 'em_create_activity_screen.dart';
 
 class EMEventsView extends StatefulWidget {
   const EMEventsView({required this.vm, super.key});
@@ -380,11 +382,18 @@ class _EventCard extends StatelessWidget {
   Future<void> _generateReport(BuildContext context) async {
     final report = await vm.generateReport(event.id);
     if (!context.mounted) return;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _EventReportSheet(report: report),
+    final assignments =
+        vm.assignments.where((a) => a.event.id == event.id).toList();
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OfficialEventReportScreen(
+          event: event,
+          assignments: assignments,
+          report: report,
+          vm: vm,
+        ),
+      ),
     );
   }
 
@@ -559,6 +568,20 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
         widget.event.status == EventStatus.ongoing;
   }
 
+  Future<void> _openCreateActivity(BuildContext context) async {
+    final event = widget.event;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EMCreateActivityScreen(
+          vm: widget.vm,
+          eventId: event.id,
+          eventTitle: event.title,
+        ),
+      ),
+    );
+    widget.vm.load();
+  }
+
   Future<void> _togglePublish() async {
     setState(() => _loading = true);
     try {
@@ -730,20 +753,68 @@ class _EventDetailSheetState extends State<_EventDetailSheet> {
                       ),
                     ),
                   ],
-                  if (event.activities.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Activities',
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Text(
+                        'Activities',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    for (final a in event.activities)
-                      _ActivityRow(activity: a),
-                  ],
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () => _openCreateActivity(context),
+                        icon: const Icon(Icons.add_rounded, size: 14),
+                        label: const Text(
+                          'Add Activity',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  if (event.activities.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 16, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F9FA),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.muted.withValues(alpha: 0.20),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.assignment_outlined,
+                              color: AppColors.muted.withValues(alpha: 0.5),
+                              size: 18),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'No activities yet — tap Add Activity to create one.',
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    for (final a in event.activities) _ActivityRow(activity: a),
                   const SizedBox(height: 20),
                   Row(
                     children: [
@@ -896,324 +967,6 @@ class _ActivityRow extends StatelessWidget {
             ),
         ],
       ),
-    );
-  }
-}
-
-// ─── Event Report Sheet ───────────────────────────────────────────────────────
-
-class _EventReportSheet extends StatelessWidget {
-  const _EventReportSheet({required this.report});
-  final EventReport report;
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.88,
-      maxChildSize: 0.95,
-      builder: (_, ctrl) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.muted.withValues(alpha: 0.30),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              child: Row(
-                children: [
-                  const Icon(Icons.summarize_rounded,
-                      color: Color(0xFF1565C0), size: 22),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Event Report',
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                    color: AppColors.muted,
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView(
-                controller: ctrl,
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
-                children: [
-                  // NGO Header
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.verified_rounded,
-                                color: Colors.white70, size: 14),
-                            const SizedBox(width: 5),
-                            const Text(
-                              'PUNJABI WELFARE TRUST',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          report.eventName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            height: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${report.eventDate.day}/${report.eventDate.month}/${report.eventDate.year} · ${report.location}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Impact numbers
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ReportStat(
-                          icon: Icons.people_rounded,
-                          value: '${report.volunteersParticipated}',
-                          label: 'Volunteers',
-                          color: const Color(0xFF1565C0),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _ReportStat(
-                          icon: Icons.favorite_rounded,
-                          value: '${report.peopleReached}',
-                          label: 'People Reached',
-                          color: const Color(0xFFC62828),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _ReportStat(
-                          icon: Icons.payments_rounded,
-                          value: report.totalDonationCollected > 0
-                              ? '₹${(report.totalDonationCollected / 1000).toStringAsFixed(1)}K'
-                              : '₹0',
-                          label: 'Donations',
-                          color: const Color(0xFF2E7D32),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  if (report.partnerSchool != null)
-                    _DetailRow(
-                        icon: Icons.school_rounded,
-                        label: 'Partner School',
-                        value: report.partnerSchool!),
-                  if (report.guestOfficerName != null)
-                    _DetailRow(
-                        icon: Icons.military_tech_rounded,
-                        label: 'Guest / Officer',
-                        value: report.guestOfficerName!),
-                  const SizedBox(height: 14),
-                  _Section(title: 'Summary', body: report.summary),
-                  const SizedBox(height: 14),
-                  _Section(title: 'Outcomes', body: report.outcomes),
-                  if (report.studentContributors.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Student Contributors',
-                      style: TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: report.studentContributors
-                          .map(
-                            (name) => Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1565C0)
-                                    .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                name,
-                                style: const TextStyle(
-                                  color: Color(0xFF1565C0),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  Text(
-                    'Generated on ${report.generatedAt.day}/${report.generatedAt.month}/${report.generatedAt.year}',
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Report shared'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.share_rounded, size: 16),
-                      label: const Text('Share Report'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF1565C0),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ReportStat extends StatelessWidget {
-  const _ReportStat(
-      {required this.icon,
-      required this.value,
-      required this.label,
-      required this.color});
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.body});
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: AppColors.ink,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          body,
-          style: const TextStyle(
-            color: AppColors.muted,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            height: 1.55,
-          ),
-        ),
-      ],
     );
   }
 }

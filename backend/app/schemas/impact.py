@@ -45,6 +45,7 @@ class ImpactPostUpdate(BaseModel):
     people_reached: Optional[int] = Field(default=None, ge=0)
     donation_collected: Optional[float] = Field(default=None, ge=0)
     hours_served: Optional[float] = Field(default=None, ge=0)
+    media: Optional[list[ImpactMediaCreate]] = None
 
 
 class ImpactPostOut(BaseModel):

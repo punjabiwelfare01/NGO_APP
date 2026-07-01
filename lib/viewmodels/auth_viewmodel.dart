@@ -119,6 +119,7 @@ class AuthViewModel extends ChangeNotifier {
     String? parentEmail,
     String? phone,
     String? requestedRole,
+    List<String>? interests,
   }) async {
     _state = ViewState.loading;
     _errorMessage = null;
@@ -135,6 +136,7 @@ class AuthViewModel extends ChangeNotifier {
         parentEmail: parentEmail,
         phone: phone,
         requestedRole: requestedRole,
+        interests: interests,
       );
       final role = UserRole.fromString(response.role);
       final status = response.accessStatus != null

@@ -22,7 +22,6 @@ from .models import (  # noqa: F401 — registers all ORM models before create_a
     Quiz, Question, QuizAttempt, DailyChallenge,
     SafetyAwarenessQuestion, UserSafetyAnswer,
     EmergencyContact,
-    ChatMessage,
     AdminNotification,
     StudentReminder,
     CreatorPost,
@@ -35,6 +34,7 @@ from .models import (  # noqa: F401 — registers all ORM models before create_a
     Announcement, PasswordResetToken, ReminderJob, EventReportFile,
     SchoolCounsellorRequest, CounsellorSessionReport,
 )
+from .models import SchoolPartnerProfile  # noqa: F401 — registers school_partner_profiles table
 from .database import Base
 from .dev_migrations import ensure_sqlite_schema
 from .middleware.rbac_logging import RBACLoggingMiddleware
@@ -44,7 +44,6 @@ from .routers import events
 from .routers import quiz
 from .routers import safety
 from .routers import emergency
-from .routers import chat
 from .routers import creator
 from .routers import upload
 from .routers import calendar
@@ -58,6 +57,7 @@ from .routers import reports
 from .routers import event_manager
 from .routers import counsellor_workspace
 from .routers import school_partner
+from .routers import file_upload
 
 Base.metadata.create_all(bind=engine)
 ensure_sqlite_schema(engine)
@@ -101,9 +101,9 @@ app.include_router(events.root_router)
 app.include_router(quiz.router)
 app.include_router(safety.router)
 app.include_router(emergency.router)
-app.include_router(chat.router)
 app.include_router(creator.router)
 app.include_router(upload.router)
+app.include_router(file_upload.router)
 app.include_router(calendar.router)
 app.include_router(volunteer.router)
 app.include_router(donations.router)
@@ -260,13 +260,17 @@ async def stream_video(
 
 
 @app.api_route(
-    "/uploads/{filename}",
+    "/uploads/{filename:path}",
     methods=["GET", "HEAD"],
     include_in_schema=False,
 )
 async def serve_upload(filename: str, request: Request):
-    upload_path = _uploads_dir / filename
-    if not upload_path.is_file() or upload_path.parent != _uploads_dir:
+    # Resolve the full path and verify it stays inside _uploads_dir (no path traversal)
+    upload_path = (_uploads_dir / filename).resolve()
+    uploads_root = _uploads_dir.resolve()
+    if not str(upload_path).startswith(str(uploads_root) + "/") and upload_path != uploads_root:
+        raise HTTPException(status_code=404, detail="Not Found")
+    if not upload_path.is_file():
         raise HTTPException(status_code=404, detail="Not Found")
 
     content_type = mimetypes.guess_type(upload_path.name)[0] or "application/octet-stream"

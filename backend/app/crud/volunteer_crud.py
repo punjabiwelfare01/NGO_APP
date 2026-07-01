@@ -44,6 +44,15 @@ def get_activity(db: Session, activity_id: int) -> Optional[VolunteerActivity]:
     return db.query(VolunteerActivity).filter(VolunteerActivity.id == activity_id).first()
 
 
+def get_activities_by_creator(db: Session, creator_id: int) -> List[VolunteerActivity]:
+    return (
+        db.query(VolunteerActivity)
+        .filter(VolunteerActivity.created_by == creator_id)
+        .order_by(VolunteerActivity.created_at.desc())
+        .all()
+    )
+
+
 def update_activity(db: Session, activity_id: int, data: VolunteerActivityUpdate) -> Optional[VolunteerActivity]:
     obj = get_activity(db, activity_id)
     if not obj:

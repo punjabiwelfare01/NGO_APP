@@ -27,58 +27,61 @@ class CounsellorHomeView extends StatelessWidget {
         if (vm.state == CounsellorHomeLoadState.loading) {
           return const Center(child: CircularProgressIndicator());
         }
-        return CustomScrollView(
-          slivers: [
-            _AppBar(name: counsellorName, profile: vm.profile),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _OverviewCards(stats: vm.stats),
-                  if (vm.todayMeetings.isNotEmpty) ...[
+        return RefreshIndicator(
+          onRefresh: vm.refreshRequests,
+          child: CustomScrollView(
+            slivers: [
+              _AppBar(name: counsellorName, profile: vm.profile),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _OverviewCards(stats: vm.stats),
+                    if (vm.todayMeetings.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      _SectionHeader(
+                        icon: Icons.today_rounded,
+                        title: "Today's Sessions",
+                        count: vm.todayMeetings.length,
+                        color: const Color(0xFF1565C0),
+                      ),
+                      const SizedBox(height: 12),
+                      _TodayMeetingsSection(meetings: vm.todayMeetings, vm: vm),
+                    ],
+                    if (vm.newRequests.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      _SectionHeader(
+                        icon: Icons.fiber_new_rounded,
+                        title: 'New School Requests',
+                        count: vm.newRequests.length,
+                        color: const Color(0xFF2E7D32),
+                      ),
+                      const SizedBox(height: 12),
+                      _NewRequestsSection(requests: vm.newRequests, vm: vm),
+                    ],
+                    if (vm.upcomingReminders.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      _SectionHeader(
+                        icon: Icons.notifications_active_outlined,
+                        title: 'Upcoming Reminders',
+                        count: vm.upcomingReminders.length,
+                        color: const Color(0xFFF57F17),
+                      ),
+                      const SizedBox(height: 12),
+                      _UpcomingRemindersSection(
+                        reminders: vm.upcomingReminders.take(3).toList(),
+                        vm: vm,
+                      ),
+                    ],
                     const SizedBox(height: 28),
-                    _SectionHeader(
-                      icon: Icons.today_rounded,
-                      title: "Today's Sessions",
-                      count: vm.todayMeetings.length,
-                      color: const Color(0xFF1565C0),
-                    ),
-                    const SizedBox(height: 12),
-                    _TodayMeetingsSection(meetings: vm.todayMeetings, vm: vm),
-                  ],
-                  if (vm.newRequests.isNotEmpty) ...[
+                    _QuickActionsSection(onNavigate: onNavigate),
                     const SizedBox(height: 28),
-                    _SectionHeader(
-                      icon: Icons.fiber_new_rounded,
-                      title: 'New School Requests',
-                      count: vm.newRequests.length,
-                      color: const Color(0xFF2E7D32),
-                    ),
-                    const SizedBox(height: 12),
-                    _NewRequestsSection(requests: vm.newRequests, vm: vm),
-                  ],
-                  if (vm.upcomingReminders.isNotEmpty) ...[
-                    const SizedBox(height: 28),
-                    _SectionHeader(
-                      icon: Icons.notifications_active_outlined,
-                      title: 'Upcoming Reminders',
-                      count: vm.upcomingReminders.length,
-                      color: const Color(0xFFF57F17),
-                    ),
-                    const SizedBox(height: 12),
-                    _UpcomingRemindersSection(
-                      reminders: vm.upcomingReminders.take(3).toList(),
-                      vm: vm,
-                    ),
-                  ],
-                  const SizedBox(height: 28),
-                  _QuickActionsSection(onNavigate: onNavigate),
-                  const SizedBox(height: 28),
-                  _VerificationStatusSection(profile: vm.profile),
-                ]),
+                    _VerificationStatusSection(profile: vm.profile),
+                  ]),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/colors.dart';
 import '../../models/counsellor_models.dart';
+import '../../repositories/api_client.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../../widgets/app_card.dart';
 
@@ -37,7 +38,7 @@ class CounsellorProfileScreen extends StatelessWidget {
                   title: 'About',
                   icon: Icons.person_rounded,
                   child: Text(
-                    c.shortBio,
+                    c.shortBio.isNotEmpty ? c.shortBio : 'No bio available.',
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 13,
@@ -47,6 +48,22 @@ class CounsellorProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
+                // Contact Information
+                if (c.phone != null || c.location != null) ...[
+                  _Section(
+                    title: 'Contact Information',
+                    icon: Icons.contact_phone_rounded,
+                    child: Column(
+                      children: [
+                        if (c.phone != null && c.phone!.isNotEmpty)
+                          _DetailRow(label: 'Phone', value: c.phone!),
+                        if (c.location != null && c.location!.isNotEmpty)
+                          _DetailRow(label: 'Location', value: c.location!),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 // Designation & background
                 _Section(
                   title: 'Designation & Background',
@@ -55,10 +72,16 @@ class CounsellorProfileScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _DetailRow(label: 'Designation', value: c.designation),
-                      _DetailRow(
-                        label: 'Background',
-                        value: c.serviceBackground,
-                      ),
+                      if (c.yearsOfExperience > 0)
+                        _DetailRow(
+                          label: 'Experience',
+                          value: '${c.yearsOfExperience} year${c.yearsOfExperience == 1 ? '' : 's'}',
+                        ),
+                      if (c.serviceBackground.isNotEmpty)
+                        _DetailRow(
+                          label: 'Background',
+                          value: c.serviceBackground,
+                        ),
                       if (c.showRetiredStatus)
                         _DetailRow(
                           label: 'Service Status',
@@ -69,56 +92,64 @@ class CounsellorProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 // Expertise areas
-                _Section(
-                  title: 'Areas of Expertise',
-                  icon: Icons.star_rounded,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: c.expertiseAreas
-                        .map(
-                          (e) =>
-                              _ExpertiseTag(label: e, color: c.category.color),
-                        )
-                        .toList(),
+                if (c.expertiseAreas.isNotEmpty) ...[
+                  _Section(
+                    title: 'Areas of Expertise',
+                    icon: Icons.star_rounded,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: c.expertiseAreas
+                          .map(
+                            (e) => _ExpertiseTag(
+                              label: e,
+                              color: c.category.color,
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
+                ],
                 // Session topics
-                _Section(
-                  title: 'Session Topics They Can Conduct',
-                  icon: Icons.topic_rounded,
-                  child: Column(
-                    children: c.sessionTopics
-                        .asMap()
-                        .entries
-                        .map(
-                          (entry) => _TopicRow(
-                            index: entry.key + 1,
-                            topic: entry.value,
-                            color: c.category.color,
-                          ),
-                        )
-                        .toList(),
+                if (c.sessionTopics.isNotEmpty) ...[
+                  _Section(
+                    title: 'Session Topics They Can Conduct',
+                    icon: Icons.topic_rounded,
+                    child: Column(
+                      children: c.sessionTopics
+                          .asMap()
+                          .entries
+                          .map(
+                            (entry) => _TopicRow(
+                              index: entry.key + 1,
+                              topic: entry.value,
+                              color: c.category.color,
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
+                ],
                 // Qualifications
-                _Section(
-                  title: 'Qualifications & Certifications',
-                  icon: Icons.workspace_premium_rounded,
-                  child: Column(
-                    children: c.qualifications
-                        .map(
-                          (q) => _QualificationRow(
-                            text: q,
-                            color: c.category.color,
-                          ),
-                        )
-                        .toList(),
+                if (c.qualifications.isNotEmpty) ...[
+                  _Section(
+                    title: 'Qualifications & Certifications',
+                    icon: Icons.workspace_premium_rounded,
+                    child: Column(
+                      children: c.qualifications
+                          .map(
+                            (q) => _QualificationRow(
+                              text: q,
+                              color: c.category.color,
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
+                ],
                 // Session details
                 _Section(
                   title: 'Session Details',
@@ -131,15 +162,16 @@ class CounsellorProfileScreen extends StatelessWidget {
                         value: c.sessionMode.label,
                         color: c.sessionMode.color,
                       ),
-                      _SessionDetailRow(
-                        icon: Icons.language_rounded,
-                        label: 'Languages',
-                        value: c.languages.join(', '),
-                      ),
+                      if (c.languages.isNotEmpty)
+                        _SessionDetailRow(
+                          icon: Icons.language_rounded,
+                          label: 'Languages',
+                          value: c.languages.join(', '),
+                        ),
                       for (final slot in c.availableSlots)
                         _SessionDetailRow(
                           icon: Icons.access_time_rounded,
-                          label: 'Available',
+                          label: 'Schedule',
                           value: slot,
                           color: const Color(0xFF2E7D32),
                         ),
@@ -148,7 +180,8 @@ class CounsellorProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 // Recognition and appreciation
-                if (c.recognitionProof.isNotEmpty)
+                if (c.recognitionProof.isNotEmpty ||
+                    c.appreciationDocuments.isNotEmpty) ...[
                   _Section(
                     title: 'Recognition & Appreciation',
                     icon: Icons.emoji_events_rounded,
@@ -161,9 +194,11 @@ class CounsellorProfileScreen extends StatelessWidget {
                           ),
                         ),
                         if (c.appreciationDocuments.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          const Divider(height: 1),
-                          const SizedBox(height: 8),
+                          if (c.recognitionProof.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            const Divider(height: 1),
+                            const SizedBox(height: 8),
+                          ],
                           ...c.appreciationDocuments.map(
                             (d) => _RecognitionRow(
                               text: d,
@@ -174,7 +209,8 @@ class CounsellorProfileScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
+                ],
                 // NGO Privacy section
                 _PrivacySection(counsellor: c),
                 const SizedBox(height: 24),
@@ -253,7 +289,7 @@ class _HeroAppBar extends StatelessWidget {
                         child: c.photoUrl != null
                             ? ClipOval(
                                 child: Image.network(
-                                  c.photoUrl!,
+                                  ApiClient.resolveUrl(c.photoUrl!),
                                   fit: BoxFit.cover,
                                 ),
                               )
@@ -980,13 +1016,13 @@ class _BookingFormState extends State<_BookingForm> {
   final _schoolCtrl = TextEditingController();
   final _principalCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _topicCtrl = TextEditingController();
   final _countCtrl = TextEditingController();
   final _requirementsCtrl = TextEditingController();
   DateTime _date = DateTime.now().add(const Duration(days: 7));
   TimeOfDay _time = const TimeOfDay(hour: 10, minute: 0);
   SessionMode _mode = SessionMode.offline;
   String _gradeLevel = 'Class 9–12';
-  String? _selectedTopic;
   bool _submitting = false;
 
   static const _gradeLevels = [
@@ -1000,9 +1036,6 @@ class _BookingFormState extends State<_BookingForm> {
   @override
   void initState() {
     super.initState();
-    if (widget.counsellor.sessionTopics.isNotEmpty) {
-      _selectedTopic = widget.counsellor.sessionTopics.first;
-    }
     // Pre-select mode based on counsellor availability
     if (widget.counsellor.sessionMode != SessionMode.both) {
       _mode = widget.counsellor.sessionMode;
@@ -1014,6 +1047,7 @@ class _BookingFormState extends State<_BookingForm> {
     _schoolCtrl.dispose();
     _principalCtrl.dispose();
     _emailCtrl.dispose();
+    _topicCtrl.dispose();
     _countCtrl.dispose();
     _requirementsCtrl.dispose();
     super.dispose();
@@ -1049,9 +1083,9 @@ class _BookingFormState extends State<_BookingForm> {
       schoolName: _schoolCtrl.text.trim(),
       principalName: _principalCtrl.text.trim(),
       schoolEmail: _emailCtrl.text.trim(),
-      topic:
-          _selectedTopic ??
-          (widget.isAwarenessCamp ? 'Awareness Camp' : 'Counselling Session'),
+      topic: _topicCtrl.text.trim().isNotEmpty
+          ? _topicCtrl.text.trim()
+          : (widget.isAwarenessCamp ? 'Awareness Camp' : 'Counselling Session'),
       preferredDate: DateTime(
         _date.year, _date.month, _date.day, _time.hour, _time.minute,
       ),
@@ -1244,34 +1278,11 @@ class _BookingFormState extends State<_BookingForm> {
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 12),
-                    _fLabel('Select Topic / Session *'),
-                    DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      initialValue: _selectedTopic,
-                      items: [
-                        if (widget.isAwarenessCamp)
-                          const DropdownMenuItem(
-                            value: 'Awareness Camp (General)',
-                            child: Text(
-                              'Awareness Camp (General)',
-                              style: TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ...c.sessionTopics.map(
-                          (t) => DropdownMenuItem(
-                            value: t,
-                            child: Text(
-                              t,
-                              style: const TextStyle(fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => _selectedTopic = v),
-                      decoration: _dropdownDecoration(),
-                      validator: (v) =>
-                          v == null ? 'Please select a topic' : null,
+                    _fLabel('Session Topic *'),
+                    _field(
+                      _topicCtrl,
+                      'e.g. Career Guidance, Mental Health Awareness…',
+                      required: true,
                     ),
                     const SizedBox(height: 12),
                     _fLabel('Preferred Date / Time *'),

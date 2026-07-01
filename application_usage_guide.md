@@ -13,6 +13,7 @@
    - [Content Publishing Flow](#content-publishing-flow)
    - [Event Pipeline Flow](#event-pipeline-flow)
    - [Counselling Request Status States](#counselling-request-status-states)
+   - [Certificate Lifecycle](#certificate-lifecycle)
 2. [Student / Youth Member](#2-student--youth-member)
 3. [Admin / Super Admin](#3-admin--super-admin)
 4. [Event Manager](#4-event-manager)
@@ -97,17 +98,18 @@ sequenceDiagram
     SYS-->>C: 🔔 New request notification
     SYS-->>A: 🔔 New request notification
 
-    alt Counsellor Accepts
-        C->>SYS: Accept request
+    alt Counsellor Accepts (single tap — no double-accept)
+        C->>SYS: Tap Accept on request card
         SYS-->>SP: 🔔 "Counsellor accepted your request"
-        SYS->>SYS: Schedule 3 reminders (24h · 2h · 15min before)
-    else Counsellor Suggests New Time
-        C->>SYS: Reschedule with suggested date/time
+        SYS->>SYS: Schedule 3 reminders (24h · 2h · 15min before session)
+        SYS->>SYS: Reveal coordinator contact to counsellor
+    else Counsellor Reschedules
+        C->>SYS: Tap Reschedule → pick new date/time
         SYS-->>SP: 🔔 "New time suggested"
         SP->>SYS: Confirm new time  OR  Cancel request
         SYS-->>C: 🔔 "School confirmed / cancelled"
     else Counsellor Declines
-        C->>SYS: Decline with reason
+        C->>SYS: Tap Decline → select reason + optional note
         SYS-->>SP: 🔔 "Request declined: [reason]"
     end
 
@@ -116,7 +118,7 @@ sequenceDiagram
     SYS-->>C: Meeting link & coordinator contact revealed
 
     Note over C,SP: Session is conducted
-    C->>SYS: Mark session as Completed
+    C->>SYS: Tap Mark Session as Completed (from Meeting Detail screen)
     C->>SYS: Submit session report\n(notes · students attended · rating)
     SYS-->>A: Session report saved to records
 ```
@@ -142,11 +144,13 @@ flowchart TD
     EM_REV -->|Approve| STATUS4[Status: EM Approved\nFlagged for Admin]
     EM_REV -->|Reject| REJ[Rejected with reason\nStudent notified]
     STATUS4 --> ADMIN_REV{Admin\nfinal review}
-    ADMIN_REV -->|Approve| CERT_ELIG[Student is Certificate-Eligible]
+    ADMIN_REV -->|Approve| CERT_ELIG[Student is Certificate-Eligible\nAppears in Ready tab]
     ADMIN_REV -->|Reject| REJ2[Rejected — student notified]
-    CERT_ELIG --> GEN[Admin or EM generates Certificate]
-    GEN --> PUB_CERT[Certificate published\nto student profile]
-    PUB_CERT --> STU2([Student downloads\nor shares Certificate])
+    CERT_ELIG --> GEN[Admin fills certificate details\nvia Ready tab → Generate]
+    GEN --> DRAFT_CERT[Certificate created as Draft]
+    DRAFT_CERT --> APPROVE[Admin approves certificate]
+    APPROVE --> PUB_CERT[Certificate status → Generated\nPublished to student profile]
+    PUB_CERT --> STU2([Student previews\ndownloads or shares Certificate])
 
     style STATUS1 fill:#1565c0,color:#fff
     style STATUS2 fill:#4527a0,color:#fff
@@ -214,9 +218,9 @@ flowchart LR
 stateDiagram-v2
     [*] --> new_request : School Partner submits booking
 
-    new_request --> accepted      : Counsellor accepts
+    new_request --> accepted      : Counsellor accepts (single tap)
     new_request --> rescheduled   : Counsellor suggests new time
-    new_request --> declined      : Counsellor declines
+    new_request --> declined      : Counsellor declines with reason
     new_request --> cancelled     : School Partner cancels
 
     rescheduled --> pending_confirmation : School Partner confirms new time
@@ -228,12 +232,40 @@ stateDiagram-v2
     accepted --> pending_confirmation : EM coordinates and confirms
 
     confirmed --> scheduled  : Meeting link + details set
-    scheduled --> completed  : Session conducted & marked done
+    scheduled --> completed  : Counsellor marks session as completed
     completed --> [*]
 
     declined  --> [*]
     cancelled --> [*]
 ```
+
+---
+
+### Certificate Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft : Admin fills details via Ready tab
+
+    draft --> pending        : Admin submits for approval
+    pending --> approved     : Admin approves + adds signatory
+    pending --> rejected     : Admin rejects with reason
+
+    approved --> generated   : PDF generated
+    generated --> issued     : Issued to student
+    issued --> downloaded    : Student downloads
+
+    approved --> revoked : Admin revokes
+    generated --> revoked : Admin revokes
+    issued --> revoked : Admin revokes
+
+    downloaded --> [*]
+    revoked --> [*]
+    rejected --> [*]
+```
+
+> **All certificate statuses (draft, pending, approved, generated, issued) now support:**
+> Edit Details · Preview · Download · Revoke · Create Impact Story — buttons are shown on every certificate card and enabled based on the current status.
 
 ---
 
@@ -344,6 +376,27 @@ flowchart TD
 
 ### Volunteer / Internship (Tab 3)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 **Step 13 — View Your Volunteer Dashboard**
 - Tap the **Volunteer** tab (heart icon).
 - At the top you see your stats: total hours earned, XP, activities completed, certificates issued.
@@ -366,7 +419,7 @@ flowchart TD
 
 **Step 18 — View My Certificates**
 - Tap **My Certificates** to see all certificates you have earned.
-- Certificates are generated automatically once your work is approved.
+- Certificates appear once an admin generates and approves them for your activity.
 
 **Step 19 — Wall of Impact**
 - Tap **Wall of Impact** to view published impact stories from the NGO.
@@ -429,7 +482,7 @@ flowchart TD
     MANAGE --> COUNS[Counsellors\nadd · verify · feature]
     MANAGE --> VOLWORK[Volunteer Work\nfinal approval]
     MANAGE --> DONATE[Donations\nverify payment proof]
-    MANAGE --> CERTS[Certificates\ngenerate · issue]
+    MANAGE --> CERTS[Certificates\nReady · Pending · All tabs\nall actions on every cert]
     MANAGE --> SAFETY[Safety Questions\ncreate awareness content]
     MANAGE --> EMERG[Emergency Contacts\nmanage helplines]
 
@@ -439,7 +492,7 @@ flowchart TD
     PUB -->|Yes| WALL[Published to Wall of Impact]
     PUB -->|No| BACK[Send back with feedback]
 
-    DASH --> SETTINGS[Settings Tab\nroles · permissions · audit logs]
+    DASH --> SETTINGS[Settings Tab\nNGO profile · roles · security · audit logs · announcements]
 
     style NOTIF_A fill:#2e7d32,color:#fff
     style NOTIF_R fill:#c62828,color:#fff
@@ -526,15 +579,38 @@ flowchart TD
 - Tap **Donations & Stipends** → view pending donation proofs.
 - Tap a donation → view screenshot / receipt → Tap **Verify** or **Reject**.
 
-**Step 14 — Issue Certificates**
-- Tap **Certificates** → view certificate-eligible students.
-- Tap **Generate Certificate** → Tap **Approve & Issue** to publish to the student's profile.
+**Step 14 — Certificate Management (3 Tabs)**
+
+The Certificate Management screen has three tabs:
+
+- **Ready** tab — Shows assignments where the EM has approved work and the student is certificate-eligible.
+  - Each card shows student name, activity, hours, and work details.
+  - Tap **Fill Details & Generate** to open the certificate detail form, fill in the signatory name/title and any extra information, then generate the certificate.
+
+- **Pending** tab — Shows certificates awaiting admin approval.
+  - Available actions on every card: **Edit Details**, **Preview**, **Download**, **Approve**, **Reject**, **Revoke**, **Create Impact Story**.
+  - Tap **Approve** → optionally add signatory name and title → Tap **Approve** to confirm.
+  - Tap **Reject** → enter a reason → Tap **Reject** (student is notified).
+
+- **All** tab — Shows every certificate across all statuses (Draft, Pending, Approved, Generated, Issued, Rejected, Revoked).
+  - Available actions on every card: **Edit Details**, **Preview**, **Download**, **Approve** (if pending), **Reject** (if pending), **Revoke** (unless already revoked/rejected), **Create Impact Story** (if no story exists yet).
+
+> **Note:** All certificate cards — regardless of status (Draft, Pending, Generated, etc.) — now show the full set of action buttons. The buttons are enabled or disabled based on the certificate's current status.
+
+**Step 15 — Revoke a Certificate**
+- On any active certificate card, tap **Revoke** → enter a revocation reason → Tap **Revoke**.
+- The certificate status changes to *Revoked* and the student is notified.
+
+**Step 16 — Create an Impact Story from a Certificate**
+- On any eligible certificate card (no existing story), tap **Create Impact Story**.
+- Review or edit the pre-filled impact summary → Tap **Create Story**.
+- A draft impact story is created; edit and publish it from the Social Impact section.
 
 ---
 
 ### Impact (Tab 4)
 
-**Step 15 — Review and Publish Impact Posts**
+**Step 17 — Review and Publish Impact Posts**
 - Tap the **Impact** tab → view draft posts submitted by Event Managers.
 - Tap any draft → Tap **Approve & Publish** or **Request Changes**.
 
@@ -542,8 +618,13 @@ flowchart TD
 
 ### Settings (Tab 5)
 
-**Step 16 — Platform Settings**
-- Tap the **Settings** tab → configure User Management, Role & Access Control, Security, Notification Settings, and Advanced Settings.
+**Step 18 — Platform Settings**
+- Tap the **Settings** tab → configure:
+  - **NGO Profile & Bank Details** — update NGO name, logo, bank account for donations.
+  - **Roles & Permissions** — manage role access across the platform.
+  - **Security & Audit Logs** — view login history and security events.
+  - **Announcements** — broadcast messages to all users.
+  - **Application Settings** — general platform configuration.
 
 ---
 
@@ -566,7 +647,8 @@ flowchart TD
     REVIEW -->|Approve| FLAG[Flagged for Admin Approval]
     REVIEW -->|Reject| NOTIF[Student Notified\nwith reason]
     FLAG --> ADMIN_OK[Admin approves]
-    ADMIN_OK --> GEN_CERT[Generate Certificate]
+    ADMIN_OK --> READY[Appears in Certificate Ready tab]
+    READY --> GEN_CERT[Admin generates Certificate]
 
     HOME --> IMPACT[Impact Tab]
     IMPACT --> AUTO[Generate Impact Post\nfrom event data]
@@ -628,21 +710,19 @@ flowchart TD
 
 **Step 9 — Send for Admin Approval**
 - After approving a submission, tap **Mark for Admin Approval** to flag it for final admin review.
-
-**Step 10 — Generate a Certificate**
-- Once admin has also approved, tap **Generate Certificate** on the assignment detail screen.
+- Once admin approves, the student appears in the **Certificate Ready** tab automatically.
 
 ---
 
 ### Impact (Tab 4)
 
-**Step 11 — Generate an Impact Draft**
+**Step 10 — Generate an Impact Draft**
 - Tap the **Impact** tab → select a completed event → Tap **Generate Impact Draft**.
 
-**Step 12 — Edit and Submit for Admin Approval**
+**Step 11 — Edit and Submit for Admin Approval**
 - Review the auto-generated post → edit text if needed → Tap **Submit for Admin Approval**.
 
-**Step 13 — Generate an Event Report**
+**Step 12 — Generate an Event Report**
 - Tap **Generate Report** for any completed event.
 - The report includes: total participants, hours contributed, work submitted, certificates issued, donation amounts.
 - Tap **Finalize Report** to lock the report and close the event record.
@@ -659,31 +739,34 @@ flowchart TD
 
     HOME --> REQ_TAB[Requests Tab]
     REQ_TAB --> TABS[New · Accepted · Rescheduled · All]
-    TABS --> DETAIL[Open Request Detail]
-    DETAIL --> ACTION{Counsellor Action}
-    ACTION -->|Accept| ACCEPT[Status: Accepted\nReminders scheduled]
-    ACTION -->|Suggest New Time| RESCHED[Status: Rescheduled\nSchool notified]
-    ACTION -->|Decline| DECLINE[Status: Declined\nSchool notified with reason]
+    TABS --> CARD[Request Card]
+    CARD --> ACTION{Action on NEW requests only}
+    ACTION -->|Single tap| ACCEPT[Status: Accepted\nReminders scheduled\nContact revealed]
+    ACTION -->|Pick date/time| RESCHED[Status: Rescheduled\nSchool notified]
+    ACTION -->|Select reason| DECLINE[Status: Declined\nSchool notified with reason]
 
-    RESCHED --> SP_CONFIRM{School Partner}
-    SP_CONFIRM -->|Confirms| PEND_CONF[Status: Pending Confirmation]
-    SP_CONFIRM -->|Cancels| CANCEL[Status: Cancelled]
+    CARD --> DETAIL[Tap View Full Details\nfor non-new requests]
+    DETAIL --> DET_ACT{Detail Screen Actions}
+    DET_ACT -->|If NEW| ACCEPT2[Accept or Decline]
+    DET_ACT -->|If SCHEDULED/CONFIRMED| COMPLETE[Mark Session as Completed]
 
-    HOME --> SCHED[Schedule Tab]
-    SCHED --> AVAIL[Add Availability Slots\ndate · time · mode · meet link]
-    AVAIL --> CAL[Slot visible in\nSchool Portal directory]
+    HOME --> SCHED[Schedule Tab\nauto-jumps to nearest session]
+    SCHED --> WEEK[Week navigation\nleft / right arrows]
+    SCHED --> DAY[Select day to view\nPending · Confirmed · Completed sessions]
+    SCHED --> SLOT_ACT[Availability Slots\nBlock / Unblock]
+    SCHED --> FAB[Tap Add Slot FAB\nset time · mode · repeat weekly]
 
     HOME --> SESS_TAB[Sessions Tab]
-    SESS_TAB --> MARK[Mark Session as Completed]
-    MARK --> REPORT_F[Submit Session Report\nnotes · students · rating]
+    SESS_TAB --> UPCOMING[Upcoming sub-tab\nall active sessions]
+    SESS_TAB --> COMPLETED_TAB[Completed sub-tab\npast sessions · impact reports]
 
     HOME --> PROFILE[Profile Tab]
-    PROFILE --> PUB_PROF[Update Public Profile\nbio · expertise · session topics]
+    PROFILE --> PUB_PROF[Update Public Profile\nbio · expertise · session topics · photo]
 
     style ACCEPT  fill:#2e7d32,color:#fff
     style RESCHED fill:#6a1b9a,color:#fff
     style DECLINE fill:#c62828,color:#fff
-    style CANCEL  fill:#546e7a,color:#fff
+    style COMPLETE fill:#00695c,color:#fff
 ```
 
 ### Login
@@ -697,65 +780,128 @@ flowchart TD
 ### Home (Tab 1)
 
 **Step 2 — View Today's Overview**
-- Home shows: Overview Cards (total requests, sessions today, completed overall), New Requests Section, Upcoming Reminders.
+- Home shows:
+  - **Overview Cards** — today's scheduled sessions, new requests count, pending confirmation count, completed this month, average rating, total students guided.
+  - **Today's Sessions** — sessions happening today (if any).
+  - **New School Requests** — the latest pending requests from schools.
+  - **Upcoming Reminders** — the next 3 time-based reminders (24h / 2h / 15min before sessions).
+  - **Quick Actions** — shortcuts to Requests, Schedule, Sessions, and Profile.
 
 **Step 3 — Respond to a New Request from Home**
-- Tap any request card → Tap **Accept**, **Suggest New Time**, or **Decline**.
-- The school is notified automatically of your response.
+- Tap any request card on the Home screen to open its **Meeting Detail Screen**.
+- Use the action buttons at the bottom to Accept or Decline directly from the detail screen.
 
 ---
 
 ### Requests (Tab 2)
 
 **Step 4 — View All School Requests**
-- Tap the **Requests** tab → four sub-tabs: **New** · **Accepted** · **Rescheduled** · **All**.
+- Tap the **Requests** tab → data is refreshed automatically on every visit.
+- Four sub-tabs:
+  - **New** — incoming requests awaiting your response (shows count badge).
+  - **Accepted** — requests you accepted plus those in pending confirmation, confirmed, and scheduled states.
+  - **Rescheduled** — requests where you suggested a new time and are awaiting school response.
+  - **All** — complete history of every request.
 
 **Step 5 — Open a Request Detail**
-- Tap any request card to open the **Meeting Detail Screen** with complete session information.
+- Tap **View Full Details** on any non-new request card to open the **Meeting Detail Screen** with complete session information, school contact (if revealed), meeting link, reminders, and action buttons.
 
 **Step 6 — Accept a Request**
-- Tap **Accept** → school receives a notification → three reminders are auto-scheduled.
+- On a **New** request card, tap the green **Accept** button.
+- The button immediately becomes inactive after one tap — re-tapping is not possible.
+- The school receives a "Counsellor accepted" notification.
+- Three automatic reminders are scheduled: 24 hours, 2 hours, and 15 minutes before the session.
+- The school's coordinator contact details are revealed to you.
 
 **Step 7 — Decline a Request**
-- Tap **Decline** → select a reason → add an optional note → Tap **Confirm Decline**.
+- On a **New** request card, tap the red **Decline** button.
+- A bottom sheet opens — select a reason from the list (Not available, Outside expertise, Location too far, Scheduling conflict, Other).
+- Add an optional additional note.
+- Tap **Decline** to confirm. The school is notified with your reason.
+- You can also decline from the **Meeting Detail Screen** if viewing a New request.
 
-**Step 8 — Suggest a New Time**
-- Tap **Suggest New Time** → pick an alternative date/time → Tap **Send Suggestion**.
-- The school receives a notification and can confirm or reject the new time.
+**Step 8 — Reschedule a Request**
+- On a **New** request card, tap the purple **Reschedule** button.
+- A date picker appears — choose an alternative date → then a time picker → choose an alternative time.
+- Tap **Done** to send the suggestion. The school receives a notification and can confirm or cancel.
 
 ---
 
 ### Schedule (Tab 3)
 
-**Step 9 — View Your Availability Calendar**
-- Tap the **Schedule** tab → calendar view with all confirmed and upcoming sessions.
+**Step 9 — View Your Session Calendar**
+- Tap the **Schedule** tab.
+- The calendar automatically refreshes and **jumps to the nearest date that has an upcoming session** — so accepted sessions are visible immediately without manual navigation.
+- If today has sessions or availability slots, the calendar stays on today.
 
-**Step 10 — Add Availability Slots**
-- Tap the **+** / **Add Availability** button.
-- Set start/end date-time, session topic, recurrence, and optional Google Meet URL → Tap **Save Slot**.
+**Step 10 — Navigate Between Weeks**
+- Use the **left (‹)** and **right (›)** chevron buttons to move between weeks.
+- The week label at the top shows the date range (e.g., "29 Jun – 5 Jul 2026").
+- Tap any day in the week strip to view that day's sessions and slots.
+- Days with sessions show a **blue dot**; days with availability slots show a **green dot**.
 
-**Step 11 — Edit or Delete a Slot**
-- Tap any existing availability slot → Tap **Edit** or **Delete**.
+**Step 11 — View Sessions on a Day**
+- Selecting a day shows three sections:
+  - **Pending Sessions** (orange icon) — accepted and pending-confirmation requests.
+  - **Confirmed Sessions** (blue icon) — confirmed and scheduled sessions.
+  - **Completed** (green icon) — past completed sessions.
+- Tap any session card to open the **Meeting Detail Screen**.
+
+**Step 12 — Add an Availability Slot**
+- Tap the blue **+ Add Slot** floating button (bottom right).
+- In the sheet that opens, set:
+  - **Start Time** — pick using the time picker.
+  - **End Time** — pick using the time picker.
+  - **Session Mode** — Online, Offline, or Both.
+  - **Repeat Weekly** — toggle on to repeat this slot every week on the same day.
+- Tap **Save Slot** to publish the slot to your public calendar.
+
+**Step 13 — Block or Unblock a Slot**
+- Scroll to the **Availability Slots** section on the selected day.
+- Each slot has a **Block** or **Unblock** button.
+- Tap **Block** to mark yourself unavailable for that slot (it remains in your calendar but shows as blocked to schools).
+- Tap **Unblock** to make it available again.
+
+**Step 14 — View Repeating Slots**
+- Scroll to the **Repeating Slots** section at the bottom.
+- This lists all weekly-recurring slots with their day, time range, and mode.
 
 ---
 
 ### Sessions (Tab 4)
 
-**Step 12 — View Accepted & Upcoming Sessions**
-- Tap the **Sessions** tab → statuses: Accepted, Confirmed, Scheduled, Completed.
+**Step 15 — View Upcoming Sessions**
+- Tap the **Sessions** tab → **Upcoming** sub-tab.
+- Shows all active sessions (accepted, pending confirmation, confirmed, scheduled) sorted by date ascending.
+- Tap **Details** on any session card to open the Meeting Detail Screen.
 
-**Step 13 — Mark a Session as Completed**
-- Tap a session card → Tap **Mark as Completed**.
+**Step 16 — View Completed Sessions**
+- Tap the **Completed** sub-tab to see all past sessions sorted by most recent first.
+- Tap **Details** to view session information.
+- Tap **Impact Report** (if available) to view the session impact data.
 
-**Step 14 — Submit a Session Report**
-- Tap **Submit Report** → fill in: counsellor notes, students attended, school feedback, rating (1–5) → Tap **Submit Report**.
+**Step 17 — Mark a Session as Completed**
+- Open the **Meeting Detail Screen** for a session with status *Confirmed* or *Scheduled*.
+- Scroll to the bottom → Tap the dark teal **Mark Session as Completed** button.
+- The session status changes to *Completed* immediately.
+
+**Step 18 — Submit a Session Report**
+- After marking a session complete, tap **Submit Report** from the Session detail.
+- Fill in:
+  - Counsellor notes (what was covered, outcomes)
+  - Number of students who attended
+  - School feedback summary
+  - Rating (1–5 stars)
+- Tap **Submit Report** to save. The report is stored against the session record.
 
 ---
 
 ### Profile (Tab 5)
 
-**Step 15 — Update Your Public Profile**
-- Tap the **Profile** tab → update photo, bio, designation, languages, expertise, session topics, and mode availability → Tap **Save Profile**.
+**Step 19 — Update Your Public Profile**
+- Tap the **Profile** tab.
+- Edit: profile photo, display name, designation, bio/service background, category, languages, expertise areas, years of experience, session mode (online/offline/both).
+- Tap **Save Profile** to publish changes. Your updated profile is visible to school partners immediately.
 
 ---
 
@@ -857,17 +1003,18 @@ flowchart TD
     PEND --> APPROVED[Account Approved]
     APPROVED --> PORTAL[School Partner Portal]
 
-    PORTAL --> BROWSE[Browse Counsellor Directory]
-    PORTAL --> REQUESTS[My Requests Section]
+    PORTAL --> SERVICES[Service Cards\nBrowse Counsellors · Book Session · Profile]
+    PORTAL --> REQUESTS[Recent Requests Section\nlast 5 requests with status]
 
+    SERVICES --> BROWSE[Browse Counsellor Directory]
     BROWSE --> SEARCH[Search by name · expertise · category]
-    BROWSE --> FILTER[Filter by mode · language · availability]
-    BROWSE --> PROFILE[Open Counsellor Profile\nbio · stats · expertise · topics]
-    PROFILE --> BOOK[Tap Book Counselling Session\nOR Request Awareness Camp]
+    BROWSE --> FILTER[Filter by mode · language · availability · featured]
+    BROWSE --> PROFILE_VIEW[Open Counsellor Profile\nbio · stats · expertise · topics]
+    PROFILE_VIEW --> BOOK[Tap Book a Counselling Session\nOR Request Awareness Camp]
 
     BOOK --> FORM[Fill Booking Form\nschool · topic · date · students · mode]
     FORM --> SUBMIT[Submit Request]
-    SUBMIT --> STATUS_NEW[Status: New Request]
+    SUBMIT --> STATUS_NEW[Status: New Request\nCounsellor & Admin notified]
 
     STATUS_NEW --> COUNSELLOR_RESP{Counsellor responds}
     COUNSELLOR_RESP -->|Accepts| STATUS_ACC[Status: Accepted\nContact details revealed]
@@ -919,8 +1066,11 @@ flowchart TD
 **Step 3 — View the Portal Dashboard**
 - The Portal home shows:
   - A **welcome banner** with the NGO trust and verification statement.
-  - Two action cards: **Browse Counsellors** and **Book a Session** (both open the directory).
-  - A **Recent Requests** section showing your booking history and status.
+  - **School Services** cards:
+    - **Verified Counsellor Panel** — tap to open the full counsellor directory.
+    - **Book a Counselling Session** — tap to open the directory and start a booking.
+    - **Profile & Account Settings** — tap to view and update your school partner profile.
+  - A **Recent Requests** section showing your last 5 booking requests with current status badges.
 - Tap any request card to open its full **Request Detail Screen**.
 
 ---
@@ -928,7 +1078,7 @@ flowchart TD
 ### Browsing the Counsellor Directory
 
 **Step 4 — Open the Counsellor Directory**
-- Tap **Browse Counsellors** or **Book a Session** on the portal home.
+- Tap **Verified Counsellor Panel** or **Book a Counselling Session** on the portal home.
 
 **Step 5 — Search for a Counsellor**
 - Use the **Search bar** to search by name, designation, or area of expertise.
@@ -969,7 +1119,7 @@ flowchart TD
 
 **Step 11 — Request Submitted**
 - A green success notification appears.
-- The counsellor and NGO Admin both receive in-app notifications.
+- Both the counsellor and NGO Admin receive in-app notifications of the new request.
 
 ---
 
@@ -977,21 +1127,24 @@ flowchart TD
 
 **Step 12 — Track Request Status**
 - Return to the **School Partner Portal** home screen.
-- Tap any request card to open the full **Request Detail Screen** showing:
-  - Complete request info, schedule, and status banner with a plain-language explanation.
-  - **Timeline** of key events (submitted, accepted, confirmed, completed).
-  - **Meeting link** (once confirmed/scheduled).
-  - Rescheduled time card (if counsellor suggested a new time).
+- Tap any request card (or tap a notification) to open the full **Request Detail Screen** showing:
+  - **Status Banner** — current status with a plain-language explanation of what it means.
+  - **Request Details** — topic, counsellor, school, coordinator contact (revealed once accepted), grade, students, mode, requirements.
+  - **Preferred Schedule** card — the date and time you originally requested.
+  - **Rescheduled Suggestion** card — appears if the counsellor suggested a new time.
+  - **Meeting Link** card — visible once the session is confirmed/scheduled (online sessions only).
+  - **Timeline** — key events with timestamps (submitted, accepted, confirmed, completed).
+  - **Action Buttons** — conditionally shown based on status (see below).
 
 **Step 13 — Receive Status Notifications**
 - When the counsellor accepts, declines, or suggests a new time, you receive an in-app notification.
 - Tap the notification to go directly to your request detail.
 
-**Step 14 — Confirm or Decline a Rescheduled Time**
+**Step 14 — Confirm or Cancel a Rescheduled Time**
 - If the counsellor suggested a new time, open the request detail.
-- Review the suggested date and time.
+- Review the suggested date and time in the **Rescheduled Suggestion** card.
 - Tap **Confirm New Time** to accept it → status moves to **Pending Confirmation**.
-- Tap **Cancel Request** to cancel entirely.
+- Tap **Cancel Request** to cancel entirely → status moves to **Cancelled**.
 
 ---
 

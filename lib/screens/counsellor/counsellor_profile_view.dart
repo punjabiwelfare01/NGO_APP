@@ -4,9 +4,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../app_state.dart';
 import '../../core/colors.dart';
 import '../../models/counsellor_models.dart';
 import '../../repositories/api_client.dart';
+import '../../repositories/auth_repository.dart';
 import '../../viewmodels/counsellor_home_viewmodel.dart';
 import '../../widgets/app_card.dart';
 
@@ -16,6 +18,13 @@ class CounsellorProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: vm,
+      builder: (context, _) => _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final p = vm.profile;
     return CustomScrollView(
       slivers: [
@@ -29,6 +38,8 @@ class CounsellorProfileView extends StatelessWidget {
               _PrivateAccountCard(vm: vm),
               const SizedBox(height: 16),
               _StatsRow(profile: p, vm: vm),
+              const SizedBox(height: 14),
+              _AvailabilityManagementSection(vm: vm),
               const SizedBox(height: 18),
               _Section(
                 icon: Icons.info_outline_rounded,
@@ -179,9 +190,14 @@ class CounsellorProfileView extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 14),
+              _VerificationDocsSection(vm: vm),
+              const SizedBox(height: 14),
               _PrivacySection(),
               const SizedBox(height: 14),
               _PublicPreviewSection(profile: p),
+              const SizedBox(height: 14),
+              _AccountSettingsSection(vm: vm),
+              const SizedBox(height: 40),
             ]),
           ),
         ),
@@ -1036,16 +1052,31 @@ class _EditCounsellorProfileSheetState
   late final TextEditingController _locationController;
   late final TextEditingController _bioController;
   late final TextEditingController _expertiseController;
+  late final TextEditingController _dobController;
+  late final TextEditingController _qualificationController;
+  late final TextEditingController _experienceController;
+  late final TextEditingController _organizationController;
+  late final TextEditingController _languagesController;
+  late final TextEditingController _cityController;
+  late final TextEditingController _stateController;
+  late final TextEditingController _pinCodeController;
   late CounsellorCategory _category;
+  String? _gender;
+  String? _counsellingMode;
   Uint8List? _photoBytes;
   String? _photoPath;
   String? _photoName;
   bool _saving = false;
 
+  static const _genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
+  static const _modeOptions = ['online', 'offline', 'both'];
+  static const _modeLabels = {'online': 'Online', 'offline': 'Offline', 'both': 'Both'};
+
   @override
   void initState() {
     super.initState();
     final profile = widget.vm.profile;
+    final ext = widget.vm.extendedProfile;
     _nameController = TextEditingController(text: profile.name);
     _phoneController = TextEditingController(text: widget.vm.user?.phone ?? '');
     _locationController = TextEditingController(
@@ -1057,7 +1088,19 @@ class _EditCounsellorProfileSheetState
     _expertiseController = TextEditingController(
       text: widget.vm.mentorProfile?.expertise ?? '',
     );
+    _dobController = TextEditingController(text: ext?['date_of_birth'] as String? ?? '');
+    _qualificationController = TextEditingController(text: ext?['qualification'] as String? ?? '');
+    _experienceController = TextEditingController(
+      text: ext?['years_of_experience'] != null ? '${ext!['years_of_experience']}' : '',
+    );
+    _organizationController = TextEditingController(text: ext?['organization'] as String? ?? '');
+    _languagesController = TextEditingController(text: ext?['languages_known'] as String? ?? '');
+    _cityController = TextEditingController(text: ext?['city'] as String? ?? '');
+    _stateController = TextEditingController(text: ext?['state'] as String? ?? '');
+    _pinCodeController = TextEditingController(text: ext?['pin_code'] as String? ?? '');
     _category = profile.category;
+    _gender = ext?['gender'] as String?;
+    _counsellingMode = ext?['counselling_mode'] as String? ?? 'both';
   }
 
   @override
@@ -1067,6 +1110,14 @@ class _EditCounsellorProfileSheetState
     _locationController.dispose();
     _bioController.dispose();
     _expertiseController.dispose();
+    _dobController.dispose();
+    _qualificationController.dispose();
+    _experienceController.dispose();
+    _organizationController.dispose();
+    _languagesController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pinCodeController.dispose();
     super.dispose();
   }
 
@@ -1083,6 +1134,21 @@ class _EditCounsellorProfileSheetState
       _photoPath = file.path;
       _photoName = file.name;
     });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+            SizedBox(width: 8),
+            Text('Photo selected — tap Save to apply'),
+          ],
+        ),
+        backgroundColor: Color(0xFF2E7D32),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   ImageProvider<Object>? get _photoProvider {
@@ -1109,12 +1175,50 @@ class _EditCounsellorProfileSheetState
       photoPath: kIsWeb ? null : _photoPath,
       photoFileName: _photoName,
     );
+    if (ok) {
+      // Also save extended profile fields
+      final extData = <String, dynamic>{
+        if (_gender != null) 'gender': _gender,
+        if (_dobController.text.trim().isNotEmpty)
+          'date_of_birth': _dobController.text.trim(),
+        if (_qualificationController.text.trim().isNotEmpty)
+          'qualification': _qualificationController.text.trim(),
+        if (_experienceController.text.trim().isNotEmpty)
+          'years_of_experience': int.tryParse(_experienceController.text.trim()),
+        if (_organizationController.text.trim().isNotEmpty)
+          'organization': _organizationController.text.trim(),
+        if (_counsellingMode != null) 'counselling_mode': _counsellingMode,
+        if (_languagesController.text.trim().isNotEmpty)
+          'languages_known': _languagesController.text.trim(),
+        if (_cityController.text.trim().isNotEmpty)
+          'city': _cityController.text.trim(),
+        if (_stateController.text.trim().isNotEmpty)
+          'state': _stateController.text.trim(),
+        if (_pinCodeController.text.trim().isNotEmpty)
+          'pin_code': _pinCodeController.text.trim(),
+      };
+      if (extData.isNotEmpty) {
+        await widget.vm.updateExtendedProfile(extData);
+      }
+    }
     if (!mounted) return;
     setState(() => _saving = false);
     if (ok) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Counsellor profile updated.')),
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+              SizedBox(width: 8),
+              Text('Profile updated successfully!',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            ],
+          ),
+          backgroundColor: Color(0xFF2E7D32),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 3),
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1271,6 +1375,110 @@ class _EditCounsellorProfileSheetState
                   label: 'Private location',
                   icon: Icons.location_on_outlined,
                 ),
+                const SizedBox(height: 18),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Professional Details',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _gender,
+                  decoration: _inputDecoration('Gender', Icons.person_outline_rounded),
+                  isExpanded: true,
+                  hint: const Text('Select gender'),
+                  items: _genderOptions
+                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                      .toList(),
+                  onChanged: _saving
+                      ? null
+                      : (v) => setState(() => _gender = v),
+                ),
+                const SizedBox(height: 12),
+                _EditField(
+                  controller: _dobController,
+                  label: 'Date of birth (yyyy-mm-dd)',
+                  icon: Icons.cake_outlined,
+                  keyboardType: TextInputType.datetime,
+                ),
+                const SizedBox(height: 12),
+                _EditField(
+                  controller: _qualificationController,
+                  label: 'Qualification',
+                  icon: Icons.school_outlined,
+                ),
+                const SizedBox(height: 12),
+                _EditField(
+                  controller: _experienceController,
+                  label: 'Years of experience',
+                  icon: Icons.timeline_rounded,
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                _EditField(
+                  controller: _organizationController,
+                  label: 'Organization',
+                  icon: Icons.business_outlined,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _counsellingMode,
+                  decoration: _inputDecoration(
+                    'Counselling mode',
+                    Icons.swap_horiz_rounded,
+                  ),
+                  isExpanded: true,
+                  items: _modeOptions
+                      .map((m) => DropdownMenuItem(
+                            value: m,
+                            child: Text(_modeLabels[m] ?? m),
+                          ))
+                      .toList(),
+                  onChanged: _saving
+                      ? null
+                      : (v) => setState(() => _counsellingMode = v),
+                ),
+                const SizedBox(height: 12),
+                _EditField(
+                  controller: _languagesController,
+                  label: 'Languages known (comma separated)',
+                  icon: Icons.language_rounded,
+                ),
+                const SizedBox(height: 18),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Location Details',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _EditField(
+                  controller: _cityController,
+                  label: 'City',
+                  icon: Icons.location_city_outlined,
+                ),
+                const SizedBox(height: 12),
+                _EditField(
+                  controller: _stateController,
+                  label: 'State',
+                  icon: Icons.map_outlined,
+                ),
+                const SizedBox(height: 12),
+                _EditField(
+                  controller: _pinCodeController,
+                  label: 'Pin code',
+                  icon: Icons.pin_drop_outlined,
+                  keyboardType: TextInputType.number,
+                ),
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: _saving ? null : _save,
@@ -1346,3 +1554,753 @@ InputDecoration _inputDecoration(String label, IconData icon) =>
         borderSide: const BorderSide(color: Color(0xFF126BFF), width: 1.5),
       ),
     );
+
+// ─── Availability Management Section ─────────────────────────────────────────
+
+class _AvailabilityManagementSection extends StatefulWidget {
+  const _AvailabilityManagementSection({required this.vm});
+  final CounsellorHomeViewModel vm;
+
+  @override
+  State<_AvailabilityManagementSection> createState() =>
+      _AvailabilityManagementSectionState();
+}
+
+class _AvailabilityManagementSectionState
+    extends State<_AvailabilityManagementSection> {
+  static const _dayNames = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+  ];
+
+  bool _loading = false;
+
+  Future<void> _refresh() async {
+    setState(() => _loading = true);
+    await widget.vm.fetchWeeklyAvailability();
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _addSlot() async {
+    int dayOfWeek = 0;
+    String startTime = '09:00';
+    String endTime = '10:00';
+    String mode = 'both';
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          title: const Text('Add Weekly Slot'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  initialValue: dayOfWeek,
+                  decoration: _inputDecoration('Day', Icons.calendar_today_rounded),
+                  items: List.generate(
+                    7,
+                    (i) => DropdownMenuItem(value: i, child: Text(_dayNames[i])),
+                  ),
+                  onChanged: (v) => setS(() => dayOfWeek = v ?? 0),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: startTime,
+                  decoration: _inputDecoration('Start time (HH:MM)', Icons.access_time_rounded),
+                  onChanged: (v) => startTime = v,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: endTime,
+                  decoration: _inputDecoration('End time (HH:MM)', Icons.access_time_filled_rounded),
+                  onChanged: (v) => endTime = v,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: mode,
+                  decoration: _inputDecoration('Mode', Icons.swap_horiz_rounded),
+                  items: const [
+                    DropdownMenuItem(value: 'online', child: Text('Online')),
+                    DropdownMenuItem(value: 'offline', child: Text('Offline')),
+                    DropdownMenuItem(value: 'both', child: Text('Both')),
+                  ],
+                  onChanged: (v) => setS(() => mode = v ?? 'both'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (ok != true || !mounted) return;
+    setState(() => _loading = true);
+    await widget.vm.addWeeklySlot({
+      'day_of_week': dayOfWeek,
+      'start_time': startTime,
+      'end_time': endTime,
+      'mode': mode,
+    });
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _deleteSlot(int slotId) async {
+    setState(() => _loading = true);
+    await widget.vm.deleteWeeklySlot(slotId);
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final slots = widget.vm.weeklySlots;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.event_repeat_rounded, size: 18, color: AppColors.ink),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Weekly Availability',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: _loading ? null : _refresh,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                tooltip: 'Refresh',
+              ),
+              TextButton.icon(
+                onPressed: _loading ? null : _addSlot,
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('Add Slot'),
+              ),
+            ],
+          ),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          if (_loading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (slots == null || slots.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No weekly availability set. Tap "Add Slot" to add one.',
+                style: TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+            )
+          else
+            ...slots.map((slot) {
+              final day = (slot['day_of_week'] as int?) ?? 0;
+              final dayName = day >= 0 && day < 7 ? _dayNames[day] : 'Day $day';
+              final start = slot['start_time'] as String? ?? '';
+              final end = slot['end_time'] as String? ?? '';
+              final mode = slot['mode'] as String? ?? 'both';
+              final slotId = slot['id'] as int? ?? 0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        dayName,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$start – $end',
+                        style: const TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.muted.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        mode,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _loading ? null : () => _deleteSlot(slotId),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                      color: AppColors.softRed,
+                      tooltip: 'Remove slot',
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Verification Docs Section ────────────────────────────────────────────────
+
+class _VerificationDocsSection extends StatefulWidget {
+  const _VerificationDocsSection({required this.vm});
+  final CounsellorHomeViewModel vm;
+
+  @override
+  State<_VerificationDocsSection> createState() => _VerificationDocsSectionState();
+}
+
+class _VerificationDocsSectionState extends State<_VerificationDocsSection> {
+  bool _uploading = false;
+
+
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'verified': return const Color(0xFF2E7D32);
+      case 'rejected': return AppColors.softRed;
+      case 'correction_required': return const Color(0xFFF57F17);
+      default: return AppColors.muted;
+    }
+  }
+
+  String _statusLabel(String? status) {
+    switch (status) {
+      case 'verified': return 'Verified';
+      case 'rejected': return 'Rejected';
+      case 'correction_required': return 'Correction Required';
+      default: return 'Pending';
+    }
+  }
+
+  Future<void> _uploadDoc(String docType) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty || !mounted) return;
+    final file = result.files.single;
+    if (file.bytes == null && file.path == null) return;
+
+    setState(() => _uploading = true);
+    try {
+      if (file.bytes != null) {
+        await ApiClient.postMultipart(
+          '/counsellor/upload-verification-doc',
+          fields: {'doc_type': docType},
+          fileBytes: file.bytes!,
+          fileName: file.name,
+          fileField: 'file',
+        );
+      } else {
+        await ApiClient.postMultipartFromPath(
+          '/counsellor/upload-verification-doc',
+          fields: {'doc_type': docType},
+          filePath: file.path!,
+          fileName: file.name,
+          fileField: 'file',
+        );
+      }
+      await widget.vm.fetchExtendedProfile();
+      final label = docType == 'id_proof' ? 'ID proof' : 'Certificate';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$label uploaded.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Upload failed. Please try again.'),
+            backgroundColor: AppColors.softRed,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = widget.vm.extendedProfile;
+    final status = ext?['verification_status'] as String? ?? 'pending';
+    final idProofDocUrl = ext?['id_proof_doc_url'] as String?;
+    final certUrl = ext?['professional_cert_url'] as String?;
+    final adminRemark = ext?['admin_remark'] as String?;
+    final idProofType = ext?['id_proof_type'] as String?;
+    final idProofNumber = ext?['id_proof_number'] as String?;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.verified_user_rounded, size: 18, color: AppColors.ink),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Verification Documents',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _statusColor(status).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _statusLabel(status),
+                  style: TextStyle(
+                    color: _statusColor(status),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+
+          // ID Proof type & number (read-only display from extended profile)
+          if (idProofType != null && idProofType.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  const Text(
+                    'ID Type: ',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  Expanded(
+                    child: Text(
+                      idProofType,
+                      style: const TextStyle(color: AppColors.ink, fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (idProofNumber != null && idProofNumber.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  const Text(
+                    'ID Number: ',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  Expanded(
+                    child: Text(
+                      idProofNumber,
+                      style: const TextStyle(color: AppColors.ink, fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // ID Proof upload
+          _DocRow(
+            label: 'ID Proof Document',
+            icon: Icons.badge_rounded,
+            hasDoc: idProofDocUrl != null && idProofDocUrl.isNotEmpty,
+            uploading: _uploading,
+            onUpload: () => _uploadDoc('id_proof'),
+          ),
+          const SizedBox(height: 8),
+
+          // Professional cert upload
+          _DocRow(
+            label: 'Professional Certificate',
+            icon: Icons.workspace_premium_rounded,
+            hasDoc: certUrl != null && certUrl.isNotEmpty,
+            uploading: _uploading,
+            onUpload: () => _uploadDoc('professional_cert'),
+          ),
+
+          if (adminRemark != null && adminRemark.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF57F17).withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFFE65100)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Admin remark: $adminRemark',
+                      style: const TextStyle(color: Color(0xFF795548), fontSize: 11, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          const Text(
+            'Documents submitted for admin verification only. Not shown publicly.',
+            style: TextStyle(color: AppColors.muted, fontSize: 11, fontStyle: FontStyle.italic),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DocRow extends StatelessWidget {
+  const _DocRow({
+    required this.label,
+    required this.icon,
+    required this.hasDoc,
+    required this.uploading,
+    required this.onUpload,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool hasDoc;
+  final bool uploading;
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: AppColors.muted),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: AppColors.ink, fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+        ),
+        if (hasDoc)
+          const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF2E7D32)),
+        const SizedBox(width: 6),
+        uploading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : TextButton.icon(
+                onPressed: onUpload,
+                icon: const Icon(Icons.upload_rounded, size: 14),
+                label: Text(hasDoc ? 'Replace' : 'Upload'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ),
+      ],
+    );
+  }
+}
+
+// ─── Account Settings Section ─────────────────────────────────────────────────
+
+class _AccountSettingsSection extends StatelessWidget {
+  const _AccountSettingsSection({required this.vm});
+  final CounsellorHomeViewModel vm;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E9F2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              children: [
+                Icon(Icons.settings_rounded, size: 18, color: AppColors.ink),
+                SizedBox(width: 8),
+                Text(
+                  'Account Settings',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 24),
+          ListTile(
+            leading: const Icon(Icons.lock_outline_rounded, color: AppColors.primary),
+            title: const Text(
+              'Change Password',
+              style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+            onTap: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => const _ChangePasswordSheet(),
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.logout_rounded, color: AppColors.softRed),
+            title: const Text(
+              'Logout',
+              style: TextStyle(color: AppColors.softRed, fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            onTap: () => _logout(context),
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.softRed),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Logout', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      final nav = Navigator.of(context);
+      try {
+        await AuthRepository.logout();
+      } catch (_) {}
+      AppState.clear();
+      nav.pushNamedAndRemoveUntil('/login', (route) => false);
+    }
+  }
+}
+
+// ─── Change Password Sheet ────────────────────────────────────────────────────
+
+class _ChangePasswordSheet extends StatefulWidget {
+  const _ChangePasswordSheet();
+
+  @override
+  State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
+}
+
+class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _currentCtrl = TextEditingController();
+  final _newCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  bool _saving = false;
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+
+  @override
+  void dispose() {
+    _currentCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      await AuthRepository.changePassword(
+        currentPassword: _currentCtrl.text.trim(),
+        newPassword: _newCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password changed successfully.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not change password. Check your current password.'),
+          backgroundColor: AppColors.softRed,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42, height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD6DCEA),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Change Password',
+                  style: TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 18),
+                TextFormField(
+                  controller: _currentCtrl,
+                  obscureText: _obscureCurrent,
+                  decoration: _inputDecoration('Current password', Icons.lock_outline_rounded).copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureCurrent ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                      onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                    ),
+                  ),
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _newCtrl,
+                  obscureText: _obscureNew,
+                  decoration: _inputDecoration('New password', Icons.lock_rounded).copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureNew ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                      onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Required';
+                    if (v.length < 6) return 'Minimum 6 characters';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _confirmCtrl,
+                  obscureText: _obscureConfirm,
+                  decoration: _inputDecoration('Confirm new password', Icons.lock_rounded).copyWith(
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureConfirm ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Required';
+                    if (v != _newCtrl.text) return 'Passwords do not match';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.3, color: Colors.white),
+                        )
+                      : const Text('Change Password', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

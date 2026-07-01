@@ -307,16 +307,34 @@ class _ActivityDetailSheet extends StatelessWidget {
               _InfoRow(
                   icon: Icons.subdirectory_arrow_right_rounded,
                   text: activity.subdivision!),
+            if (activity.location != null)
+              _InfoRow(
+                  icon: Icons.location_on_rounded,
+                  text: activity.location!),
             _InfoRow(
                 icon: Icons.schedule_rounded,
-                text: '${activity.rewardHours} hours reward'),
+                text: '${activity.rewardHours} hrs reward'),
+            if (activity.startDate != null)
+              _InfoRow(
+                  icon: Icons.calendar_today_rounded,
+                  text: activity.endDate != null
+                      ? '${_fmtDate(activity.startDate!)} – ${_fmtDate(activity.endDate!)}'
+                      : _fmtDate(activity.startDate!)),
+            if (activity.maxStudents != null)
+              _InfoRow(
+                  icon: Icons.people_rounded,
+                  text: '${activity.maxStudents} volunteers max'),
+            if (activity.certificateEligible)
+              const _InfoRow(
+                  icon: Icons.workspace_premium_rounded,
+                  text: 'Certificate eligible upon completion'),
+            if (activity.stipendAmount != null)
+              _InfoRow(
+                  icon: Icons.payments_rounded,
+                  text: '₹${activity.stipendAmount!.toStringAsFixed(0)} stipend'),
             const SizedBox(height: 12),
             if (activity.description != null) ...[
-              const Text('Description',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
-                      fontSize: 14)),
+              _SectionLabel('Description'),
               const SizedBox(height: 4),
               Text(activity.description!,
                   style: const TextStyle(
@@ -324,27 +342,25 @@ class _ActivityDetailSheet extends StatelessWidget {
               const SizedBox(height: 12),
             ],
             if (activity.expectedWork != null) ...[
-              const Text('Expected Work',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
-                      fontSize: 14)),
+              _SectionLabel('Work Details'),
               const SizedBox(height: 4),
               Text(activity.expectedWork!,
                   style: const TextStyle(
                       color: AppColors.muted, height: 1.5)),
               const SizedBox(height: 12),
             ],
-            if (activity.proofRequired != null) ...[
-              const Text('Proof Required',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
-                      fontSize: 14)),
+            if (activity.workInstructions != null) ...[
+              _SectionLabel('Work Instructions'),
               const SizedBox(height: 4),
-              Text(activity.proofRequired!,
+              Text(activity.workInstructions!,
                   style: const TextStyle(
                       color: AppColors.muted, height: 1.5)),
+              const SizedBox(height: 12),
+            ],
+            if (activity.proofRequired != null) ...[
+              _SectionLabel('Proof Required'),
+              const SizedBox(height: 4),
+              _ProofBadge(text: activity.proofRequired!),
               const SizedBox(height: 16),
             ],
             if (onApply != null) ...[
@@ -484,4 +500,63 @@ class _StatusChip extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+String _fmtDate(DateTime d) {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${d.day} ${months[d.month - 1]} ${d.year}';
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(
+          fontWeight: FontWeight.w800,
+          color: AppColors.ink,
+          fontSize: 14,
+        ),
+      );
+}
+
+class _ProofBadge extends StatelessWidget {
+  const _ProofBadge({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.upload_file_rounded,
+                size: 16, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: AppColors.accent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }

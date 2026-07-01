@@ -58,6 +58,7 @@ class ProfileViewModel extends ChangeNotifier {
     DateTime? dateOfBirth,
     String? parentEmail,
     String? phone,
+    List<String>? interests,
     List<int>? photoBytes,
     String? photoPath,
     String? photoFileName,
@@ -84,7 +85,8 @@ class ProfileViewModel extends ChangeNotifier {
           age != null ||
           dateOfBirth != null ||
           parentEmail != null ||
-          phone != null) {
+          phone != null ||
+          interests != null) {
         final updated = await UserRepository.updateProfile(
           name: name,
           className: className,
@@ -94,6 +96,7 @@ class ProfileViewModel extends ChangeNotifier {
           dateOfBirth: dateOfBirth,
           parentEmail: parentEmail,
           phone: phone,
+          interests: interests,
         );
         _user = updated;
       }

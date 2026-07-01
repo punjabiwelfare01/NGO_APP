@@ -12,6 +12,11 @@ class EventManagerViewModel extends ChangeNotifier {
   List<NGOEvent> _events = [];
   List<EMStudentAssignment> _assignments = [];
   List<EMImpactPost> _impactPosts = [];
+  List<EMActivity> _activities = [];
+
+  // Activities loading is separate so the main dashboard doesn't block on it
+  bool _activitiesLoading = false;
+  String? _activitiesError;
 
   EMLoadState get state => _state;
   String? get error => _error;
@@ -19,6 +24,9 @@ class EventManagerViewModel extends ChangeNotifier {
   List<NGOEvent> get events => List.unmodifiable(_events);
   List<EMStudentAssignment> get assignments => List.unmodifiable(_assignments);
   List<EMImpactPost> get impactPosts => List.unmodifiable(_impactPosts);
+  List<EMActivity> get activities => List.unmodifiable(_activities);
+  bool get activitiesLoading => _activitiesLoading;
+  String? get activitiesError => _activitiesError;
   List<NGOEvent> get todayEvents {
     final now = DateTime.now();
     return _events
@@ -108,6 +116,12 @@ class EventManagerViewModel extends ChangeNotifier {
     await load();
   }
 
+  Future<void> deleteImpactPost(int postId) async {
+    await EventManagerRepository.deleteImpact(postId);
+    _impactPosts.removeWhere((p) => p.id == postId);
+    notifyListeners();
+  }
+
   Future<EventReport> generateReport(int eventId) async {
     final response = await EventManagerRepository.generateReport(eventId);
     final event = _events.firstWhere((item) => item.id == eventId);
@@ -145,13 +159,96 @@ class EventManagerViewModel extends ChangeNotifier {
     );
   }
 
+  Future<void> loadActivities({String? status}) async {
+    _activitiesLoading = true;
+    _activitiesError = null;
+    notifyListeners();
+    try {
+      _activities = await EventManagerRepository.getMyActivities(status: status);
+    } catch (e) {
+      _activitiesError = e.toString();
+    }
+    _activitiesLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> editActivity(int activityId, Map<String, dynamic> payload) async {
+    final updated = await EventManagerRepository.editActivity(activityId, payload);
+    final idx = _activities.indexWhere((a) => a.id == activityId);
+    if (idx != -1) {
+      _activities[idx] = updated;
+      notifyListeners();
+    }
+  }
+
+  /// Creates a new activity (linked to an event or standalone) and prepends it
+  /// to the local activities list so the UI updates immediately.
+  Future<EMActivity> createActivity({
+    required String title,
+    required String category,
+    int? eventId,
+    String? description,
+    String? location,
+    String? expectedWork,
+    String? workInstructions,
+    String? proofRequired,
+    double rewardHours = 2.0,
+    int maxStudents = 20,
+    bool certificateEligible = true,
+    double? stipendAmount,
+    DateTime? startDate,
+    DateTime? endDate,
+    String status = 'active',
+  }) async {
+    final created = await EventManagerRepository.createActivity(
+      title: title,
+      category: category,
+      eventId: eventId,
+      description: description,
+      location: location,
+      expectedWork: expectedWork,
+      workInstructions: workInstructions,
+      proofRequired: proofRequired,
+      rewardHours: rewardHours,
+      maxStudents: maxStudents,
+      certificateEligible: certificateEligible,
+      stipendAmount: stipendAmount,
+      startDate: startDate,
+      endDate: endDate,
+      status: status,
+    );
+    _activities = [created, ..._activities];
+    notifyListeners();
+    return created;
+  }
+
   Future<void> addNewEvent(NGOEvent event) async {
     await EventManagerRepository.createEvent(event);
     await load();
   }
 
-  Future<void> addImpactPost(EMImpactPost post) async {
-    await EventManagerRepository.createStandaloneImpact(post);
+  Future<int> addImpactPost(
+    EMImpactPost post, {
+    List<Map<String, dynamic>> mediaList = const [],
+  }) async {
+    final id = await EventManagerRepository.createStandaloneImpact(
+      post,
+      mediaList: mediaList,
+    );
+    await load();
+    return id;
+  }
+
+  Future<void> updateImpactPost(
+    int postId,
+    EMImpactPost post, {
+    List<Map<String, dynamic>>? mediaList,
+  }) async {
+    await EventManagerRepository.updateStandaloneImpact(
+      postId,
+      post,
+      mediaList: mediaList,
+    );
     await load();
   }
 }

@@ -2049,7 +2049,7 @@ class _EmergencyHelpCard extends StatelessWidget {
                           ),
                           SizedBox(width: 4),
                           Text(
-                            'Registered NGO  •  Visit us for help',
+                            'Registered NGO  •  Regt. No. 736',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 11,
@@ -2085,9 +2085,9 @@ class _EmergencyHelpCard extends StatelessWidget {
                 _ContactRow(
                   icon: Icons.phone_rounded,
                   color: const Color(0xFF1A6B3A),
-                  label: 'Helpline Number',
-                  value: '+91 98765 43210',
-                  onTap: () => _launch('tel:+919876543210'),
+                  label: 'Helpline Numbers',
+                  value: '+91 92117 72333\n+91 78349 92799',
+                  onTap: () => _launch('tel:+919211772333'),
                   actionLabel: 'Call Now',
                 ),
                 const _Divider(),
@@ -2095,9 +2095,9 @@ class _EmergencyHelpCard extends StatelessWidget {
                   icon: Icons.chat_rounded,
                   color: const Color(0xFF25D366),
                   label: 'WhatsApp',
-                  value: '+91 98765 43210',
+                  value: '+91 92117 72333',
                   onTap: () => _launch(
-                    'https://wa.me/919876543210?text=Hello%20Punjabi%20Welfare%20Trust%2C%20I%20need%20help.',
+                    'https://wa.me/919211772333?text=Hello%20Punjabi%20Welfare%20Trust%2C%20I%20need%20help.',
                   ),
                   actionLabel: 'Message',
                 ),
@@ -2106,9 +2106,9 @@ class _EmergencyHelpCard extends StatelessWidget {
                   icon: Icons.mail_rounded,
                   color: const Color(0xFFFF8C00),
                   label: 'Email',
-                  value: 'help@punjabiwelfaretrust.org',
+                  value: 'Punjabiwelfaretrust99@gmail.com',
                   onTap: () => _launch(
-                    'mailto:help@punjabiwelfaretrust.org?subject=Help%20Request',
+                    'mailto:Punjabiwelfaretrust99@gmail.com?subject=Help%20Request',
                   ),
                   actionLabel: 'Send Mail',
                 ),

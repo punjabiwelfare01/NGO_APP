@@ -1,3 +1,4 @@
+import json
 from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
@@ -29,7 +30,10 @@ def update_user(db: Session, user_id: int, update: UserUpdate) -> User | None:
     if not user:
         return None
     for key, value in update.model_dump(exclude_unset=True).items():
-        setattr(user, key, value)
+        if key == "interests" and value is not None:
+            setattr(user, key, json.dumps(value))
+        else:
+            setattr(user, key, value)
     db.commit()
     db.refresh(user)
     return user

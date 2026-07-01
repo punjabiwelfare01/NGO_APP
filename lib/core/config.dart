@@ -54,7 +54,7 @@ class AppConfig {
   static const String ngrokBackendUrl =
       'https://streak-pogo-bonded.ngrok-free.dev';
   // static const String localBackendUrl = 'http://localhost:8000';
-  static const String localBackendUrl = 'http://10.42.112.128:8000';
+  static const String localBackendUrl = 'http://192.168.1.41:8000';
   // Android emulator reaches the host machine via 10.0.2.2.
   static const String androidEmulatorBackendUrl = 'http://10.0.2.2:8000';
   static const String testBackendUrl =
@@ -139,17 +139,6 @@ class AppConfig {
   //   com.careskill.app://{auth0Domain}/android/com.careskill.app/callback
   //   https://android-app/android/com.careskill.app/callback  (HTTPS App Links)
   static const String auth0CallbackScheme = 'com.careskill.app';
-
-  // ── WebSocket base URL ────────────────────────────────────────────────────
-  /// Converts the HTTP base URL to a WebSocket base URL.
-  /// http://... → ws://...   |   https://... → wss://...
-  static String get wsBaseUrl {
-    final base = apiBaseUrl;
-    if (base.startsWith('https://')) {
-      return base.replaceFirst('https://', 'wss://');
-    }
-    return base.replaceFirst('http://', 'ws://');
-  }
 
   // ── Default values ────────────────────────────────────────────────────────
   /// Default hex theme colour used when creating a new event.

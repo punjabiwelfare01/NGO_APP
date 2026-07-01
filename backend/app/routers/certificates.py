@@ -20,7 +20,9 @@ from ..schemas.certificate import (
     CertificateOut,
     CertificateRequest,
     CertificateRevoke,
+    CertificateUpdate,
     CertificateUpload,
+    ImpactStoryFromCertificate,
 )
 from ..services.file_storage import resolve_stored_file, save_upload
 from ..services.pdf_service import create_text_pdf
@@ -78,6 +80,88 @@ def verify_certificate(token: str, db: Session = Depends(get_db)):
     return CertificateOut.from_db(obj)
 
 
+@router.put("/{cert_id}", response_model=CertificateOut)
+def update_certificate(
+    cert_id: int,
+    data: CertificateUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.admin, UserRole.super_admin, UserRole.event_manager)),
+):
+    obj = certificate_crud.get_certificate(db, cert_id)
+    if not obj:
+        raise HTTPException(404, "Certificate not found")
+    obj = certificate_crud.update_certificate(db, obj, data)
+    audit_service.record(db, user.id, "update_certificate", entity_type="certificate", entity_id=obj.certificate_id)
+    return CertificateOut.from_db(obj)
+
+
+@router.get("/{cert_id}/download")
+def admin_download_certificate(
+    cert_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role(UserRole.admin, UserRole.super_admin, UserRole.event_manager)),
+):
+    obj = certificate_crud.get_certificate(db, cert_id)
+    if not obj:
+        raise HTTPException(404, "Certificate not found")
+    path = resolve_stored_file(obj.certificate_file, "certificates")
+    if not path:
+        raise HTTPException(404, "Certificate PDF not found — generate or upload it first")
+    # Mark as downloaded if it was only generated
+    if obj.status == CertificateStatus.generated:
+        obj.status = CertificateStatus.downloaded
+        db.commit()
+    return FileResponse(path, media_type="application/pdf", filename=f"{obj.certificate_id}.pdf")
+
+
+@router.post("/{cert_id}/impact-story", status_code=201)
+def create_impact_story_from_certificate(
+    cert_id: int,
+    data: ImpactStoryFromCertificate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.admin, UserRole.super_admin, UserRole.event_manager)),
+):
+    from ..repositories import impact_repository
+    from ..schemas.impact import ImpactPostCreate, ImpactMediaCreate
+
+    obj = certificate_crud.get_certificate(db, cert_id)
+    if not obj:
+        raise HTTPException(404, "Certificate not found")
+    if obj.impact_story_id:
+        raise HTTPException(409, "Impact story already created for this certificate")
+
+    student_name = obj.student.name if obj.student else "Unknown Student"
+    title = data.override_title or f"{student_name} — {obj.activity_name}"
+    summary = data.override_summary or obj.impact_story_summary or (
+        f"{student_name} completed {obj.activity_name}"
+        + (f" ({obj.duration})" if obj.duration else "")
+        + (f" as part of {obj.program_name}" if obj.program_name else "")
+        + "."
+    )
+
+    media = []
+    # If a pdf_url has been set (e.g., from an upload) include it as media.
+    if obj.pdf_url:
+        media.append(ImpactMediaCreate(media_type="document", url=obj.pdf_url, caption="Certificate"))
+
+    post_data = ImpactPostCreate(
+        category="achievement",
+        title=title,
+        description=summary,
+        event_id=obj.event_id,
+        activity_id=obj.activity_id,
+        certificate_id=obj.id,
+        student_names=student_name,
+        hours_served=obj.service_hours or 0,
+        media=media,
+    )
+    post = impact_repository.create_post(db, post_data, user.id)
+    obj.impact_story_id = post.id
+    db.commit()
+    audit_service.record(db, user.id, "create_impact_story_from_cert", entity_type="certificate", entity_id=obj.certificate_id)
+    return {"impact_story_id": post.id, "certificate_id": obj.certificate_id}
+
+
 @router.patch("/{cert_id}/upload", response_model=CertificateOut)
 def upload_signed_certificate(
     cert_id: int,
@@ -108,6 +192,66 @@ def get_certificate(
 
 
 # ── Admin certificate routes ──────────────────────────────────────────────────
+
+@admin_router.get("/ready", response_model=List[dict])
+def get_ready_to_generate(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role(UserRole.admin, UserRole.super_admin)),
+):
+    """
+    Returns assignments that have an approved submission but no certificate yet.
+    Includes both event_manager_verified and admin_approved statuses.
+    """
+    from sqlalchemy import and_, or_
+    from ..models.volunteer import VolunteerActivity
+    from ..models.user import User as UserModel
+    assignments = (
+        db.query(ActivityAssignment)
+        .filter(ActivityAssignment.status.in_(["event_manager_verified", "admin_approved"]))
+        .all()
+    )
+    result = []
+    for a in assignments:
+        existing = db.query(Certificate).filter(Certificate.assignment_id == a.id).first()
+        if existing:
+            continue
+        # Include orphaned submissions (assignment_id=None linked by student+activity)
+        sub = (
+            db.query(WorkSubmission)
+            .filter(
+                or_(
+                    and_(
+                        WorkSubmission.assignment_id == a.id,
+                        WorkSubmission.status == SubmissionStatus.approved,
+                    ),
+                    and_(
+                        WorkSubmission.assignment_id.is_(None),
+                        WorkSubmission.student_id == a.student_id,
+                        WorkSubmission.activity_id == a.activity_id,
+                        WorkSubmission.status == SubmissionStatus.approved,
+                    ),
+                )
+            )
+            .order_by(WorkSubmission.created_at.desc())
+            .first()
+        )
+        if not sub:
+            continue
+        student = db.query(UserModel).filter(UserModel.id == a.student_id).first()
+        activity = db.query(VolunteerActivity).filter(VolunteerActivity.id == a.activity_id).first()
+        result.append({
+            "assignment_id": a.id,
+            "student_id": a.student_id,
+            "student_name": student.name if student else "Unknown",
+            "activity_id": a.activity_id,
+            "activity_name": activity.title if activity else "Unknown Activity",
+            "hours_worked": float(sub.hours_worked) if sub.hours_worked else 0,
+            "submission_id": sub.id,
+            "submission_title": sub.title,
+            "approved_at": sub.created_at.isoformat() if sub.created_at else None,
+        })
+    return result
+
 
 @admin_router.get("/pending", response_model=List[CertificateOut])
 def get_pending(
@@ -176,11 +320,31 @@ def generate_certificate(
     db: Session = Depends(get_db),
     user: User = Depends(require_role(UserRole.admin, UserRole.super_admin)),
 ):
+    from sqlalchemy import and_, or_
     assignment = db.query(ActivityAssignment).filter(ActivityAssignment.id == data.assignment_id).first()
     if not assignment:
         raise HTTPException(404, "Assignment not found")
-    submission = db.query(WorkSubmission).filter(WorkSubmission.assignment_id == assignment.id).order_by(WorkSubmission.created_at.desc()).first()
-    if not submission or submission.status != SubmissionStatus.approved:
+    # Include orphaned submissions (assignment_id=None) linked by student+activity
+    submission = (
+        db.query(WorkSubmission)
+        .filter(
+            or_(
+                and_(
+                    WorkSubmission.assignment_id == assignment.id,
+                    WorkSubmission.status == SubmissionStatus.approved,
+                ),
+                and_(
+                    WorkSubmission.assignment_id.is_(None),
+                    WorkSubmission.student_id == assignment.student_id,
+                    WorkSubmission.activity_id == assignment.activity_id,
+                    WorkSubmission.status == SubmissionStatus.approved,
+                ),
+            )
+        )
+        .order_by(WorkSubmission.created_at.desc())
+        .first()
+    )
+    if not submission:
         raise HTTPException(409, "Approved work submission required")
     existing = db.query(Certificate).filter(Certificate.assignment_id == assignment.id).first()
     if existing:

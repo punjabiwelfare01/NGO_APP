@@ -57,6 +57,7 @@ enum CertificateStatus {
   generated,
   signed,
   issued,
+  downloaded,
   revoked;
 
   String get displayName => switch (this) {
@@ -68,11 +69,15 @@ enum CertificateStatus {
     generated         => 'Generated',
     signed            => 'Signed',
     issued            => 'Issued & Verified',
+    downloaded        => 'Downloaded',
     revoked           => 'Revoked',
   };
 
   bool get canGeneratePdf =>
-      this == approved || this == issued || this == generated;
+      this == approved || this == issued || this == generated || this == downloaded;
+
+  bool get canDownload =>
+      this == generated || this == issued || this == downloaded;
 
   bool get isActive => this != rejected && this != revoked;
 
@@ -91,10 +96,26 @@ class Certificate {
   final CertificateType certificateType;
   final String activityName;
   final String? duration;
+  // Extended detail fields
+  final String? studentIdNumber;
+  final String? studentRole;
+  final String? eventName;
+  final String? programName;
+  final String? workDescription;
+  final double? serviceHours;
+  final DateTime? startDate;
+  final DateTime? endDate;
   final String? signatoryName;
   final String? signatoryTitle;
+  final String? signatureUrl;
+  final String? logoUrl;
+  final String? remarks;
+  final String? impactStorySummary;
+  final int? impactStoryId;
+  // Status/verification fields
   final DateTime? issueDate;
   final String? certificateFile;
+  final String? pdfUrl;
   final CertificateStatus status;
   final bool isVerified;
   final String? qrToken;
@@ -112,10 +133,24 @@ class Certificate {
     required this.certificateType,
     required this.activityName,
     this.duration,
+    this.studentIdNumber,
+    this.studentRole,
+    this.eventName,
+    this.programName,
+    this.workDescription,
+    this.serviceHours,
+    this.startDate,
+    this.endDate,
     this.signatoryName,
     this.signatoryTitle,
+    this.signatureUrl,
+    this.logoUrl,
+    this.remarks,
+    this.impactStorySummary,
+    this.impactStoryId,
     this.issueDate,
     this.certificateFile,
+    this.pdfUrl,
     required this.status,
     required this.isVerified,
     this.qrToken,
@@ -131,17 +166,29 @@ class Certificate {
     eventId: j['event_id'] as int?,
     activityId: j['activity_id'] as int?,
     assignmentId: j['assignment_id'] as int?,
-    certificateType: CertificateType.fromString(
-      j['certificate_type'] as String,
-    ),
+    certificateType: CertificateType.fromString(j['certificate_type'] as String),
     activityName: j['activity_name'] as String,
     duration: j['duration'] as String?,
+    studentIdNumber: j['student_id_number'] as String?,
+    studentRole: j['student_role'] as String?,
+    eventName: j['event_name'] as String?,
+    programName: j['program_name'] as String?,
+    workDescription: j['work_description'] as String?,
+    serviceHours: (j['service_hours'] as num?)?.toDouble(),
+    startDate: j['start_date'] == null ? null : DateTime.tryParse(j['start_date'] as String),
+    endDate: j['end_date'] == null ? null : DateTime.tryParse(j['end_date'] as String),
     signatoryName: j['signatory_name'] as String?,
     signatoryTitle: j['signatory_title'] as String?,
+    signatureUrl: j['signature_url'] as String?,
+    logoUrl: j['logo_url'] as String?,
+    remarks: j['remarks'] as String?,
+    impactStorySummary: j['impact_story_summary'] as String?,
+    impactStoryId: j['impact_story_id'] as int?,
     issueDate: j['issue_date'] == null
         ? null
         : DateTime.tryParse(j['issue_date'] as String),
     certificateFile: j['certificate_file'] as String?,
+    pdfUrl: j['pdf_url'] as String?,
     status: CertificateStatus.fromString(j['status'] as String),
     isVerified: j['is_verified'] as bool? ?? false,
     qrToken: j['qr_token'] as String?,
@@ -149,5 +196,60 @@ class Certificate {
     createdAt: j['created_at'] == null
         ? null
         : DateTime.tryParse(j['created_at'] as String),
+  );
+
+  Certificate copyWith({
+    String? studentIdNumber,
+    String? studentRole,
+    String? eventName,
+    String? programName,
+    String? workDescription,
+    double? serviceHours,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? signatoryName,
+    String? signatoryTitle,
+    String? signatureUrl,
+    String? logoUrl,
+    String? remarks,
+    String? impactStorySummary,
+    DateTime? issueDate,
+    CertificateType? certificateType,
+    String? activityName,
+    String? duration,
+  }) => Certificate(
+    id: id,
+    certificateId: certificateId,
+    studentId: studentId,
+    studentName: studentName,
+    eventId: eventId,
+    activityId: activityId,
+    assignmentId: assignmentId,
+    certificateType: certificateType ?? this.certificateType,
+    activityName: activityName ?? this.activityName,
+    duration: duration ?? this.duration,
+    studentIdNumber: studentIdNumber ?? this.studentIdNumber,
+    studentRole: studentRole ?? this.studentRole,
+    eventName: eventName ?? this.eventName,
+    programName: programName ?? this.programName,
+    workDescription: workDescription ?? this.workDescription,
+    serviceHours: serviceHours ?? this.serviceHours,
+    startDate: startDate ?? this.startDate,
+    endDate: endDate ?? this.endDate,
+    signatoryName: signatoryName ?? this.signatoryName,
+    signatoryTitle: signatoryTitle ?? this.signatoryTitle,
+    signatureUrl: signatureUrl ?? this.signatureUrl,
+    logoUrl: logoUrl ?? this.logoUrl,
+    remarks: remarks ?? this.remarks,
+    impactStorySummary: impactStorySummary ?? this.impactStorySummary,
+    impactStoryId: impactStoryId,
+    issueDate: issueDate ?? this.issueDate,
+    certificateFile: certificateFile,
+    pdfUrl: pdfUrl,
+    status: status,
+    isVerified: isVerified,
+    qrToken: qrToken,
+    rejectionReason: rejectionReason,
+    createdAt: createdAt,
   );
 }

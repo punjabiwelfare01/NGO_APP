@@ -3,13 +3,12 @@ from .user import User, UserRole
 from .auth import BlacklistedToken
 from .course import SkillCategory, Course, UserCourseProgress, Lesson, UserLessonProgress, LearningResource
 from .wellness import CounsellingAvailability, CounsellingSession
-from .counselling import MentorProfile, CounsellingNotification
+from .counselling import MentorProfile, CounsellingNotification, CounsellorWeeklyAvailability
 from .badge import Badge, UserBadge
 from .event import Event, EventParticipant, EventQuiz, EventSelection, EventSlot, EventType, EventStatus, SelectionMethod, QuizMapping
 from .quiz import Quiz, Question, QuizAttempt, DailyChallenge, QuizDifficulty
 from .safety import SafetyAwarenessQuestion, UserSafetyAnswer
 from .emergency import EmergencyContact
-from .chat import ChatMessage
 from .notification import AdminNotification
 from .calendar import StudentReminder
 from .creator_post import CreatorPost
@@ -23,3 +22,5 @@ from .platform import (
     Announcement, PasswordResetToken, ReminderJob, EventReportFile,
     SchoolCounsellorRequest, CounsellorSessionReport,
 )
+from .school_partner import SchoolPartnerProfile
+from .file_asset import FileAsset, FileAssetType

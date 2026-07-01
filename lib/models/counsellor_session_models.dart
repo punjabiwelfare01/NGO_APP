@@ -63,6 +63,7 @@ enum ReminderType {
 class SchoolBookingRequest {
   const SchoolBookingRequest({
     required this.id,
+    this.counsellorUserId,
     required this.schoolName,
     required this.coordinatorName,
     required this.coordinatorPhone,
@@ -97,6 +98,7 @@ class SchoolBookingRequest {
   });
 
   final int id;
+  final int? counsellorUserId;
 
   final String counsellorName;
 
@@ -155,6 +157,7 @@ class SchoolBookingRequest {
         json[key] == null ? null : DateTime.tryParse(json[key] as String);
     return SchoolBookingRequest(
       id: json['id'] as int,
+      counsellorUserId: json['counsellor_user_id'] as int?,
       counsellorName: json['counsellor_name'] as String? ?? 'TBD',
       schoolName: json['school_name'] as String,
       coordinatorName: json['coordinator_name'] as String,
@@ -182,7 +185,9 @@ class SchoolBookingRequest {
         json['status'] as String? ?? 'new_request',
       ),
       declineNote: json['decline_note'] as String? ?? '',
-      requestedAt: DateTime.parse(json['requested_at'] as String),
+      requestedAt: json['requested_at'] != null
+          ? DateTime.parse(json['requested_at'] as String)
+          : DateTime.now(),
       acceptedAt: optionalDate('accepted_at'),
       confirmedAt: optionalDate('confirmed_at'),
       completedAt: optionalDate('completed_at'),
@@ -198,6 +203,8 @@ class SchoolBookingRequest {
       status == SchoolRequestStatus.completed;
 
   bool get isUpcoming =>
+      status == SchoolRequestStatus.accepted ||
+      status == SchoolRequestStatus.pendingConfirmation ||
       status == SchoolRequestStatus.confirmed ||
       status == SchoolRequestStatus.scheduled;
 
@@ -239,6 +246,7 @@ class SchoolBookingRequest {
     String? feedbackComment,
   }) => SchoolBookingRequest(
     id: id,
+    counsellorUserId: counsellorUserId,
     counsellorName: counsellorName ?? this.counsellorName,
     schoolName: schoolName,
     coordinatorName: coordinatorName,

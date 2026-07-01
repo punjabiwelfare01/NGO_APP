@@ -5,6 +5,7 @@ import '../models/api_models.dart';
 import '../models/counselling_models.dart';
 import '../models/counsellor_models.dart';
 import '../models/counsellor_session_models.dart';
+import '../repositories/api_client.dart';
 import '../repositories/counselling_repository.dart';
 import '../repositories/user_repository.dart';
 
@@ -20,6 +21,8 @@ class CounsellorHomeViewModel extends ChangeNotifier {
   MentorProfile? _mentorProfile;
   bool _savingProfile = false;
   String? _profileError;
+  Map<String, dynamic>? _extendedProfile;
+  List<Map<String, dynamic>>? _weeklySlots;
   CounsellorStats _stats = const CounsellorStats(
     todayScheduled: 0,
     newRequests: 0,
@@ -35,38 +38,60 @@ class CounsellorHomeViewModel extends ChangeNotifier {
   MentorProfile? get mentorProfile => _mentorProfile;
   bool get savingProfile => _savingProfile;
   String? get profileError => _profileError;
-  CounsellorProfile get profile => CounsellorProfile(
-    id: AppState.userId,
-    ngoVerificationId: 'PWT-COUN-${AppState.userId}',
-    name:
-        _mentorProfile?.displayName ??
-        _user?.name ??
-        AppState.studentName ??
-        'Counsellor',
-    photoUrl: _mentorProfile?.profileImageUrl ?? _user?.photoUrl,
-    category:
-        CounsellorCategory.fromLabel(_mentorProfile?.category ?? '') ??
-        CounsellorCategory.educationCounsellor,
-    designation: 'Verified NGO Counsellor',
-    serviceBackground: _mentorProfile?.expertise?.trim().isNotEmpty == true
-        ? _mentorProfile!.expertise!.trim()
-        : 'Add your professional background and areas of expertise.',
-    shortBio: _mentorProfile?.bio?.trim().isNotEmpty == true
-        ? _mentorProfile!.bio!.trim()
-        : 'Counsellor serving Punjabi Welfare Trust school and community programs.',
-    qualifications: const [],
-    expertiseAreas: _splitValues(_mentorProfile?.expertise),
-    sessionTopics: const [],
-    languages: const [],
-    sessionMode: SessionMode.both,
-    availableSlots: _slots.map((slot) => slot.timeLabel).toList(),
-    yearsOfExperience: 0,
-    schoolSessionsCompleted: completedSessions.length,
-    studentsGuided: _stats.totalStudentsGuided,
-    recognitionProof: const [],
-    verificationStatus: VerificationStatus.verified,
-    availableThisWeek: _slots.any((slot) => !slot.isBlocked && !slot.isBooked),
-  );
+  Map<String, dynamic>? get extendedProfile => _extendedProfile;
+  List<Map<String, dynamic>>? get weeklySlots => _weeklySlots;
+  CounsellorProfile get profile {
+    // Qualification: prefer extended profile, fall back to schoolName saved at registration
+    final qualStr = (_extendedProfile?['qualification'] as String?)?.trim().isNotEmpty == true
+        ? _extendedProfile!['qualification'] as String
+        : (_user?.schoolName?.trim().isNotEmpty == true ? _user!.schoolName! : null);
+    // Languages: prefer extended profile, fall back to a sensible default
+    final langStr = (_extendedProfile?['languages_known'] as String?)?.trim().isNotEmpty == true
+        ? _extendedProfile!['languages_known'] as String
+        : null;
+    return CounsellorProfile(
+      id: AppState.userId,
+      ngoVerificationId: 'PWT-COUN-${AppState.userId}',
+      name:
+          _mentorProfile?.displayName ??
+          _user?.name ??
+          AppState.studentName ??
+          'Counsellor',
+      photoUrl: _mentorProfile?.profileImageUrl ?? _user?.photoUrl,
+      phone: _user?.phone,
+      location: _user?.location,
+      category:
+          CounsellorCategory.fromLabel(_mentorProfile?.category ?? '') ??
+          CounsellorCategory.educationCounsellor,
+      // designation comes from className saved at registration
+      designation: _user?.className?.trim().isNotEmpty == true
+          ? _user!.className!.trim()
+          : (_mentorProfile?.category ?? 'NGO Counsellor'),
+      serviceBackground: _mentorProfile?.bio?.trim().isNotEmpty == true
+          ? _mentorProfile!.bio!.trim()
+          : (_mentorProfile?.expertise?.trim().isNotEmpty == true
+              ? _mentorProfile!.expertise!.trim()
+              : 'Add your professional background and areas of expertise.'),
+      shortBio: _mentorProfile?.bio?.trim().isNotEmpty == true
+          ? _mentorProfile!.bio!.trim()
+          : 'Counsellor serving Punjabi Welfare Trust school and community programs.',
+      qualifications: _splitValues(qualStr),
+      expertiseAreas: _splitValues(_mentorProfile?.expertise),
+      sessionTopics: const [],
+      languages: langStr != null ? _splitValues(langStr) : const [],
+      sessionMode: SessionMode.fromString(
+        _extendedProfile?['counselling_mode'] as String? ?? 'both',
+      ),
+      availableSlots: _slots.map((slot) => slot.timeLabel).toList(),
+      yearsOfExperience:
+          (_extendedProfile?['years_of_experience'] as num?)?.toInt() ?? 0,
+      schoolSessionsCompleted: completedSessions.length,
+      studentsGuided: _stats.totalStudentsGuided,
+      recognitionProof: const [],
+      verificationStatus: VerificationStatus.verified,
+      availableThisWeek: _slots.any((slot) => !slot.isBlocked && !slot.isBooked),
+    );
+  }
 
   List<String> _splitValues(String? value) =>
       value
@@ -83,6 +108,16 @@ class CounsellorHomeViewModel extends ChangeNotifier {
       _requests.where((item) => item.isActive).toList();
   List<SchoolBookingRequest> get upcomingMeetings =>
       _requests.where((item) => item.isUpcoming).toList();
+
+  /// All requests that should appear in the counsellor's calendar:
+  /// every status except declined and cancelled.
+  List<SchoolBookingRequest> get calendarRequests => _requests
+      .where(
+        (r) =>
+            r.status != SchoolRequestStatus.declined &&
+            r.status != SchoolRequestStatus.cancelled,
+      )
+      .toList();
   List<SchoolBookingRequest> get todayMeetings =>
       upcomingMeetings.where((item) => item.isToday).toList();
   List<SchoolBookingRequest> get completedSessions => _requests
@@ -136,9 +171,84 @@ class CounsellorHomeViewModel extends ChangeNotifier {
       AppState.updateStudentName(_user!.name);
       _reminders = _buildReminders();
       _stats = _buildStats();
+      // Load extended profile and weekly availability in parallel (non-fatal)
+      await Future.wait([
+        fetchExtendedProfile(),
+        fetchWeeklyAvailability(),
+      ]);
     } finally {
       _state = CounsellorHomeLoadState.idle;
       if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> refreshRequests() async {
+    try {
+      _requests = await CounsellingRepository.getCounsellorRequests();
+      _reminders = _buildReminders();
+      _stats = _buildStats();
+      if (!_disposed) notifyListeners();
+    } catch (_) {
+      // non-fatal on manual refresh
+    }
+  }
+
+  Future<void> fetchExtendedProfile() async {
+    try {
+      final data = await ApiClient.get('/counselling/mentors/me/extended');
+      _extendedProfile = Map<String, dynamic>.from(data as Map);
+      if (!_disposed) notifyListeners();
+    } catch (_) {
+      // non-fatal – extended profile may not exist yet
+    }
+  }
+
+  Future<bool> updateExtendedProfile(Map<String, dynamic> data) async {
+    _savingProfile = true;
+    _profileError = null;
+    if (!_disposed) notifyListeners();
+    try {
+      final result = await ApiClient.patch('/counselling/mentors/me/extended', data);
+      _extendedProfile = Map<String, dynamic>.from(result as Map);
+      return true;
+    } catch (_) {
+      _profileError = 'Could not save extended profile. Please try again.';
+      return false;
+    } finally {
+      _savingProfile = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> fetchWeeklyAvailability() async {
+    try {
+      final data = await ApiClient.get('/counsellor/weekly-availability');
+      _weeklySlots = (data as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (!_disposed) notifyListeners();
+    } catch (_) {
+      // non-fatal
+    }
+  }
+
+  Future<bool> addWeeklySlot(Map<String, dynamic> payload) async {
+    try {
+      await ApiClient.post('/counsellor/weekly-availability', payload);
+      await fetchWeeklyAvailability();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteWeeklySlot(int slotId) async {
+    try {
+      await ApiClient.delete('/counsellor/weekly-availability/$slotId');
+      await fetchWeeklyAvailability();
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -251,6 +361,14 @@ class CounsellorHomeViewModel extends ChangeNotifier {
   }
 
   Future<void> acceptRequest(int id) async {
+    // Optimistically update status so the action buttons disappear immediately,
+    // preventing double-taps while the API call is in flight.
+    final index = _requests.indexWhere((r) => r.id == id);
+    if (index >= 0) {
+      _requests[index] =
+          _requests[index].copyWith(status: SchoolRequestStatus.accepted);
+      if (!_disposed) notifyListeners();
+    }
     await CounsellingRepository.acceptRequest(id);
     await load();
   }

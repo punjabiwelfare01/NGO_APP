@@ -1,13 +1,22 @@
+import uuid
 from datetime import datetime
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+import aiofiles
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..models.platform import SchoolCounsellorRequest
+from ..models.school_partner import SchoolPartnerProfile
 from ..models.user import User, UserRole
 from ..services import notification_service
+
+_UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads" / "school_logos"
+_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+_CHUNK_SIZE = 1024 * 1024
 
 router = APIRouter(prefix="/school", tags=["School Partner"])
 
@@ -208,3 +217,174 @@ def cancel_request(
     )
     db.commit()
     return _school_json(item, db)
+
+
+# ── Profile ────────────────────────────────────────────────────────────────────
+
+def _profile_json(user: User, profile: SchoolPartnerProfile | None) -> dict:
+    """Build the combined profile response dict."""
+    return {
+        # Core user fields
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "school_name": user.school_name,
+        "phone": user.phone,
+        "location": user.location,
+        "photo_url": user.photo_url,
+        "access_status": user.access_status,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "verification_note": user.verification_note,
+        # Extended school fields (from SchoolPartnerProfile — None when not yet created)
+        "school_type": profile.school_type if profile else None,
+        "school_board": profile.school_board if profile else None,
+        "registration_number": profile.registration_number if profile else None,
+        "address": profile.address if profile else None,
+        "city": profile.city if profile else None,
+        "state": profile.state if profile else None,
+        "pin_code": profile.pin_code if profile else None,
+        "coordinator_designation": profile.coordinator_designation if profile else None,
+        "alternate_phone": profile.alternate_phone if profile else None,
+        # Computed fields
+        "partner_id": f"SP-{user.id:04d}",
+        "joined_date": user.created_at.isoformat() if user.created_at else None,
+    }
+
+
+def _require_school_partner(user: User) -> None:
+    if user.role != UserRole.school_partner:
+        raise HTTPException(status_code=403, detail="School partner access only")
+
+
+@router.get("/profile", summary="Get school partner profile [authenticated, school_partner]")
+def get_profile(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _require_school_partner(user)
+    profile = db.query(SchoolPartnerProfile).filter(SchoolPartnerProfile.user_id == user.id).first()
+    return _profile_json(user, profile)
+
+
+@router.patch("/profile", summary="Update school partner profile [authenticated, school_partner]")
+def update_profile(
+    payload: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _require_school_partner(user)
+
+    # Update User-level fields
+    if "name" in payload:
+        user.name = payload["name"]
+    if "phone" in payload:
+        user.phone = payload["phone"]
+    if "school_name" in payload:
+        user.school_name = payload["school_name"]
+    if "location" in payload:
+        user.location = payload["location"]
+    if "photo_url" in payload:
+        user.photo_url = payload["photo_url"]
+
+    # Update or create SchoolPartnerProfile for extended fields
+    profile = db.query(SchoolPartnerProfile).filter(SchoolPartnerProfile.user_id == user.id).first()
+    if profile is None:
+        profile = SchoolPartnerProfile(user_id=user.id)
+        db.add(profile)
+
+    extended_fields = [
+        "school_type", "school_board", "registration_number",
+        "address", "city", "state", "pin_code",
+        "coordinator_designation", "alternate_phone",
+    ]
+    for field in extended_fields:
+        if field in payload:
+            setattr(profile, field, payload[field])
+
+    db.commit()
+    db.refresh(user)
+    db.refresh(profile)
+    return _profile_json(user, profile)
+
+
+@router.post("/profile/upload-logo", summary="Upload school logo [authenticated, school_partner]")
+async def upload_logo(
+    file: UploadFile,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _require_school_partner(user)
+
+    original = Path(file.filename or "logo")
+    ext = original.suffix.lower()
+    if ext not in _IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type '{ext}' not allowed. Use png/jpg/jpeg/gif/webp.",
+        )
+
+    # Remove old logo if stored locally
+    if user.photo_url and user.photo_url.startswith("/uploads/school_logos/"):
+        old_path = _UPLOADS_DIR / Path(user.photo_url).name
+        if old_path.exists():
+            old_path.unlink(missing_ok=True)
+
+    filename = f"{uuid.uuid4()}{ext}"
+    dest = _UPLOADS_DIR / filename
+
+    async with aiofiles.open(dest, "wb") as out:
+        while True:
+            chunk = await file.read(_CHUNK_SIZE)
+            if not chunk:
+                break
+            await out.write(chunk)
+
+    url = f"/uploads/school_logos/{filename}"
+    user.photo_url = url
+    db.commit()
+    return {"url": url}
+
+
+@router.get("/ngo-events", summary="Active NGO events visible to school partners")
+def ngo_events(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_school_partner(user)
+    from ..models.event import Event, EventStatus
+    from ..models.volunteer import VolunteerActivity
+    events = (
+        db.query(Event)
+        .filter(Event.status == EventStatus.registration_open)
+        .order_by(Event.event_start.asc())
+        .limit(20)
+        .all()
+    )
+    result = []
+    for e in events:
+        acts = db.query(VolunteerActivity).filter(VolunteerActivity.event_id == e.id).all()
+        location = next((a.location for a in acts if a.location), None)
+        result.append({
+            "id": e.id,
+            "title": e.title,
+            "description": e.description or e.subtitle or "",
+            "event_type": e.event_type.value,
+            "status": e.status.value,
+            "event_start": e.event_start.isoformat() if e.event_start else None,
+            "location": location,
+            "banner_url": e.banner_url,
+            "max_participants": e.max_participants or 20,
+            "certificate_eligible": e.certificate_enabled,
+        })
+    return result
+
+
+@router.get("/impact-stats", summary="NGO platform impact summary for school partners")
+def impact_stats(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_school_partner(user)
+    from ..repositories import impact_repository
+    row = impact_repository.metrics(db)
+    return {
+        "total_posts": row[0],
+        "people_reached": row[1],
+        "donation_collected": row[2],
+        "hours_served": row[3],
+        "appreciations": row[4],
+    }

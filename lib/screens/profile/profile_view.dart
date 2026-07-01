@@ -21,6 +21,16 @@ import 'profile_notifications_screen.dart';
 import 'profile_reports_screen.dart';
 import 'profile_settings_screen.dart';
 
+// ── Interest options (shared between registration and profile) ────────────────
+const _kInterestOptions = [
+  'Education Support',
+  'Donation Drive',
+  'Awareness Camp',
+  'Event Support',
+  'Documentation',
+  'Social Media / Promotion',
+];
+
 class ProfileView extends StatefulWidget {
   const ProfileView({super.key});
 
@@ -103,52 +113,64 @@ class _ProfileViewState extends State<ProfileView> {
       backgroundColor: Colors.transparent,
       builder: (_) => _EditProfileSheet(
         user: user,
-        onSave:
-            (
-              name,
-              className,
-              schoolName,
-              location,
-              age,
-              dateOfBirth,
-              parentEmail,
-              phone,
-              photoBytes,
-              photoPath,
-              photoFileName,
-            ) async {
-              final ok = await _vm.updateProfile(
-                name: name,
-                className: className,
-                schoolName: schoolName,
-                location: location,
-                age: age,
-                dateOfBirth: dateOfBirth,
-                parentEmail: parentEmail,
-                phone: phone,
-                photoBytes: photoBytes,
-                photoPath: photoPath,
-                photoFileName: photoFileName,
-              );
-              if (!mounted) return;
-              if (ok) {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Profile updated successfully.'),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      _vm.updateError ?? 'Failed to update profile.',
-                    ),
-                    backgroundColor: AppColors.softRed,
-                  ),
-                );
-              }
-            },
+        onSave: (
+          name,
+          className,
+          schoolName,
+          location,
+          age,
+          dateOfBirth,
+          parentEmail,
+          phone,
+          interests,
+          photoBytes,
+          photoPath,
+          photoFileName,
+        ) async {
+          final ok = await _vm.updateProfile(
+            name: name,
+            className: className,
+            schoolName: schoolName,
+            location: location,
+            age: age,
+            dateOfBirth: dateOfBirth,
+            parentEmail: parentEmail,
+            phone: phone,
+            interests: interests,
+            photoBytes: photoBytes,
+            photoPath: photoPath,
+            photoFileName: photoFileName,
+          );
+          if (!mounted) return;
+          if (ok) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded,
+                        color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Text('Profile updated successfully!',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                backgroundColor: Color(0xFF2E7D32),
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  _vm.updateError ?? 'Failed to update profile.',
+                ),
+                backgroundColor: AppColors.softRed,
+              ),
+            );
+          }
+        },
       ),
     );
   }
@@ -167,10 +189,11 @@ class _ProfileViewState extends State<ProfileView> {
 
         final user = _vm.user;
         final stats = _vm.stats;
+        final isStudent = AppState.role.isStudent;
 
         return AppScrollView(
           children: [
-            _ProfileHeader(
+            _PageHeader(
               onNotificationTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const ProfileNotificationsScreen(),
@@ -182,111 +205,187 @@ class _ProfileViewState extends State<ProfileView> {
                 ),
               ),
             ),
-            _StudentSummaryCard(
+            _SummaryCard(
               user: user,
               stats: stats,
               volunteerStats: _volunteerVm?.stats,
               badgeCount: _vm.badges.length,
               onEditProfile: _openEditProfile,
             ),
-            if (AppState.role.isStudent) _QuickActionBar(
-              actions: [
-                _QuickAction(
-                  icon: Icons.menu_book_rounded,
-                  label: 'My Logbook',
-                  color: const Color(0xFF20BF6B),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          DailyLogScreen(vm: VolunteerViewModel()..load()),
-                    ),
-                  ),
-                ),
-                _QuickAction(
-                  icon: Icons.workspace_premium_rounded,
-                  label: 'Certificates',
-                  color: const Color(0xFF1E6BFF),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => MyCertificatesScreen(
-                        vm: VolunteerViewModel()..load(),
+            if (isStudent)
+              _QuickActionBar(
+                actions: [
+                  _QuickAction(
+                    icon: Icons.menu_book_rounded,
+                    label: 'My Logbook',
+                    color: const Color(0xFF20BF6B),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            DailyLogScreen(vm: VolunteerViewModel()..load()),
                       ),
                     ),
                   ),
-                ),
-                _QuickAction(
-                  icon: Icons.volunteer_activism_rounded,
-                  label: 'Donations',
-                  color: const Color(0xFF8B5CF6),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          DonationScreen(vm: VolunteerViewModel()..load()),
+                  _QuickAction(
+                    icon: Icons.workspace_premium_rounded,
+                    label: 'Certificates',
+                    color: const Color(0xFF1E6BFF),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => MyCertificatesScreen(
+                          vm: VolunteerViewModel()..load(),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                _QuickAction(
-                  icon: Icons.assignment_rounded,
-                  label: 'Reports',
-                  color: const Color(0xFFFF8800),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ProfileReportsScreen(),
+                  _QuickAction(
+                    icon: Icons.volunteer_activism_rounded,
+                    label: 'Donations',
+                    color: const Color(0xFF8B5CF6),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            DonationScreen(vm: VolunteerViewModel()..load()),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                  _QuickAction(
+                    icon: Icons.assignment_rounded,
+                    label: 'Reports',
+                    color: const Color(0xFFFF8800),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileReportsScreen(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+            // ── Profile Information ─────────────────────────────────────────
             const _SectionTitle('Profile Information'),
-            _InfoCard(
-              rows: [
-                _InfoRowData(
-                  icon: Icons.person_outline_rounded,
-                  tint: const Color(0xFF126BFF),
-                  label: 'Full Name',
-                  value: _value(user?.name),
-                  onTap: _openEditProfile,
-                ),
-                if (!AppState.role.isStudent) ...[
+            if (isStudent) ...[
+              // Personal details subsection label
+              const _SubSectionLabel('Personal Details'),
+              _InfoCard(
+                rows: [
+                  _InfoRowData(
+                    icon: Icons.person_outline_rounded,
+                    tint: const Color(0xFF126BFF),
+                    label: 'Full Name',
+                    value: _value(user?.name),
+                    onTap: _openEditProfile,
+                  ),
+                  _InfoRowData(
+                    icon: Icons.email_outlined,
+                    tint: const Color(0xFF9C27B0),
+                    label: 'Email Address',
+                    value: _value(user?.email),
+                  ),
+                  _InfoRowData(
+                    icon: Icons.phone_outlined,
+                    tint: const Color(0xFF20BF6B),
+                    label: 'Phone Number',
+                    value: _value(user?.phone),
+                    onTap: _openEditProfile,
+                  ),
+                ],
+              ),
+              const _SubSectionLabel('Education Details'),
+              _InfoCard(
+                rows: [
+                  _InfoRowData(
+                    icon: Icons.cake_outlined,
+                    tint: const Color(0xFF11B8C9),
+                    label: 'Date of Birth / Age',
+                    value: _dateOrAge(user),
+                    onTap: _openEditProfile,
+                  ),
                   _InfoRowData(
                     icon: Icons.school_rounded,
                     tint: const Color(0xFF17B86A),
-                    label: 'Class',
+                    label: 'Class / College / Year',
                     value: _value(user?.className),
                     onTap: _openEditProfile,
                   ),
                   _InfoRowData(
                     icon: Icons.account_balance_rounded,
                     tint: const Color(0xFF8B5CF6),
-                    label: 'School',
+                    label: 'School / College / Institution',
                     value: _value(user?.schoolName),
                     onTap: _openEditProfile,
                   ),
-                ],
-                _InfoRowData(
-                  icon: Icons.location_on_outlined,
-                  tint: const Color(0xFFFF8800),
-                  label: 'Location',
-                  value: _value(user?.location),
-                  onTap: _openEditProfile,
-                ),
-                if (!AppState.role.isStudent)
                   _InfoRowData(
-                    icon: Icons.mail_outline_rounded,
-                    tint: const Color(0xFFFF9800),
-                    label: 'Parent Email',
-                    value: _value(user?.parentEmail),
+                    icon: Icons.location_on_outlined,
+                    tint: const Color(0xFFFF8800),
+                    label: 'City / Location',
+                    value: _value(user?.location),
                     onTap: _openEditProfile,
                   ),
-                _InfoRowData(
-                  icon: Icons.calendar_month_rounded,
-                  tint: const Color(0xFF11B8C9),
-                  label: 'Date of Birth',
-                  value: _dateOrAge(user),
-                  onTap: _openEditProfile,
-                ),
-              ],
-            ),
+                ],
+              ),
+              const _SubSectionLabel('Volunteer Details'),
+              _InterestsCard(
+                interests: user?.interests ?? const [],
+                onEdit: _openEditProfile,
+              ),
+            ] else ...[
+              // Non-student (Event Manager / Content Creator / Counsellor)
+              // Fields map to the NGO Staff registration form
+              _InfoCard(
+                rows: [
+                  _InfoRowData(
+                    icon: Icons.person_outline_rounded,
+                    tint: const Color(0xFF126BFF),
+                    label: 'Full Name',
+                    value: _value(user?.name),
+                  ),
+                  _InfoRowData(
+                    icon: Icons.email_outlined,
+                    tint: const Color(0xFF9C27B0),
+                    label: 'Email Address',
+                    value: _value(user?.email),
+                  ),
+                  _InfoRowData(
+                    icon: Icons.phone_outlined,
+                    tint: const Color(0xFF20BF6B),
+                    label: 'Phone Number',
+                    value: _value(user?.phone),
+                  ),
+                  _InfoRowData(
+                    icon: Icons.business_outlined,
+                    tint: const Color(0xFFFF8800),
+                    label: 'Organization / Department',
+                    value: _value(user?.schoolName),
+                  ),
+                ],
+              ),
+              const _SubSectionLabel('Role Information'),
+              _InfoCard(
+                rows: [
+                  _InfoRowData(
+                    icon: Icons.work_outline_rounded,
+                    tint: const Color(0xFF1565C0),
+                    label: 'Role',
+                    value: _roleLabel(user?.role),
+                  ),
+                  if (user?.requestedRole != null)
+                    _InfoRowData(
+                      icon: Icons.how_to_reg_rounded,
+                      tint: const Color(0xFF17B86A),
+                      label: 'Requested Role',
+                      value: _roleLabel(user?.requestedRole),
+                    ),
+                  _InfoRowData(
+                    icon: Icons.verified_outlined,
+                    tint: const Color(0xFF11B8C9),
+                    label: 'Account Status',
+                    value: _accessStatusLabel(user?.accessStatus),
+                  ),
+                ],
+              ),
+            ],
+
             const _SectionTitle('Preferences & Security'),
             _InfoCard(
               rows: [
@@ -312,6 +411,8 @@ class _ProfileViewState extends State<ProfileView> {
   }
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 String _value(String? value) {
   final trimmed = value?.trim();
   return trimmed == null || trimmed.isEmpty ? 'Not set' : trimmed;
@@ -325,21 +426,13 @@ String _dateOrAge(AppUser? user) {
 
 String _formatDate(DateTime date) {
   const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
   return '${date.day} ${months[date.month - 1]} ${date.year}';
 }
+
+// ── Error view ────────────────────────────────────────────────────────────────
 
 class _ProfileError extends StatelessWidget {
   const _ProfileError({required this.message, required this.onRetry});
@@ -364,8 +457,10 @@ class _ProfileError extends StatelessWidget {
   }
 }
 
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({
+// ── Page header (title + icon buttons) ───────────────────────────────────────
+
+class _PageHeader extends StatelessWidget {
+  const _PageHeader({
     required this.onNotificationTap,
     required this.onSettingsTap,
   });
@@ -459,8 +554,10 @@ class _RoundIconButton extends StatelessWidget {
   }
 }
 
-class _StudentSummaryCard extends StatelessWidget {
-  const _StudentSummaryCard({
+// ── Summary card (avatar + stats) ─────────────────────────────────────────────
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
     required this.user,
     required this.stats,
     this.volunteerStats,
@@ -501,7 +598,7 @@ class _StudentSummaryCard extends StatelessWidget {
           LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 460;
-              final details = _ProfileIdentity(
+              final identity = _ProfileIdentity(
                 user: user,
                 onCameraTap: onEditProfile,
               );
@@ -525,16 +622,17 @@ class _StudentSummaryCard extends StatelessWidget {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    details,
+                    identity,
                     const SizedBox(height: 14),
-                    Align(alignment: Alignment.centerLeft, child: editButton),
+                    Align(
+                        alignment: Alignment.centerLeft, child: editButton),
                   ],
                 );
               }
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: details),
+                  Expanded(child: identity),
                   const SizedBox(width: 14),
                   editButton,
                 ],
@@ -585,6 +683,8 @@ class _StudentSummaryCard extends StatelessWidget {
   }
 }
 
+// ── Profile identity (avatar + name + badges) ─────────────────────────────────
+
 class _ProfileIdentity extends StatelessWidget {
   const _ProfileIdentity({required this.user, this.onCameraTap});
 
@@ -593,8 +693,11 @@ class _ProfileIdentity extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isVolunteer = AppState.role.isStudent;
-    final subtitle = isVolunteer
+    final isStudent = AppState.role.isStudent;
+    final status = user?.accessStatus ?? 'pending';
+
+    // Subtitle line below the name
+    final subtitle = isStudent
         ? (user?.location?.trim().isNotEmpty == true
               ? user!.location!.trim()
               : '')
@@ -678,35 +781,41 @@ class _ProfileIdentity extends StatelessWidget {
                 user?.name ?? AppState.studentName ?? 'Student',
                 style: const TextStyle(
                   color: Color(0xFF08164A),
-                  fontSize: 24,
+                  fontSize: 22,
                   fontWeight: FontWeight.w900,
                   height: 1.1,
                 ),
               ),
+              const SizedBox(height: 4),
+              // Role label
+              Text(
+                isStudent ? 'Student Volunteer / Intern' : _roleLabel(user?.role),
+                style: const TextStyle(
+                  color: Color(0xFF4A587C),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              // Approval status badge
+              _StatusBadge(status: status),
               if (subtitle.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF4A587C),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-              if (!isVolunteer &&
-                  user?.parentEmail?.trim().isNotEmpty == true) ...[
-                const SizedBox(height: 12),
-                _InlineMeta(
-                  icon: Icons.mail_outline_rounded,
-                  text: user!.parentEmail!.trim(),
-                ),
+                _InlineMeta(icon: Icons.location_on_outlined, text: subtitle),
               ],
               if (user?.phone?.trim().isNotEmpty == true) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 _InlineMeta(
                   icon: Icons.phone_outlined,
                   text: user!.phone!.trim(),
+                ),
+              ],
+              if (!isStudent &&
+                  user?.parentEmail?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 4),
+                _InlineMeta(
+                  icon: Icons.mail_outline_rounded,
+                  text: user!.parentEmail!.trim(),
                 ),
               ],
             ],
@@ -717,11 +826,85 @@ class _ProfileIdentity extends StatelessWidget {
   }
 }
 
+String _roleLabel(String? role) {
+  return switch (role) {
+    'super_admin' => 'Super Administrator',
+    'admin' => 'Administrator',
+    'event_manager' => 'Event Manager',
+    'mentor' => 'Mentor / Counsellor',
+    'content_creator' => 'Content Creator',
+    'support_staff' => 'Support Staff',
+    'school_partner' => 'School Partner',
+    'student' => 'Student Volunteer',
+    _ => 'User',
+  };
+}
+
+String _accessStatusLabel(String? status) => switch (status) {
+  'approved' => 'Approved',
+  'rejected' => 'Rejected',
+  'pending' => 'Pending Approval',
+  _ => 'Pending Approval',
+};
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, bg, icon, label) = switch (status) {
+      'approved' => (
+          const Color(0xFF2E7D32),
+          const Color(0xFFE8F5E9),
+          Icons.check_circle_rounded,
+          'Approved',
+        ),
+      'rejected' => (
+          const Color(0xFFC62828),
+          const Color(0xFFFFEBEE),
+          Icons.cancel_rounded,
+          'Rejected',
+        ),
+      _ => (
+          const Color(0xFFE65100),
+          const Color(0xFFFFF3E0),
+          Icons.hourglass_top_rounded,
+          'Pending Approval',
+        ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 String _initials(String? name) {
   final parts = (name ?? 'Student')
       .trim()
       .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty)
+      .where((p) => p.isNotEmpty)
       .toList();
   if (parts.isEmpty) return 'S';
   if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
@@ -739,15 +922,15 @@ class _InlineMeta extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFF4A587C), size: 18),
-        const SizedBox(width: 10),
+        Icon(icon, color: const Color(0xFF4A587C), size: 16),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(
             text,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: Color(0xFF4A587C),
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -756,6 +939,8 @@ class _InlineMeta extends StatelessWidget {
     );
   }
 }
+
+// ── Stats panel ───────────────────────────────────────────────────────────────
 
 class _StatsPanel extends StatelessWidget {
   const _StatsPanel({required this.stats});
@@ -875,6 +1060,8 @@ class _StatData {
   final String? suffix;
 }
 
+// ── Quick action bar ──────────────────────────────────────────────────────────
+
 class _QuickActionBar extends StatelessWidget {
   const _QuickActionBar({required this.actions});
 
@@ -960,6 +1147,8 @@ class _QuickAction {
   final VoidCallback onTap;
 }
 
+// ── Section / sub-section labels ──────────────────────────────────────────────
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.title);
 
@@ -980,6 +1169,30 @@ class _SectionTitle extends StatelessWidget {
     );
   }
 }
+
+class _SubSectionLabel extends StatelessWidget {
+  const _SubSectionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF4A587C),
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Info card (rows of icon + label + value) ──────────────────────────────────
 
 class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.rows});
@@ -1049,7 +1262,7 @@ class _InfoRow extends StatelessWidget {
                 data.label,
                 style: TextStyle(
                   color: labelColor,
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -1062,14 +1275,16 @@ class _InfoRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF3F4D70),
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
             ],
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF4A587C)),
+            if (data.onTap != null)
+              const Icon(Icons.chevron_right_rounded,
+                  color: Color(0xFF4A587C)),
           ],
         ),
       ),
@@ -1095,6 +1310,122 @@ class _InfoRowData {
   final VoidCallback? onTap;
 }
 
+// ── Interests card (chips display) ────────────────────────────────────────────
+
+class _InterestsCard extends StatelessWidget {
+  const _InterestsCard({
+    required this.interests,
+    required this.onEdit,
+  });
+
+  final List<String> interests;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE8ECF4)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF08164A).withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: onEdit,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.18)),
+                    ),
+                    child: const Icon(Icons.interests_rounded,
+                        color: Color(0xFF8B5CF6), size: 22),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Text(
+                      'Area of Interest',
+                      style: TextStyle(
+                        color: Color(0xFF08164A),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF4A587C)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              interests.isEmpty
+                  ? const Text(
+                      'Not set — tap to add your areas of interest',
+                      style: TextStyle(
+                          color: Color(0xFF9DAABF),
+                          fontSize: 13,
+                          fontStyle: FontStyle.italic),
+                    )
+                  : Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: interests.map((interest) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEDE7F6),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: const Color(0xFF8B5CF6)
+                                    .withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.interests_rounded,
+                                  size: 12,
+                                  color: Color(0xFF6A1B9A)),
+                              const SizedBox(width: 5),
+                              Text(
+                                interest,
+                                style: const TextStyle(
+                                  color: Color(0xFF6A1B9A),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Edit Profile bottom sheet ─────────────────────────────────────────────────
+
 class _EditProfileSheet extends StatefulWidget {
   const _EditProfileSheet({required this.user, required this.onSave});
 
@@ -1108,6 +1439,7 @@ class _EditProfileSheet extends StatefulWidget {
     DateTime? dateOfBirth,
     String? parentEmail,
     String? phone,
+    List<String>? interests,
     List<int>? photoBytes,
     String? photoPath,
     String? photoFileName,
@@ -1128,6 +1460,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _parentEmailCtrl;
   late final TextEditingController _phoneCtrl;
   DateTime? _dateOfBirth;
+  late Set<String> _selectedInterests;
   bool _saving = false;
   String? _pickedImagePath;
   Uint8List? _pickedImageBytes;
@@ -1145,6 +1478,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     _parentEmailCtrl = TextEditingController(text: user.parentEmail ?? '');
     _phoneCtrl = TextEditingController(text: user.phone ?? '');
     _dateOfBirth = user.dateOfBirth;
+    _selectedInterests = Set<String>.from(user.interests);
   }
 
   @override
@@ -1163,7 +1497,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: false,
-      withData: true, // always load bytes — avoids null path on Android 12+
+      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
@@ -1172,11 +1506,28 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       _pickedImagePath = file.path;
       _pickedFileName = file.name;
     });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+            SizedBox(width: 8),
+            Text('Photo selected — tap Save to apply'),
+          ],
+        ),
+        backgroundColor: Color(0xFF2E7D32),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   ImageProvider? get _pickedImageProvider {
     if (_pickedImageBytes != null) return MemoryImage(_pickedImageBytes!);
-    if (_pickedImagePath != null) return FileImage(File(_pickedImagePath!));
+    if (_pickedImagePath != null && !kIsWeb) {
+      return FileImage(File(_pickedImagePath!));
+    }
     return null;
   }
 
@@ -1184,27 +1535,29 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _dateOfBirth ?? DateTime(now.year - 15, now.month, now.day),
+      initialDate:
+          _dateOfBirth ?? DateTime(now.year - 15, now.month, now.day),
       firstDate: DateTime(now.year - 30),
       lastDate: now,
     );
-    if (picked != null) {
-      setState(() => _dateOfBirth = picked);
-    }
+    if (picked != null) setState(() => _dateOfBirth = picked);
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
+    final isStudent = AppState.role.isStudent;
     await widget.onSave(
       _emptyToNull(_nameCtrl.text),
+      // For non-students _classCtrl holds "Organization / Department" — save to both className and schoolName
       _emptyToNull(_classCtrl.text),
-      _emptyToNull(_schoolCtrl.text),
-      _emptyToNull(_locationCtrl.text),
-      int.tryParse(_ageCtrl.text.trim()),
-      _dateOfBirth,
-      _emptyToNull(_parentEmailCtrl.text),
+      isStudent ? _emptyToNull(_schoolCtrl.text) : _emptyToNull(_classCtrl.text),
+      isStudent ? _emptyToNull(_locationCtrl.text) : null,
+      isStudent ? int.tryParse(_ageCtrl.text.trim()) : null,
+      isStudent ? _dateOfBirth : null,
+      null,
       _emptyToNull(_phoneCtrl.text),
+      isStudent ? _selectedInterests.toList() : null,
       _pickedImageBytes?.toList(),
       kIsWeb ? null : _pickedImagePath,
       _pickedFileName,
@@ -1219,13 +1572,15 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isStudent = AppState.role.isStudent;
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.9,
+          maxHeight: MediaQuery.of(context).size.height * 0.92,
         ),
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -1239,6 +1594,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Drag handle
                 Center(
                   child: Container(
                     width: 42,
@@ -1260,7 +1616,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  AppState.role.isStudent
+                  isStudent
                       ? 'Update the details shown on your volunteer profile.'
                       : 'Update the details shown on your profile.',
                   style: const TextStyle(
@@ -1271,7 +1627,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 const SizedBox(height: 22),
 
-                // ── Profile photo picker ────────────────────────────
+                // ── Profile photo ──────────────────────────────────────────
                 Center(
                   child: GestureDetector(
                     onTap: _saving ? null : _pickImage,
@@ -1304,15 +1660,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                                   color: const Color(0xFF126BFF),
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
+                                      color: Colors.white, width: 2),
                                 ),
-                                child: const Icon(
-                                  Icons.camera_alt_rounded,
-                                  color: Colors.white,
-                                  size: 15,
-                                ),
+                                child: const Icon(Icons.camera_alt_rounded,
+                                    color: Colors.white, size: 15),
                               ),
                             ),
                           ],
@@ -1332,106 +1683,163 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
+                // ── Personal Details ───────────────────────────────────────
+                _FormSectionLabel('Personal Details'),
+                const SizedBox(height: 10),
                 _SheetField(
                   controller: _nameCtrl,
                   label: 'Full Name',
                   icon: Icons.person_outline_rounded,
                   enabled: !_saving,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Name is required'
-                      : null,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Name is required' : null,
                 ),
                 const SizedBox(height: 12),
-                if (!AppState.role.isStudent) ...[
+                // Email is read-only — shown as disabled field
+                _SheetField(
+                  controller:
+                      TextEditingController(text: widget.user.email ?? ''),
+                  label: 'Email Address (read-only)',
+                  icon: Icons.email_outlined,
+                  enabled: false,
+                ),
+                const SizedBox(height: 12),
+                _SheetField(
+                  controller: _phoneCtrl,
+                  label: 'Phone Number',
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                  enabled: !_saving,
+                ),
+                const SizedBox(height: 20),
+
+                // ── Education / Organization Details ──────────────────────
+                if (isStudent) ...[
+                  _FormSectionLabel('Education Details'),
+                  const SizedBox(height: 10),
+                  _SheetField(
+                    controller: _ageCtrl,
+                    label: 'Age',
+                    icon: Icons.cake_outlined,
+                    keyboardType: TextInputType.number,
+                    enabled: !_saving,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return null;
+                      final age = int.tryParse(v.trim());
+                      if (age == null || age < 5 || age > 30) {
+                        return 'Enter a valid age (5–30)';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _saving ? null : _pickDate,
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    label: Text(
+                      _dateOfBirth == null
+                          ? 'Add Date of Birth'
+                          : _formatDate(_dateOfBirth!),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      alignment: Alignment.centerLeft,
+                      foregroundColor: const Color(0xFF08164A),
+                      side: const BorderSide(color: Color(0xFFDDE6F4)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 15),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   _SheetField(
                     controller: _classCtrl,
-                    label: 'Class',
+                    label: 'Class / College / Year',
                     icon: Icons.school_outlined,
                     enabled: !_saving,
                   ),
                   const SizedBox(height: 12),
                   _SheetField(
                     controller: _schoolCtrl,
-                    label: 'School',
+                    label: 'School / College / Institution',
                     icon: Icons.account_balance_outlined,
                     enabled: !_saving,
                   ),
                   const SizedBox(height: 12),
-                ],
-                _SheetField(
-                  controller: _locationCtrl,
-                  label: 'Location',
-                  icon: Icons.location_on_outlined,
-                  enabled: !_saving,
-                ),
-                if (!AppState.role.isStudent) ...[
-                  const SizedBox(height: 12),
                   _SheetField(
-                    controller: _parentEmailCtrl,
-                    label: 'Parent Email',
-                    icon: Icons.mail_outline_rounded,
-                    keyboardType: TextInputType.emailAddress,
+                    controller: _locationCtrl,
+                    label: 'City / Location',
+                    icon: Icons.location_on_outlined,
                     enabled: !_saving,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) return null;
-                      if (!RegExp(
-                        r'^[^@]+@[^@]+\.[^@]+$',
-                      ).hasMatch(value.trim())) {
-                        return 'Enter a valid email';
-                      }
-                      return null;
-                    },
+                  ),
+                ] else ...[
+                  // Non-student: only Organization / Department
+                  _FormSectionLabel('Organization Details'),
+                  const SizedBox(height: 10),
+                  _SheetField(
+                    controller: _classCtrl,
+                    label: 'Organization / Department',
+                    icon: Icons.business_outlined,
+                    enabled: !_saving,
                   ),
                 ],
-                const SizedBox(height: 12),
-                _SheetField(
-                  controller: _phoneCtrl,
-                  label: 'Phone',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  enabled: !_saving,
-                ),
-                const SizedBox(height: 12),
-                _SheetField(
-                  controller: _ageCtrl,
-                  label: 'Age',
-                  icon: Icons.cake_outlined,
-                  keyboardType: TextInputType.number,
-                  enabled: !_saving,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) return null;
-                    final age = int.tryParse(value.trim());
-                    if (age == null || age < 5 || age > 30) {
-                      return 'Enter a valid age';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _saving ? null : _pickDate,
-                  icon: const Icon(Icons.calendar_month_outlined),
-                  label: Text(
-                    _dateOfBirth == null
-                        ? 'Add Date of Birth'
-                        : _formatDate(_dateOfBirth!),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    alignment: Alignment.centerLeft,
-                    foregroundColor: const Color(0xFF08164A),
-                    side: const BorderSide(color: Color(0xFFDDE6F4)),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 15,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+
+                // ── Area of Interest (students only) ───────────────────────
+                if (isStudent) ...[
+                  const SizedBox(height: 20),
+                  _FormSectionLabel('Volunteer Details'),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Area of Interest',
+                    style: TextStyle(
+                      color: Color(0xFF4A587C),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                const SizedBox(height: 22),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _kInterestOptions.map((option) {
+                      final selected = _selectedInterests.contains(option);
+                      return FilterChip(
+                        label: Text(option),
+                        selected: selected,
+                        onSelected: _saving
+                            ? null
+                            : (val) => setState(() {
+                                  if (val) {
+                                    _selectedInterests.add(option);
+                                  } else {
+                                    _selectedInterests.remove(option);
+                                  }
+                                }),
+                        selectedColor:
+                            const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                        checkmarkColor: const Color(0xFF6A1B9A),
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected
+                              ? const Color(0xFF6A1B9A)
+                              : const Color(0xFF4A587C),
+                        ),
+                        side: BorderSide(
+                          color: selected
+                              ? const Color(0xFF8B5CF6).withValues(alpha: 0.5)
+                              : const Color(0xFFDDE6F4),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 4),
+                      );
+                    }).toList(),
+                  ),
+                ],
+
+                const SizedBox(height: 26),
                 FilledButton(
                   onPressed: _saving ? null : _save,
                   style: FilledButton.styleFrom(
@@ -1467,6 +1875,26 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 }
 
+class _FormSectionLabel extends StatelessWidget {
+  const _FormSectionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: const TextStyle(
+        color: Color(0xFF08164A),
+        fontSize: 14,
+        fontWeight: FontWeight.w900,
+      ),
+    );
+  }
+}
+
+// ── Shared form field ─────────────────────────────────────────────────────────
+
 class _SheetField extends StatelessWidget {
   const _SheetField({
     required this.controller,
@@ -1501,28 +1929,33 @@ class _SheetField extends StatelessWidget {
         prefixIcon: Icon(icon, color: const Color(0xFF4A587C)),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: const Color(0xFFF7FAFF),
+        fillColor: enabled ? const Color(0xFFF7FAFF) : const Color(0xFFF0F0F0),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF126BFF), width: 1.5),
+          borderSide:
+              const BorderSide(color: Color(0xFF126BFF), width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.softRed, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.softRed, width: 1.5),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.softRed, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.softRed, width: 1.5),
         ),
       ),
       validator: validator,
     );
   }
 }
+
+// ── Change Password sheet ─────────────────────────────────────────────────────
 
 class _ChangePasswordSheet extends StatefulWidget {
   const _ChangePasswordSheet({required this.onSave});
@@ -1619,7 +2052,8 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                         : Icons.visibility_outlined,
                     color: const Color(0xFF4A587C),
                   ),
-                  onPressed: () => setState(() => _showCurrent = !_showCurrent),
+                  onPressed: () =>
+                      setState(() => _showCurrent = !_showCurrent),
                 ),
                 validator: (v) => v == null || v.isEmpty
                     ? 'Enter your current password'
@@ -1661,7 +2095,8 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                         : Icons.visibility_outlined,
                     color: const Color(0xFF4A587C),
                   ),
-                  onPressed: () => setState(() => _showConfirm = !_showConfirm),
+                  onPressed: () =>
+                      setState(() => _showConfirm = !_showConfirm),
                 ),
                 validator: (v) =>
                     v != _newCtrl.text ? 'Passwords do not match' : null,

@@ -98,8 +98,15 @@ class CounsellorViewModel extends ChangeNotifier {
       )
       .toList();
 
-  List<CounsellingRequest> requestsForCounsellor(int counsellorId) =>
-      _requests.where((r) => r.counsellorId == counsellorId).toList();
+  // Admin-fetched list of ALL school requests across all counsellors
+  List<SchoolBookingRequest> _allAdminRequests = [];
+  List<SchoolBookingRequest> get allAdminRequests =>
+      List.unmodifiable(_allAdminRequests);
+
+  List<SchoolBookingRequest> requestsForCounsellor(int counsellorUserId) =>
+      _allAdminRequests
+          .where((r) => r.counsellorUserId == counsellorUserId)
+          .toList();
 
   CounsellorProfile? findById(int id) {
     try {
@@ -134,6 +141,15 @@ class CounsellorViewModel extends ChangeNotifier {
     try {
       _schoolRequests = await CounsellingRepository.getMySchoolRequests();
       _schoolRequestsLoaded = true;
+    } catch (_) {}
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Admin-only: fetch ALL school counsellor requests across every counsellor.
+  /// Uses GET /counsellor/requests which returns all rows for admin/super_admin.
+  Future<void> loadAllAdminRequests() async {
+    try {
+      _allAdminRequests = await CounsellingRepository.getCounsellorRequests();
     } catch (_) {}
     if (!_disposed) notifyListeners();
   }

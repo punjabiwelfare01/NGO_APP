@@ -42,6 +42,7 @@ class User(Base):
     reset_token         = Column(String, nullable=True)
     reset_token_expires = Column(DateTime, nullable=True)
     photo_url           = Column(String, nullable=True)
+    interests           = Column(String, nullable=True)   # JSON array of interest strings
     created_at          = Column(DateTime, server_default=func.now())
 
     course_progress     = relationship("UserCourseProgress",  back_populates="user", cascade="all, delete-orphan")

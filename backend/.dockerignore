@@ -1,0 +1,35 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Dev/test files
+tests/
+*.db
+careskill.db
+seed.py
+setup_google_auth.py
+requirements-dev.txt
+
+# Large media (uploaded by users — stored in Docker volumes, not the image)
+uploads/
+videos_uploaded/
+
+# Logs
+logs/*.log
+
+# Secrets (copied separately as .env on the server)
+.env
+.env.*
+client_secret_*.json
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/

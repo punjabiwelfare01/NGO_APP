@@ -51,10 +51,13 @@ class VolunteerActivity {
   final String? subdivision;
   final String? description;
   final String? expectedWork;
+  final String? workInstructions;
   final String? proofRequired;
   final double rewardHours;
   final bool isActive;
   final String? location;
+  final DateTime? startDate;
+  final DateTime? endDate;
   final String? duration;
   final DateTime? applicationDeadline;
   final int? maxStudents;
@@ -71,10 +74,13 @@ class VolunteerActivity {
     this.subdivision,
     this.description,
     this.expectedWork,
+    this.workInstructions,
     this.proofRequired,
     required this.rewardHours,
     required this.isActive,
     this.location,
+    this.startDate,
+    this.endDate,
     this.duration,
     this.applicationDeadline,
     this.maxStudents,
@@ -93,10 +99,17 @@ class VolunteerActivity {
         subdivision: j['subdivision'] as String?,
         description: j['description'] as String?,
         expectedWork: j['expected_work'] as String?,
+        workInstructions: j['work_instructions'] as String?,
         proofRequired: j['proof_required'] as String?,
         rewardHours: (j['reward_hours'] as num).toDouble(),
         isActive: j['is_active'] as bool? ?? true,
         location: j['location'] as String?,
+        startDate: j['start_date'] == null
+            ? null
+            : DateTime.tryParse(j['start_date'] as String),
+        endDate: j['end_date'] == null
+            ? null
+            : DateTime.tryParse(j['end_date'] as String),
         duration: j['duration'] as String?,
         applicationDeadline: j['application_deadline'] == null
             ? null

@@ -7,7 +7,7 @@ import '../../../repositories/event_repository.dart';
 import '../../../viewmodels/event_list_viewmodel.dart';
 import '../../../viewmodels/view_state.dart';
 import '../../../utils/navigation_helper.dart';
-import 'create_event/create_event_view.dart';
+
 
 class EventManagerScreen extends StatefulWidget {
   const EventManagerScreen({super.key});
@@ -168,8 +168,12 @@ class _EventManagerScreenState extends State<EventManagerScreen> {
   }
 
   Future<void> _openCreateEvent() async {
-    final created = await Navigator.of(context).push<EventModel>(
-      MaterialPageRoute(builder: (_) => const CreateEventView()),
+    final created = await showModalBottomSheet<EventModel>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _CreateEventSheet(),
     );
     if (created == null) return;
     _vm.addOrUpdate(created);
@@ -889,6 +893,463 @@ class _ActionBtn extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Quick Create Event Bottom Sheet ────────────────────────────────────────────
+
+class _CreateEventSheet extends StatefulWidget {
+  const _CreateEventSheet();
+
+  @override
+  State<_CreateEventSheet> createState() => _CreateEventSheetState();
+}
+
+class _CreateEventSheetState extends State<_CreateEventSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleCtrl = TextEditingController();
+  final _categoryCtrl = TextEditingController();
+  final _locationCtrl = TextEditingController();
+  final _partnerCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _eligCtrl = TextEditingController();
+  final _maxVolCtrl = TextEditingController(text: '20');
+
+  EventType? _selectedType;
+  DateTime? _selectedDate;
+  bool _submitting = false;
+
+  static const _categories = [
+    (label: 'Quiz Event', type: EventType.quiz),
+    (label: 'Workshop', type: EventType.workshop),
+    (label: 'Awareness Campaign', type: EventType.awarenessCampaign),
+    (label: 'Competition', type: EventType.competition),
+    (label: 'Talent Hunt', type: EventType.talentHunt),
+    (label: 'Scholarship Drive', type: EventType.scholarship),
+    (label: 'Counselling Drive', type: EventType.counsellingDrive),
+    (label: 'Cyber Security', type: EventType.cyberSecurity),
+    (label: 'Stationery Drive', type: EventType.stationeryDrive),
+    (label: 'Donation Drive', type: EventType.donationDrive),
+    (label: 'School Partnership', type: EventType.schoolPartnership),
+    (label: 'Community Outreach', type: EventType.communityOutreach),
+  ];
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _categoryCtrl.dispose();
+    _locationCtrl.dispose();
+    _partnerCtrl.dispose();
+    _descCtrl.dispose();
+    _eligCtrl.dispose();
+    _maxVolCtrl.dispose();
+    super.dispose();
+  }
+
+  void _selectChip(({String label, EventType type}) cat) {
+    setState(() {
+      _selectedType = cat.type;
+      _categoryCtrl.text = cat.label;
+    });
+  }
+
+  void _onCategoryTyped(String value) {
+    // Clear chip selection when user types a custom category
+    if (_selectedType != null &&
+        _categories.any((c) => c.type == _selectedType) &&
+        _categories
+                .firstWhere((c) => c.type == _selectedType)
+                .label
+                .toLowerCase() !=
+            value.toLowerCase()) {
+      setState(() => _selectedType = null);
+    }
+  }
+
+  EventType _resolveEventType() {
+    if (_selectedType != null) return _selectedType!;
+    // Try to match typed text to a known category label
+    final text = _categoryCtrl.text.trim().toLowerCase();
+    for (final cat in _categories) {
+      if (cat.label.toLowerCase() == text) return cat.type;
+    }
+    // Default to workshop for free-text custom categories
+    return EventType.workshop;
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select an event date.'),
+          backgroundColor: AppColors.softRed,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+
+    // Build description with optional partner/eligibility prefix
+    final parts = <String>[];
+    final partner = _partnerCtrl.text.trim();
+    final elig = _eligCtrl.text.trim();
+    final desc = _descCtrl.text.trim();
+    if (partner.isNotEmpty) parts.add('Partner School / Organisation: $partner');
+    if (elig.isNotEmpty) parts.add('Student Eligibility: $elig');
+    if (desc.isNotEmpty) parts.add(desc);
+    final fullDescription = parts.join('\n\n');
+
+    final eventDate = DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      12, // noon
+    );
+
+    final maxVol = int.tryParse(_maxVolCtrl.text.trim());
+
+    try {
+      final created = await EventRepository.createEvent({
+        'title': _titleCtrl.text.trim(),
+        'subtitle': _locationCtrl.text.trim().isEmpty
+            ? null
+            : _locationCtrl.text.trim(),
+        'description': fullDescription.isEmpty ? null : fullDescription,
+        'event_type': _resolveEventType().apiValue,
+        'is_daily_challenge': false,
+        'theme_color': '#41A7F5',
+        'event_start': eventDate.toIso8601String(),
+        'start_date': eventDate.toIso8601String(),
+        'max_participants': maxVol,
+        'auto_notification': true,
+        'push_notification': true,
+        'in_app_notification': true,
+        'email_notification': false,
+        'certificate_enabled': true,
+      });
+      if (!mounted) return;
+      Navigator.of(context).pop(created);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Event created as draft.'),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not create event. Please try again.'),
+          backgroundColor: AppColors.softRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now.add(const Duration(days: 1)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 3),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: ColorScheme.light(primary: AppColors.primary),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.muted.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 8, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Create New Event',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppColors.ink,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: AppColors.muted),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Scrollable form
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, bottom + 16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    TextFormField(
+                      controller: _titleCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Event Title *',
+                        hintText: 'e.g. Cyber Safety Awareness Camp',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Category label
+                    Text(
+                      'Category *',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: AppColors.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Category chips
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _categories.map((cat) {
+                        final selected = _selectedType == cat.type;
+                        return GestureDetector(
+                          onTap: () => _selectChip(cat),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? AppColors.primary.withValues(alpha: 0.12)
+                                  : AppColors.muted.withValues(alpha: 0.07),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.primary
+                                    : AppColors.muted.withValues(alpha: 0.25),
+                                width: selected ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Text(
+                              cat.label,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: selected ? AppColors.primary : AppColors.ink,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                    // Custom category text field
+                    TextFormField(
+                      controller: _categoryCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Or type a custom category',
+                        hintText: 'e.g. Blood Donation Camp',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: _categoryCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded,
+                                    size: 18, color: AppColors.muted),
+                                onPressed: () {
+                                  setState(() {
+                                    _categoryCtrl.clear();
+                                    _selectedType = null;
+                                  });
+                                },
+                              )
+                            : null,
+                      ),
+                      onChanged: _onCategoryTyped,
+                      validator: (v) {
+                        if ((v == null || v.trim().isEmpty) &&
+                            _selectedType == null) {
+                          return 'Please select or type a category';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Date
+                    GestureDetector(
+                      onTap: _pickDate,
+                      child: AbsorbPointer(
+                        child: TextFormField(
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            labelText: 'Date *',
+                            hintText: 'Select event date',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.calendar_today_rounded,
+                                size: 18, color: AppColors.primary),
+                            suffixText: _selectedDate == null
+                                ? null
+                                : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                          ),
+                          controller: TextEditingController(
+                            text: _selectedDate == null
+                                ? ''
+                                : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Location
+                    TextFormField(
+                      controller: _locationCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Location *',
+                        hintText: 'e.g. Delhi Public School, Cantt',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.location_on_rounded,
+                            size: 18, color: AppColors.primary),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Location is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Partner School / Organisation
+                    TextFormField(
+                      controller: _partnerCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Partner School / Organisation',
+                        hintText: 'Optional',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.business_rounded,
+                            size: 18, color: AppColors.muted),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Description
+                    TextFormField(
+                      controller: _descCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Description *',
+                        hintText: 'What is this event about?',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                      maxLines: 4,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Description is required' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Max Volunteers
+                    TextFormField(
+                      controller: _maxVolCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Max Volunteers *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.people_rounded,
+                            size: 18, color: AppColors.primary),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Required';
+                        }
+                        final n = int.tryParse(v.trim());
+                        if (n == null || n < 1) return 'Enter a positive number';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Student Eligibility
+                    TextFormField(
+                      controller: _eligCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Student Eligibility',
+                        hintText: 'Optional — e.g. Class 8–12, Age 13+',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.school_rounded,
+                            size: 18, color: AppColors.muted),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Submit
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _submitting ? null : _submit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Create Event',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

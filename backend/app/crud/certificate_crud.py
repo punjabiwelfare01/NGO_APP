@@ -7,7 +7,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from ..models.certificate import Certificate, CertificateStatus, CertificateType
-from ..schemas.certificate import CertificateCreate, CertificateRequest, CertificateUpload
+from ..schemas.certificate import CertificateCreate, CertificateRequest, CertificateUpdate, CertificateUpload
 
 
 def _generate_cert_id(db: Session) -> str:
@@ -115,6 +115,14 @@ def get_certificate_by_public_id(db: Session, certificate_id: str) -> Optional[C
 
 def get_certificate_by_token(db: Session, token: str) -> Optional[Certificate]:
     return db.query(Certificate).filter(Certificate.qr_token == token).first()
+
+
+def update_certificate(db: Session, cert: Certificate, data: CertificateUpdate) -> Certificate:
+    for field, value in data.model_dump(exclude_none=True).items():
+        setattr(cert, field, value)
+    db.commit()
+    db.refresh(cert)
+    return cert
 
 
 def upload_signed_certificate(db: Session, cert_id: int, data: CertificateUpload) -> Optional[Certificate]:

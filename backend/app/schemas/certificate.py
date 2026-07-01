@@ -17,8 +17,42 @@ class CertificateCreate(BaseModel):
     certificate_type: CertificateType
     activity_name: str
     duration: Optional[str] = None
+    # Extended detail fields
+    student_id_number: Optional[str] = None
+    student_role: Optional[str] = None
+    event_name: Optional[str] = None
+    program_name: Optional[str] = None
+    work_description: Optional[str] = None
+    service_hours: Optional[float] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     signatory_name: Optional[str] = None
     signatory_title: Optional[str] = None
+    signature_url: Optional[str] = None
+    logo_url: Optional[str] = None
+    remarks: Optional[str] = None
+    impact_story_summary: Optional[str] = None
+    issue_date: Optional[date] = None
+
+
+class CertificateUpdate(BaseModel):
+    certificate_type: Optional[CertificateType] = None
+    activity_name: Optional[str] = None
+    duration: Optional[str] = None
+    student_id_number: Optional[str] = None
+    student_role: Optional[str] = None
+    event_name: Optional[str] = None
+    program_name: Optional[str] = None
+    work_description: Optional[str] = None
+    service_hours: Optional[float] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    signatory_name: Optional[str] = None
+    signatory_title: Optional[str] = None
+    signature_url: Optional[str] = None
+    logo_url: Optional[str] = None
+    remarks: Optional[str] = None
+    impact_story_summary: Optional[str] = None
     issue_date: Optional[date] = None
 
 
@@ -56,10 +90,25 @@ class CertificateOut(BaseModel):
     certificate_type: CertificateType
     activity_name: str
     duration: Optional[str]
+    # Extended detail fields
+    student_id_number: Optional[str] = None
+    student_role: Optional[str] = None
+    event_name: Optional[str] = None
+    program_name: Optional[str] = None
+    work_description: Optional[str] = None
+    service_hours: Optional[float] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     signatory_name: Optional[str]
     signatory_title: Optional[str]
+    signature_url: Optional[str] = None
+    logo_url: Optional[str] = None
+    remarks: Optional[str] = None
+    impact_story_summary: Optional[str] = None
+    impact_story_id: Optional[int] = None
     issue_date: Optional[date]
     certificate_file: Optional[str]
+    pdf_url: Optional[str] = None
     status: CertificateStatus
     is_verified: bool
     qr_token: Optional[str]
@@ -88,3 +137,9 @@ class CertificateGenerate(BaseModel):
 
 class CertificateRevoke(BaseModel):
     reason: str
+
+
+class ImpactStoryFromCertificate(BaseModel):
+    """Body for POST /certificates/{id}/impact-story."""
+    override_summary: Optional[str] = None
+    override_title: Optional[str] = None

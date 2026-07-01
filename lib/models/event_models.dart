@@ -9,7 +9,11 @@ enum EventType {
   awarenessCampaign,
   workshop,
   competition,
-  cyberSecurity;
+  cyberSecurity,
+  stationeryDrive,
+  donationDrive,
+  schoolPartnership,
+  communityOutreach;
 
   static EventType fromString(String value) => switch (value) {
     'quiz' => EventType.quiz,
@@ -21,19 +25,27 @@ enum EventType {
     'workshop' => EventType.workshop,
     'competition' => EventType.competition,
     'cyber_security' => EventType.cyberSecurity,
+    'stationery_drive' => EventType.stationeryDrive,
+    'donation_drive' => EventType.donationDrive,
+    'school_partnership' => EventType.schoolPartnership,
+    'community_outreach' => EventType.communityOutreach,
     _ => EventType.quiz,
   };
 
   String get displayName => switch (this) {
-    EventType.quiz => 'Quiz',
+    EventType.quiz => 'Quiz Event',
     EventType.talentHunt => 'Talent Hunt',
     EventType.dailyChallenge => 'Daily Challenge',
     EventType.counsellingDrive => 'Counselling Drive',
-    EventType.scholarship => 'Scholarship',
+    EventType.scholarship => 'Scholarship Drive',
     EventType.awarenessCampaign => 'Awareness Campaign',
     EventType.workshop => 'Workshop',
     EventType.competition => 'Competition',
     EventType.cyberSecurity => 'Cyber Security',
+    EventType.stationeryDrive => 'Stationery Drive',
+    EventType.donationDrive => 'Donation Drive',
+    EventType.schoolPartnership => 'School Partnership',
+    EventType.communityOutreach => 'Community Outreach',
   };
 
   String get apiValue => switch (this) {
@@ -46,6 +58,10 @@ enum EventType {
     EventType.workshop => 'workshop',
     EventType.competition => 'competition',
     EventType.cyberSecurity => 'cyber_security',
+    EventType.stationeryDrive => 'stationery_drive',
+    EventType.donationDrive => 'donation_drive',
+    EventType.schoolPartnership => 'school_partnership',
+    EventType.communityOutreach => 'community_outreach',
   };
 }
 

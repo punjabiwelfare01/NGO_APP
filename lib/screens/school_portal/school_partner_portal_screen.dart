@@ -4,6 +4,7 @@ import '../../core/colors.dart';
 import '../../models/counsellor_session_models.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import 'counsellor_directory_screen.dart';
+import 'school_partner_profile_screen.dart';
 import 'school_request_detail_screen.dart';
 
 class SchoolPartnerPortalScreen extends StatefulWidget {
@@ -32,6 +33,22 @@ class _SchoolPartnerPortalScreenState extends State<SchoolPartnerPortalScreen> {
         title: const Text('School Partner Portal'),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.person_rounded, size: 18, color: Colors.white),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const SchoolPartnerProfileScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: ListenableBuilder(
         listenable: _vm,
@@ -67,6 +84,21 @@ class _SchoolPartnerPortalScreenState extends State<SchoolPartnerPortalScreen> {
                   'Filter trusted experts and submit a school counselling or awareness-camp request.',
               color: const Color(0xFF2E7D32),
               onTap: () => _openDirectory(context),
+            ),
+            const SizedBox(height: 12),
+            _serviceCard(
+              context,
+              icon: Icons.manage_accounts_rounded,
+              title: 'Profile & Account Settings',
+              subtitle:
+                  'View and update your school details, contact info, and manage your account.',
+              color: const Color(0xFF6A1B9A),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => const SchoolPartnerProfileScreen(),
+                ),
+              ),
             ),
             const SizedBox(height: 22),
             Row(

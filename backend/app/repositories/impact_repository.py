@@ -27,11 +27,20 @@ def create_post(db: Session, data, creator_id: int):
 
 
 def update_post(db: Session, post: ImpactPost, data):
-    for key, value in data.model_dump(exclude_none=True).items():
+    for key, value in data.model_dump(exclude_none=True, exclude={"media"}).items():
         setattr(post, key, value)
+    if data.media is not None:
+        # Replace all existing media with the new list.
+        for m in list(post.media):
+            db.delete(m)
+        db.flush()
+        for i, media_item in enumerate(data.media):
+            d = media_item.model_dump()
+            d["position"] = i
+            db.add(ImpactPostMedia(post_id=post.id, **d))
     db.commit()
     db.refresh(post)
-    return post
+    return get_post(db, post.id)
 
 
 def reaction(db: Session, post_id: int, user_id: int):
@@ -60,6 +69,13 @@ def has_reacted(db: Session, post_id: int, user_id: int) -> bool:
         ImpactPostReaction.post_id == post_id,
         ImpactPostReaction.user_id == user_id,
     ).first() is not None
+
+
+def delete_post(db: Session, post: ImpactPost) -> None:
+    for media in list(post.media):
+        db.delete(media)
+    db.delete(post)
+    db.commit()
 
 
 def metrics(db: Session):

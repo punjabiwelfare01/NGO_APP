@@ -19,6 +19,7 @@ class _CounsellorAdminScreenState extends State<CounsellorAdminScreen> {
   void initState() {
     super.initState();
     _vm.load();
+    _vm.loadAllAdminRequests();
   }
 
   @override
@@ -76,7 +77,7 @@ class _CounsellorAdminScreenState extends State<CounsellorAdminScreen> {
               ),
               _stat(
                 'Requests',
-                _vm.requests.length,
+                _vm.allAdminRequests.length,
                 Icons.event_note_rounded,
                 const Color(0xFF6A1B9A),
               ),
@@ -396,9 +397,10 @@ class _CounsellorAdminScreenState extends State<CounsellorAdminScreen> {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (_) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,14 +414,44 @@ class _CounsellorAdminScreenState extends State<CounsellorAdminScreen> {
               ),
               const SizedBox(height: 12),
               if (requests.isEmpty)
-                const Text('No school requests yet.')
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text('No school requests yet.'),
+                )
               else
                 for (final r in requests)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.school_rounded),
-                    title: Text(r.schoolName),
-                    subtitle: Text('${r.topic} • ${r.status.label}'),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: r.status.color.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.school_rounded,
+                          color: r.status.color, size: 18),
+                    ),
+                    title: Text(r.schoolName,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(
+                      '${r.topic} • ${r.preferredDate.day}/${r.preferredDate.month}/${r.preferredDate.year}',
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: r.status.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        r.status.label,
+                        style: TextStyle(
+                          color: r.status.color,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
             ],
           ),

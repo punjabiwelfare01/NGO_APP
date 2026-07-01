@@ -14,7 +14,6 @@ import '../wellness/widgets/protection_lesson_card.dart';
 import '../wellness/widgets/wellness_action_card.dart';
 import 'admin/counselling_admin_screen.dart';
 import 'admin/emergency_contacts_admin_screen.dart';
-import 'mentor/mentor_chats_screen.dart';
 import 'mentor/mentor_schedule_screen.dart';
 import 'student/mentor_detail_screen.dart';
 import 'student/mentor_list_screen.dart';
@@ -110,19 +109,6 @@ class _HelpingSupportViewState extends State<HelpingSupportView> {
 
             // Mentor view
             if (isMentor) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _ActionTile(
-                  icon: Icons.chat_rounded,
-                  label: 'My Student Chats',
-                  color: AppColors.secondary,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const MentorChatsScreen(),
-                    ),
-                  ),
-                ),
-              ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: _ActionTile(

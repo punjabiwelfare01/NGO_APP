@@ -1,14 +1,21 @@
+import os
+import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import get_current_user, require_role
+from ..models.counselling import CounsellorWeeklyAvailability, MentorProfile
 from ..models.platform import CounsellorSessionReport, ReminderJob, SchoolCounsellorRequest
 from ..models.user import User, UserRole
 from ..models.wellness import CounsellingAvailability
 from ..services import notification_service
+
+_UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads" / "counsellor_docs"
+_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(tags=["Counsellor Workspace"])
 
@@ -23,7 +30,7 @@ def _request_json(item: SchoolCounsellorRequest, db: Session, reveal: bool) -> d
     counsellor = db.query(User).filter(User.id == item.counsellor_id).first()
     preferred = item.preferred_at
     suggested = item.suggested_at
-    return {"id": item.id, "school_name": item.school_name, "coordinator_name": item.coordinator_name, "coordinator_phone": item.coordinator_phone if reveal else "", "coordinator_email": item.coordinator_email if reveal else "", "school_address": item.school_address or "", "program": item.program or "School counselling", "topic": item.topic, "class_group": item.class_group or "", "expected_students": item.expected_students, "language": item.language or "", "special_requirements": item.special_requirements or "", "preferred_date": preferred.date().isoformat(), "preferred_hour": preferred.hour, "preferred_minute": preferred.minute, "mode": item.mode, "offline_location": item.offline_location or "", "meeting_link": item.meeting_link if reveal else None, "counsellor_name": counsellor.name if counsellor else "TBD", "assigned_event_manager": manager.name if manager else None, "assigned_event_manager_phone": manager.phone if manager and reveal else None, "preparation_notes": item.preparation_notes or "", "suggested_date": suggested.date().isoformat() if suggested else None, "suggested_hour": suggested.hour if suggested else None, "suggested_minute": suggested.minute if suggested else None, "status": item.status, "decline_reason": item.decline_reason, "decline_note": item.decline_note or "", "requested_at": item.created_at.isoformat(), "accepted_at": item.accepted_at.isoformat() if item.accepted_at else None, "confirmed_at": item.confirmed_at.isoformat() if item.confirmed_at else None, "completed_at": item.completed_at.isoformat() if item.completed_at else None}
+    return {"id": item.id, "counsellor_user_id": item.counsellor_id, "school_name": item.school_name, "coordinator_name": item.coordinator_name, "coordinator_phone": item.coordinator_phone if reveal else "", "coordinator_email": item.coordinator_email if reveal else "", "school_address": item.school_address or "", "program": item.program or "School counselling", "topic": item.topic, "class_group": item.class_group or "", "expected_students": item.expected_students, "language": item.language or "", "special_requirements": item.special_requirements or "", "preferred_date": preferred.date().isoformat(), "preferred_hour": preferred.hour, "preferred_minute": preferred.minute, "mode": item.mode, "offline_location": item.offline_location or "", "meeting_link": item.meeting_link if reveal else None, "counsellor_name": counsellor.name if counsellor else "TBD", "assigned_event_manager": manager.name if manager else None, "assigned_event_manager_phone": manager.phone if manager and reveal else None, "preparation_notes": item.preparation_notes or "", "suggested_date": suggested.date().isoformat() if suggested else None, "suggested_hour": suggested.hour if suggested else None, "suggested_minute": suggested.minute if suggested else None, "status": item.status, "decline_reason": item.decline_reason, "decline_note": item.decline_note or "", "requested_at": item.created_at.isoformat() if item.created_at else None, "accepted_at": item.accepted_at.isoformat() if item.accepted_at else None, "confirmed_at": item.confirmed_at.isoformat() if item.confirmed_at else None, "completed_at": item.completed_at.isoformat() if item.completed_at else None}
 
 
 
@@ -109,3 +116,195 @@ def delete_availability(slot_id: int, db: Session = Depends(get_db), user: User 
     item = db.query(CounsellingAvailability).filter(CounsellingAvailability.id == slot_id, CounsellingAvailability.mentor_id == user.id).first()
     if not item: raise HTTPException(404, "Availability not found")
     db.delete(item); db.commit()
+
+
+# ── Extended Profile ──────────────────────────────────────────────────────────
+
+@router.get("/counsellor/profile/extended")
+def get_extended_profile(db: Session = Depends(get_db), user: User = Depends(_counsellor)):
+    mentor = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    return {
+        "id": user.id,
+        "name": user.name,
+        "email": user.email,
+        "phone": user.phone,
+        "location": user.location,
+        "photo_url": user.photo_url,
+        "gender": mentor.gender if mentor else None,
+        "date_of_birth": mentor.date_of_birth if mentor else None,
+        "address": mentor.address if mentor else None,
+        "city": mentor.city if mentor else None,
+        "state": mentor.state if mentor else None,
+        "pin_code": mentor.pin_code if mentor else None,
+        "qualification": mentor.qualification if mentor else None,
+        "years_of_experience": mentor.years_of_experience if mentor else None,
+        "organization": mentor.organization if mentor else None,
+        "counselling_mode": mentor.counselling_mode if mentor else "both",
+        "languages_known": mentor.languages_known if mentor else None,
+        "bio": mentor.bio if mentor else None,
+        "expertise": mentor.expertise if mentor else None,
+        "category": mentor.category if mentor else None,
+        "profile_image_url": mentor.profile_image_url if mentor else None,
+        "id_proof_type": mentor.id_proof_type if mentor else None,
+        "id_proof_number": mentor.id_proof_number if mentor else None,
+        "id_proof_doc_url": mentor.id_proof_doc_url if mentor else None,
+        "professional_cert_url": mentor.professional_cert_url if mentor else None,
+        "verification_status": mentor.verification_status if mentor else "pending",
+        "verified_by": mentor.verified_by if mentor else None,
+        "verified_at": mentor.verified_at if mentor else None,
+        "admin_remark": mentor.admin_remark if mentor else None,
+    }
+
+
+@router.patch("/counsellor/profile/extended")
+def update_extended_profile(payload: dict, db: Session = Depends(get_db), user: User = Depends(_counsellor)):
+    # Update user-level fields
+    if "name" in payload:
+        user.name = payload["name"]
+    if "phone" in payload:
+        user.phone = payload["phone"]
+    if "location" in payload:
+        user.location = payload["location"]
+
+    # Find or create MentorProfile
+    mentor = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    if not mentor:
+        mentor = MentorProfile(
+            user_id=user.id,
+            display_name=user.name or "",
+        )
+        db.add(mentor)
+
+    mentor_fields = [
+        "gender", "date_of_birth", "address", "city", "state", "pin_code",
+        "qualification", "years_of_experience", "organization", "counselling_mode",
+        "languages_known", "bio", "expertise", "category", "profile_image_url",
+        "id_proof_type", "id_proof_number", "id_proof_doc_url", "professional_cert_url",
+    ]
+    for field in mentor_fields:
+        if field in payload:
+            setattr(mentor, field, payload[field])
+
+    # Keep display_name in sync with name
+    if "name" in payload:
+        mentor.display_name = payload["name"]
+
+    db.commit()
+    db.refresh(mentor)
+    return get_extended_profile(db=db, user=user)
+
+
+# ── Weekly Availability ───────────────────────────────────────────────────────
+
+def _slot_dict(slot: CounsellorWeeklyAvailability) -> dict:
+    return {
+        "id": slot.id,
+        "counsellor_id": slot.counsellor_id,
+        "day_of_week": slot.day_of_week,
+        "start_time": slot.start_time,
+        "end_time": slot.end_time,
+        "session_duration_minutes": slot.session_duration_minutes,
+        "max_sessions": slot.max_sessions,
+        "mode": slot.mode,
+        "location": slot.location,
+        "online_link": slot.online_link,
+        "is_active": slot.is_active,
+        "created_at": slot.created_at.isoformat() if slot.created_at else None,
+    }
+
+
+@router.get("/counsellor/weekly-availability")
+def get_weekly_availability(db: Session = Depends(get_db), user: User = Depends(_counsellor)):
+    slots = db.query(CounsellorWeeklyAvailability).filter(
+        CounsellorWeeklyAvailability.counsellor_id == user.id
+    ).order_by(CounsellorWeeklyAvailability.day_of_week, CounsellorWeeklyAvailability.start_time).all()
+    return [_slot_dict(s) for s in slots]
+
+
+@router.post("/counsellor/weekly-availability", status_code=201)
+def add_weekly_availability(payload: dict, db: Session = Depends(get_db), user: User = Depends(_counsellor)):
+    slot = CounsellorWeeklyAvailability(
+        counsellor_id=user.id,
+        day_of_week=payload["day_of_week"],
+        start_time=payload["start_time"],
+        end_time=payload["end_time"],
+        session_duration_minutes=payload.get("session_duration_minutes", 45),
+        max_sessions=payload.get("max_sessions", 4),
+        mode=payload.get("mode", "both"),
+        location=payload.get("location"),
+        online_link=payload.get("online_link"),
+        is_active=payload.get("is_active", True),
+    )
+    db.add(slot)
+    db.commit()
+    db.refresh(slot)
+    return _slot_dict(slot)
+
+
+@router.patch("/counsellor/weekly-availability/{slot_id}")
+def update_weekly_availability(slot_id: int, payload: dict, db: Session = Depends(get_db), user: User = Depends(_counsellor)):
+    slot = db.query(CounsellorWeeklyAvailability).filter(
+        CounsellorWeeklyAvailability.id == slot_id,
+        CounsellorWeeklyAvailability.counsellor_id == user.id,
+    ).first()
+    if not slot:
+        raise HTTPException(404, "Weekly availability slot not found")
+    updatable = ["day_of_week", "start_time", "end_time", "session_duration_minutes",
+                 "max_sessions", "mode", "location", "online_link", "is_active"]
+    for field in updatable:
+        if field in payload:
+            setattr(slot, field, payload[field])
+    db.commit()
+    db.refresh(slot)
+    return _slot_dict(slot)
+
+
+@router.delete("/counsellor/weekly-availability/{slot_id}", status_code=204)
+def delete_weekly_availability(slot_id: int, db: Session = Depends(get_db), user: User = Depends(_counsellor)):
+    slot = db.query(CounsellorWeeklyAvailability).filter(
+        CounsellorWeeklyAvailability.id == slot_id,
+        CounsellorWeeklyAvailability.counsellor_id == user.id,
+    ).first()
+    if not slot:
+        raise HTTPException(404, "Weekly availability slot not found")
+    db.delete(slot)
+    db.commit()
+
+
+# ── Verification Document Upload ──────────────────────────────────────────────
+
+@router.post("/counsellor/upload-verification-doc")
+async def upload_verification_doc(
+    doc_type: str = Form(...),   # "id_proof" or "professional_cert"
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(_counsellor),
+):
+    allowed_types = {"application/pdf", "image/jpeg", "image/png", "image/jpg"}
+    content_type = file.content_type or ""
+    if content_type not in allowed_types:
+        raise HTTPException(400, "Only PDF, JPEG, or PNG files are allowed")
+
+    ext = Path(file.filename or "file").suffix or ".pdf"
+    filename = f"counsellor_{user.id}_{uuid.uuid4().hex}{ext}"
+    dest = _UPLOADS_DIR / filename
+
+    contents = await file.read()
+    dest.write_bytes(contents)
+
+    relative_url = f"/uploads/counsellor_docs/{filename}"
+
+    mentor = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
+    if not mentor:
+        mentor = MentorProfile(user_id=user.id, display_name=user.name or "")
+        db.add(mentor)
+
+    if doc_type == "id_proof":
+        mentor.id_proof_doc_url = relative_url
+    elif doc_type == "professional_cert":
+        mentor.professional_cert_url = relative_url
+    else:
+        raise HTTPException(400, "doc_type must be 'id_proof' or 'professional_cert'")
+
+    db.commit()
+    return {"url": relative_url, "doc_type": doc_type}

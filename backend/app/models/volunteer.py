@@ -20,10 +20,11 @@ class ActivityCategory(str, enum.Enum):
 
 
 class SubmissionStatus(str, enum.Enum):
-    submitted    = "submitted"
-    under_review = "under_review"
-    approved     = "approved"
-    rejected     = "rejected"
+    submitted        = "submitted"
+    under_review     = "under_review"
+    approved         = "approved"
+    rejected         = "rejected"
+    needs_correction = "needs_correction"
 
 
 class VolunteerActivity(Base):
@@ -37,16 +38,21 @@ class VolunteerActivity(Base):
     description     = Column(String, nullable=True)
     expected_work   = Column(String, nullable=True)
     proof_required  = Column(String, nullable=True)   # JSON array: ["photo","report"]
+    work_instructions = Column(String, nullable=True)
     reward_hours    = Column(Float, default=0.0)
     location        = Column(String, nullable=True)
+    start_date      = Column(Date, nullable=True)
+    end_date        = Column(Date, nullable=True)
     duration        = Column(String, nullable=True)
     application_deadline = Column(DateTime, nullable=True)
     max_students    = Column(Integer, nullable=True)
     certificate_eligible = Column(Boolean, default=True, nullable=False)
     stipend_amount  = Column(Float, nullable=True)
     is_active       = Column(Boolean, default=True, nullable=False)
+    status          = Column(String, default="active", nullable=False)  # draft/active/completed/cancelled
     created_by      = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at      = Column(DateTime, server_default=func.now())
+    updated_at      = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     assignments = relationship("ActivityAssignment", back_populates="activity", cascade="all, delete-orphan")
     submissions = relationship("WorkSubmission",     back_populates="activity", cascade="all, delete-orphan")
