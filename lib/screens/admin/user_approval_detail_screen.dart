@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/colors.dart';
 import '../../models/api_models.dart';
 import '../../repositories/admin_repository.dart';
+import '../../repositories/api_client.dart';
 import '../../viewmodels/admin_viewmodel.dart';
 
 /// Full profile review page for a pending user.
@@ -136,6 +138,40 @@ class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
             _SectionLabel('Requested Access'),
             const SizedBox(height: 8),
             _RequestedRoleBanner(role: user.requestedRole!),
+            const SizedBox(height: 20),
+          ],
+
+          // ── Government ID submitted ──────────────────────────────────
+          if (user.govIdDocUrl != null) ...[
+            _SectionLabel('Government ID Submitted'),
+            const SizedBox(height: 8),
+            _GovIdDocumentCard(
+              idType: user.govIdType,
+              docUrl: user.govIdDocUrl!,
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (user.govIdDocUrl == null) ...[
+            _SectionLabel('Government ID'),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.muted.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.muted.withValues(alpha: 0.2)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 16, color: AppColors.muted),
+                  SizedBox(width: 8),
+                  Text(
+                    'No government ID uploaded by this user.',
+                    style: TextStyle(color: AppColors.muted, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 20),
           ],
 
@@ -641,6 +677,85 @@ class _ErrorBody extends StatelessWidget {
             FilledButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _GovIdDocumentCard extends StatelessWidget {
+  const _GovIdDocumentCard({required this.docUrl, this.idType});
+  final String docUrl;
+  final String? idType;
+
+  Future<void> _open() async {
+    final fullUrl = '${ApiClient.baseUrl}$docUrl';
+    final uri = Uri.parse(fullUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.badge_outlined,
+              color: AppColors.primary,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  idType ?? 'Government ID',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Document uploaded — tap to view',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: _open,
+            icon: const Icon(Icons.open_in_new_rounded, size: 16),
+            label: const Text('View'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

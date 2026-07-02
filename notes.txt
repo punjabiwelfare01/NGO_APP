@@ -163,55 +163,15 @@ start command
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 
+currently in profile section there is no logout option is present pls add
+and remove the logout option from the edit profile form section
 
-logout button is not working in school profile section
+in school portal in councellor section map each councellor profile 
+to their profiles not show the verified councellor all profiles of all 
+councellor fix this
 
-after the event  manager create an acitivity for an event then their is no option 
-event manger dashboard should show all register student of ngo app so that 
-the event manager can assign the work among those students
-
-
-no dashboard where event manager can see the created activity and can edit created the activity
-and admin also have specitic option in dashboard to see  all activies for specific activity
-
-generate report for event manager should include all activities logs by created  an event manger should 
-able to download as a pdf with ngo logo and event manager name 
-
-event manger should give request to admin for cerficate generation for 
-intern/volunteer after that only admin will generate certificate for student 
-if the event manager certication request is approve by admin then status should be updated to event 
-manager dashboard
-
-
-activities shown to student have no clear description for which event this 
-blong to for which event this activies is ? so student can clear about which 
-activities they participated 
-
-in councellor book session form the session topic should be manually writing
-input title for session topic not selest topic 
-
-fix the councellor profile to be volunteer profile
-
-
-event page of admin fix
-
-the admin can also download the generate certificate of student so that can use it
-to create impact story for student their is no form  for about add 
-details manulally for student certificate deatil and edit it 
-certification  template is correct as it 
-
-
-
-logout of councellor role  is not working currently fix the issue
-
-
-councellor schedule calender is not showing any upcomming schedule session
-while the councellor has already accepted the councelling request of school
-also in councellor also my session dashboard is not updated after
-the event schedule 
-
-admin portal is updated for school request data information showing no 
-school request
+also add the ngo address ,registration number,logo and phone number 
+for legal authenticity for school
 
 
 

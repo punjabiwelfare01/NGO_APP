@@ -388,3 +388,23 @@ def impact_stats(db: Session = Depends(get_db), user: User = Depends(get_current
         "hours_served": row[3],
         "appreciations": row[4],
     }
+
+
+@router.get("/my-stats", summary="School-specific impact stats derived from this school's requests")
+def my_stats(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    _require_school_partner(user)
+    from ..models.platform import SchoolCounsellorRequest as SCR
+
+    all_reqs = db.query(SCR).filter(SCR.requested_by == user.id).all()
+    completed = [r for r in all_reqs if r.status == "completed"]
+    awareness = [
+        r for r in all_reqs
+        if "awareness" in (r.program or "").lower()
+    ]
+
+    return {
+        "students_counselled": sum(r.expected_students or 0 for r in completed),
+        "counselling_sessions": len(completed),
+        "awareness_programs": len(awareness),
+        "success_stories": max(len(completed) - len(awareness), 0),
+    }

@@ -22,14 +22,23 @@ def _base(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
+_IMPACT_CREATOR_ROLES = (UserRole.mentor, UserRole.event_manager, UserRole.admin, UserRole.super_admin)
+
+
 @router.get("/posts", response_model=list[ImpactPostOut])
 def posts(
     request: Request,
     status: str = "published",
     category: str | None = None,
+    mine: bool = False,
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
 ):
+    if mine:
+        if not user or user.role not in _IMPACT_CREATOR_ROLES:
+            raise HTTPException(403, "Not allowed")
+        posts = impact_repository.list_posts(db, status=None, category=category, created_by=user.id)
+        return [impact_service.serialize_post(db, item, user.id, _base(request)) for item in posts]
     if status != "published" and (not user or user.role not in (UserRole.event_manager, UserRole.admin, UserRole.super_admin)):
         raise HTTPException(403, "Published posts only")
     return [impact_service.serialize_post(db, post, user.id if user else None, _base(request)) for post in impact_repository.list_posts(db, status, category)]
@@ -50,7 +59,7 @@ def impact_metrics(db: Session = Depends(get_db)):
 
 
 @router.post("/posts", response_model=ImpactPostOut, status_code=201)
-def create(data: ImpactPostCreate, request: Request, db: Session = Depends(get_db), user: User = Depends(require_role(UserRole.event_manager))):
+def create(data: ImpactPostCreate, request: Request, db: Session = Depends(get_db), user: User = Depends(require_role(UserRole.mentor))):
     item = impact_repository.create_post(db, data, user.id)
     return impact_service.serialize_post(db, item, user.id, _base(request))
 
@@ -59,7 +68,7 @@ def create(data: ImpactPostCreate, request: Request, db: Session = Depends(get_d
 async def upload_media(
     file: UploadFile = File(...),
     media_type: str = Form(default="image"),
-    user: User = Depends(require_role(UserRole.event_manager, UserRole.admin, UserRole.super_admin)),
+    user: User = Depends(require_role(UserRole.mentor)),
 ):
     """Upload an impact media file immediately and return its URL.
     Pass the URL in the `media` list when creating or updating an impact post.
@@ -82,12 +91,12 @@ async def add_media(
     display_order: int = Form(default=0),
     media_type: str = Form(default="image"),
     db: Session = Depends(get_db),
-    user: User = Depends(require_role(UserRole.event_manager)),
+    user: User = Depends(require_role(UserRole.mentor)),
 ):
     item = impact_repository.get_post(db, post_id)
     if not item:
         raise HTTPException(404, "Impact post not found")
-    if user.role == UserRole.event_manager and item.created_by != user.id:
+    if user.role in (UserRole.event_manager, UserRole.mentor) and item.created_by != user.id:
         raise HTTPException(403, "Access denied")
 
     _IMPACT_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
@@ -113,11 +122,11 @@ async def add_media(
 
 
 @router.patch("/posts/{post_id}", response_model=ImpactPostOut)
-def update(post_id: int, data: ImpactPostUpdate, request: Request, db: Session = Depends(get_db), user: User = Depends(require_role(UserRole.event_manager))):
+def update(post_id: int, data: ImpactPostUpdate, request: Request, db: Session = Depends(get_db), user: User = Depends(require_role(UserRole.mentor))):
     item = impact_repository.get_post(db, post_id)
     if not item:
         raise HTTPException(404, "Impact post not found")
-    if user.role == UserRole.event_manager and item.created_by != user.id:
+    if user.role in (UserRole.event_manager, UserRole.mentor) and item.created_by != user.id:
         raise HTTPException(403, "Access denied")
     item = impact_repository.update_post(db, item, data)
     return impact_service.serialize_post(db, item, user.id, _base(request))

@@ -73,6 +73,8 @@ flutter:
   assets:
     - assests/ngo_logo.jpeg
     - assests/new_donation_qr.png
+    - assests/home_screen_card_councellor.png
+    - assests/donation_upi_qr_code.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -97,6 +97,11 @@ def content_creator_user(db):
     return _create_user(db, "cc@test.local", UserRole.content_creator, "Content Creator", age=28)
 
 
+@pytest.fixture()
+def school_partner_user(db):
+    return _create_user(db, "school@test.local", UserRole.school_partner, "School Partner", age=40)
+
+
 # ── auth header fixtures ───────────────────────────────────────────────────────
 
 def _get_token(client, email: str) -> str:
@@ -128,6 +133,11 @@ def mentor_headers(client, mentor_user):
 @pytest.fixture()
 def cc_headers(client, content_creator_user):
     return {"Authorization": f"Bearer {_get_token(client, 'cc@test.local')}"}
+
+
+@pytest.fixture()
+def school_partner_headers(client, school_partner_user):
+    return {"Authorization": f"Bearer {_get_token(client, 'school@test.local')}"}
 
 
 # ── shared payloads ────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
@@ -63,6 +63,56 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             "requested_role": user.requested_role,
         },
     }
+
+
+@router.post("/upload-gov-id", status_code=200,
+             summary="Upload a government ID document for admin verification")
+async def upload_gov_id(
+    file: UploadFile = File(...),
+    id_type: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    import pathlib, tempfile
+    from ..config import settings as cfg
+
+    allowed_types = {"application/pdf", "image/jpeg", "image/jpg", "image/png"}
+    if file.content_type and file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Only PDF, JPG, and PNG files are allowed.")
+
+    contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum 10 MB allowed.")
+
+    ext = pathlib.Path(file.filename or "id").suffix.lower() or ".pdf"
+    safe_name = f"{secrets.token_urlsafe(18)}{ext}"
+
+    # ── Route to Hostinger SFTP when configured, else local fallback ──────────
+    use_sftp = bool(cfg.hostinger_host and cfg.hostinger_username)
+
+    if use_sftp:
+        from ..services.storage_service import upload_local_file, get_public_url, StorageError
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            tmp.write(contents)
+            tmp_path = tmp.name
+        try:
+            upload_local_file(tmp_path, "gov_ids", safe_name)
+            doc_url = get_public_url("gov_ids", safe_name)
+        except StorageError as exc:
+            raise HTTPException(status_code=500, detail=f"File transfer failed: {exc}") from exc
+        finally:
+            pathlib.Path(tmp_path).unlink(missing_ok=True)
+    else:
+        upload_dir = pathlib.Path("uploads/gov_ids")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        (upload_dir / safe_name).write_bytes(contents)
+        doc_url = f"/uploads/gov_ids/{safe_name}"
+
+    current_user.gov_id_type = id_type.strip()
+    current_user.gov_id_doc_url = doc_url
+    db.commit()
+
+    return {"message": "Government ID uploaded successfully.", "doc_url": doc_url}
 
 
 @router.post("/login", response_model=TokenResponse,

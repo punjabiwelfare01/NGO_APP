@@ -20,6 +20,13 @@ class SchoolPartnerRepository {
     return SchoolPartnerProfile.fromJson(json);
   }
 
+  /// GET /school/my-stats
+  static Future<SchoolStats> getMyStats() async {
+    final json =
+        await ApiClient.get('/school/my-stats') as Map<String, dynamic>;
+    return SchoolStats.fromJson(json);
+  }
+
   /// POST /school/profile/upload-logo  (multipart)
   static Future<String> uploadLogo(
     List<int> bytes,

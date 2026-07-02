@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app_state.dart';
 import '../../core/colors.dart';
 import '../../viewmodels/counsellor_home_viewmodel.dart';
+import '../internship/wall_of_impact_view.dart';
 import 'counsellor_home_view.dart';
 import 'counsellor_requests_view.dart';
 import 'counsellor_schedule_view.dart';
@@ -45,6 +46,7 @@ class _CounsellorShellState extends State<CounsellorShell> {
       CounsellorRequestsView(vm: _vm),
       CounsellorScheduleView(vm: _vm),
       CounsellorSessionsView(vm: _vm),
+      const WallOfImpactView(),
       CounsellorProfileView(vm: _vm),
     ];
 
@@ -91,6 +93,11 @@ class _CounsellorShellState extends State<CounsellorShell> {
                 icon: Icon(Icons.event_note_outlined),
                 selectedIcon: Icon(Icons.event_note_rounded),
                 label: 'Sessions',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.auto_awesome_outlined),
+                selectedIcon: Icon(Icons.auto_awesome_rounded),
+                label: 'Impact',
               ),
               const NavigationDestination(
                 icon: Icon(Icons.person_outline_rounded),

@@ -1,3 +1,31 @@
+class SchoolStats {
+  const SchoolStats({
+    required this.studentsCounselled,
+    required this.counsellingSessions,
+    required this.awarenessPrograms,
+    required this.successStories,
+  });
+
+  final int studentsCounselled;
+  final int counsellingSessions;
+  final int awarenessPrograms;
+  final int successStories;
+
+  factory SchoolStats.fromJson(Map<String, dynamic> j) => SchoolStats(
+        studentsCounselled: j['students_counselled'] as int? ?? 0,
+        counsellingSessions: j['counselling_sessions'] as int? ?? 0,
+        awarenessPrograms: j['awareness_programs'] as int? ?? 0,
+        successStories: j['success_stories'] as int? ?? 0,
+      );
+
+  static const empty = SchoolStats(
+    studentsCounselled: 0,
+    counsellingSessions: 0,
+    awarenessPrograms: 0,
+    successStories: 0,
+  );
+}
+
 class SchoolPartnerProfile {
   const SchoolPartnerProfile({
     required this.id,

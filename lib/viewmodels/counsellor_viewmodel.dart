@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import '../models/counsellor_models.dart';
 import '../models/counsellor_session_models.dart';
+import '../models/school_partner_models.dart';
 import '../repositories/counselling_repository.dart';
+import '../repositories/school_partner_repository.dart';
 
 enum CounsellorLoadState { idle, loading, error }
 
@@ -17,12 +19,17 @@ class CounsellorViewModel extends ChangeNotifier {
   bool _disposed = false;
   bool _loaded = false;
   bool _schoolRequestsLoaded = false;
+  SchoolPartnerProfile? _schoolProfile;
+  SchoolStats _schoolStats = SchoolStats.empty;
+  bool _schoolStatsLoaded = false;
 
   CounsellorLoadState get state => _state;
   CounsellorFilter get filter => _filter;
   List<CounsellingRequest> get requests => List.unmodifiable(_requests);
   List<SchoolBookingRequest> get schoolRequests =>
       List.unmodifiable(_schoolRequests);
+  SchoolPartnerProfile? get schoolProfile => _schoolProfile;
+  SchoolStats get schoolStats => _schoolStats;
 
   List<CounsellorProfile> get allCounsellors =>
       _counsellors.where((c) => c.isActive && c.isVerified).toList();
@@ -141,6 +148,23 @@ class CounsellorViewModel extends ChangeNotifier {
     try {
       _schoolRequests = await CounsellingRepository.getMySchoolRequests();
       _schoolRequestsLoaded = true;
+    } catch (_) {}
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<void> loadSchoolProfile({bool force = false}) async {
+    if (_schoolProfile != null && !force) return;
+    try {
+      _schoolProfile = await SchoolPartnerRepository.getProfile();
+    } catch (_) {}
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<void> loadSchoolStats({bool force = false}) async {
+    if (_schoolStatsLoaded && !force) return;
+    try {
+      _schoolStats = await SchoolPartnerRepository.getMyStats();
+      _schoolStatsLoaded = true;
     } catch (_) {}
     if (!_disposed) notifyListeners();
   }

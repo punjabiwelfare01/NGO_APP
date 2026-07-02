@@ -58,6 +58,8 @@ class _EMStudentsViewState extends State<EMStudentsView>
             ),
             TabBar(
               controller: _tabs,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               labelColor: const Color(0xFF1565C0),
               unselectedLabelColor: AppColors.muted,
               indicatorColor: const Color(0xFF1565C0),

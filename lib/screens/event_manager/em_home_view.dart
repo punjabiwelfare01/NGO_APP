@@ -847,15 +847,18 @@ class _PendingSubmissionsSection extends StatelessWidget {
               size: 20,
             ),
             const SizedBox(width: 6),
-            const Text(
-              'Pending Student Submissions',
-              style: TextStyle(
-                color: AppColors.ink,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
+            const Flexible(
+              child: Text(
+                'Pending Student Submissions',
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(

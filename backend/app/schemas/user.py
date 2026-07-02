@@ -62,6 +62,8 @@ class UserResponse(BaseModel):
     phone: Optional[str] = None
     requested_role: Optional[str] = None
     verification_note: Optional[str] = None
+    gov_id_type: Optional[str] = None
+    gov_id_doc_url: Optional[str] = None
     photo_url: Optional[str] = None
     created_at: datetime
     interests: Optional[List[str]] = None

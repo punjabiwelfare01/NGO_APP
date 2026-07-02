@@ -4,10 +4,14 @@ from sqlalchemy.orm import Session, selectinload
 from ..models.impact import ImpactPost, ImpactPostMedia, ImpactPostReaction
 
 
-def list_posts(db: Session, status: str = "published", category: str | None = None):
-    query = db.query(ImpactPost).options(selectinload(ImpactPost.media)).filter(ImpactPost.status == status)
+def list_posts(db: Session, status: str | None = "published", category: str | None = None, created_by: int | None = None):
+    query = db.query(ImpactPost).options(selectinload(ImpactPost.media))
+    if status is not None:
+        query = query.filter(ImpactPost.status == status)
     if category:
         query = query.filter(ImpactPost.category == category)
+    if created_by is not None:
+        query = query.filter(ImpactPost.created_by == created_by)
     return query.order_by(ImpactPost.published_at.desc(), ImpactPost.created_at.desc()).all()
 
 

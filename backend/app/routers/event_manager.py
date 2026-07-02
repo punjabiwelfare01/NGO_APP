@@ -190,9 +190,14 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
     if user.role in (UserRole.admin, UserRole.super_admin):
         impacts = db.query(ImpactPost).order_by(ImpactPost.created_at.desc()).all()
     else:
-        # Include posts linked to the EM's events AND standalone posts they created
-        # (standalone posts have event_id = None and would otherwise be invisible).
-        conditions = [ImpactPost.created_by == user.id]
+        # Include:
+        #  1. Posts this EM created (all statuses — their drafts + submitted)
+        #  2. Posts linked to their events
+        #  3. ALL published posts (so their Published tab matches what admin/students see)
+        conditions = [
+            ImpactPost.created_by == user.id,
+            ImpactPost.status == "published",
+        ]
         if event_ids:
             conditions.append(ImpactPost.event_id.in_(event_ids))
         impacts = (

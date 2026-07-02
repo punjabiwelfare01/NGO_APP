@@ -21,6 +21,8 @@ class AppUser {
     this.accessStatus,
     this.requestedRole,
     this.verificationNote,
+    this.govIdType,
+    this.govIdDocUrl,
     this.photoUrl,
     this.interests = const [],
   });
@@ -43,6 +45,8 @@ class AppUser {
   final String? accessStatus;
   final String? requestedRole;
   final String? verificationNote;
+  final String? govIdType;
+  final String? govIdDocUrl;
   final String? photoUrl;
   final List<String> interests;
 
@@ -62,6 +66,8 @@ class AppUser {
     String? accessStatus,
     String? requestedRole,
     String? verificationNote,
+    String? govIdType,
+    String? govIdDocUrl,
     String? photoUrl,
     List<String>? interests,
   }) => AppUser(
@@ -83,6 +89,8 @@ class AppUser {
     accessStatus: accessStatus ?? this.accessStatus,
     requestedRole: requestedRole ?? this.requestedRole,
     verificationNote: verificationNote ?? this.verificationNote,
+    govIdType: govIdType ?? this.govIdType,
+    govIdDocUrl: govIdDocUrl ?? this.govIdDocUrl,
     photoUrl: photoUrl ?? this.photoUrl,
     interests: interests ?? this.interests,
   );
@@ -110,6 +118,8 @@ class AppUser {
     accessStatus: j['access_status'] as String?,
     requestedRole: j['requested_role'] as String?,
     verificationNote: j['verification_note'] as String?,
+    govIdType: j['gov_id_type'] as String?,
+    govIdDocUrl: j['gov_id_doc_url'] as String?,
     photoUrl: j['photo_url'] as String?,
     interests: (j['interests'] as List<dynamic>?)
             ?.map((e) => e as String)

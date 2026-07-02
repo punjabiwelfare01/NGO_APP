@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'impact_post.dart';
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum EventStatus {
@@ -604,6 +606,32 @@ class EMImpactPost {
         isPublished: j['is_published'] as bool? ?? false,
         adminApproved: j['admin_approved'] as bool? ?? false,
         verifiedByName: j['verified_by_name'] as String? ?? '',
+      );
+
+  /// Maps a post fetched from the creator-scoped `/impact/posts?mine=true`
+  /// endpoint (used by roles without access to the event-manager dashboard,
+  /// e.g. counsellors) into the same shape this view already renders.
+  factory EMImpactPost.fromImpactPost(ImpactPost post) => EMImpactPost(
+        id: post.id,
+        type: EMImpactPostType.fromString(post.category),
+        title: post.title,
+        studentName: post.studentNames,
+        teamName: post.teamName,
+        eventName: post.eventId != null ? 'Linked Event' : 'Standalone Post',
+        location: post.location ?? '',
+        date: post.publishedAt ?? DateTime.now(),
+        description: post.description,
+        appreciationMessage:
+            'Thank you to everyone who made this impact possible.',
+        studentsHelped: post.peopleReached,
+        hoursServed: post.hoursServed,
+        donationRaised: post.donationCollected,
+        photoUrls: post.media.map((m) => m.url).toList(),
+        isPublished:
+            post.status == 'pending_review' || post.status == 'published',
+        adminApproved: post.approvedBy != null,
+        verifiedByName:
+            post.approvedBy != null ? 'NGO Admin' : 'Pending approval',
       );
 }
 

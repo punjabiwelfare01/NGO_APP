@@ -20,6 +20,14 @@ class ImpactRepository {
     await ApiClient.get('/impact/posts/$id') as Map<String, dynamic>,
   );
 
+  static Future<List<ImpactPost>> getMine() async {
+    final data =
+        await ApiClient.get('/impact/posts?mine=true') as List<dynamic>;
+    return data
+        .map((item) => ImpactPost.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
   static Future<ImpactMetrics> getMetrics() async => ImpactMetrics.fromJson(
     await ApiClient.get('/impact/metrics') as Map<String, dynamic>,
   );

@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -877,6 +878,8 @@ class _StudentVolunteerFormState extends State<_StudentVolunteerForm> {
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   final Set<String> _interests = {};
+  String? _govIdType;
+  PlatformFile? _govIdFile;
 
   static const _interestOptions = [
     'Education Support',
@@ -905,6 +908,15 @@ class _StudentVolunteerFormState extends State<_StudentVolunteerForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_govIdFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload a government ID document for verification.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     final status = await _vm.registerStudent(
       name: _nameCtrl.text.trim(),
       email: _emailCtrl.text.trim(),
@@ -917,10 +929,32 @@ class _StudentVolunteerFormState extends State<_StudentVolunteerForm> {
       interests: _interests.toList(),
     );
     if (!mounted || status == null) return;
+    if (_govIdFile?.bytes != null && _govIdType != null) {
+      try {
+        await ApiClient.postMultipart(
+          '/auth/upload-gov-id',
+          fields: {'id_type': _govIdType!},
+          fileBytes: _govIdFile!.bytes!,
+          fileName: _govIdFile!.name,
+        );
+      } catch (_) {}
+    }
+    if (!mounted) return;
     if (status == AccessStatus.approved) {
       Navigator.of(context).pushReplacementNamed('/home');
     } else {
       widget.onSuccess();
+    }
+  }
+
+  Future<void> _pickGovIdFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _govIdFile = result.files.first);
     }
   }
 
@@ -1119,6 +1153,34 @@ class _StudentVolunteerFormState extends State<_StudentVolunteerForm> {
                 validator: (v) => (v == null || v.trim().isEmpty)
                     ? 'Please share your reason for joining'
                     : null,
+              ),
+              const SizedBox(height: 20),
+              _SectionLabel(
+                icon: Icons.badge_outlined,
+                label: 'Government ID Verification',
+                color: const Color(0xFF37474F),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Upload a government-issued photo ID for admin verification. It will only be seen by the NGO admin and will not be publicly displayed.',
+                style: TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 11.5,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _GovIdTypeDropdown(
+                value: _govIdType,
+                enabled: !loading,
+                onChanged: (v) => setState(() => _govIdType = v),
+              ),
+              const SizedBox(height: 10),
+              _GovIdFilePicker(
+                file: _govIdFile,
+                enabled: !loading,
+                onPick: _pickGovIdFile,
+                onClear: () => setState(() => _govIdFile = null),
               ),
               const SizedBox(height: 18),
               const _PendingNotice(),
@@ -1616,6 +1678,8 @@ class _CounsellorFormState extends State<_CounsellorForm> {
   String? _sessionPreference;
   bool _consentVerification = false;
   bool _consentPublicProfile = false;
+  String? _govIdType;
+  PlatformFile? _govIdFile;
 
   static const _categories = [
     'Retired Army Officer Counsellor',
@@ -1651,6 +1715,15 @@ class _CounsellorFormState extends State<_CounsellorForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please consent to document verification.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (_govIdFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload a government ID document for verification.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -1704,8 +1777,30 @@ class _CounsellorFormState extends State<_CounsellorForm> {
       // Non-fatal — profile data can be updated later from the profile screen
     }
 
+    if (_govIdFile?.bytes != null && _govIdType != null) {
+      try {
+        await ApiClient.postMultipart(
+          '/auth/upload-gov-id',
+          fields: {'id_type': _govIdType!},
+          fileBytes: _govIdFile!.bytes!,
+          fileName: _govIdFile!.name,
+        );
+      } catch (_) {}
+    }
+
     if (!mounted) return;
     widget.onSuccess();
+  }
+
+  Future<void> _pickGovIdFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _govIdFile = result.files.first);
+    }
   }
 
   @override
@@ -1943,6 +2038,34 @@ class _CounsellorFormState extends State<_CounsellorForm> {
                 label:
                     'I consent to show my verified public profile to schools after admin approval.',
               ),
+              const SizedBox(height: 20),
+              _SectionLabel(
+                icon: Icons.badge_outlined,
+                label: 'Government ID Verification',
+                color: const Color(0xFF37474F),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Upload a government-issued photo ID for admin verification. It will only be seen by the NGO admin and will not be publicly displayed.',
+                style: TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 11.5,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _GovIdTypeDropdown(
+                value: _govIdType,
+                enabled: !loading,
+                onChanged: (v) => setState(() => _govIdType = v),
+              ),
+              const SizedBox(height: 10),
+              _GovIdFilePicker(
+                file: _govIdFile,
+                enabled: !loading,
+                onPick: _pickGovIdFile,
+                onClear: () => setState(() => _govIdFile = null),
+              ),
               const SizedBox(height: 18),
               const _PendingNotice(),
               const SizedBox(height: 14),
@@ -1997,6 +2120,8 @@ class _NgoStaffFormState extends State<_NgoStaffForm> {
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   String? _requestedRole;
+  String? _govIdType;
+  PlatformFile? _govIdFile;
 
   static const _roles = [
     'Event Manager',
@@ -2020,6 +2145,15 @@ class _NgoStaffFormState extends State<_NgoStaffForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_govIdFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload a government ID document for verification.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     final roleKey = _requestedRole?.toLowerCase().replaceAll(' ', '_');
     final status = await _vm.registerStudent(
       name: _nameCtrl.text.trim(),
@@ -2032,7 +2166,29 @@ class _NgoStaffFormState extends State<_NgoStaffForm> {
       requestedRole: roleKey ?? 'other',
     );
     if (!mounted || status == null) return;
+    if (_govIdFile?.bytes != null && _govIdType != null) {
+      try {
+        await ApiClient.postMultipart(
+          '/auth/upload-gov-id',
+          fields: {'id_type': _govIdType!},
+          fileBytes: _govIdFile!.bytes!,
+          fileName: _govIdFile!.name,
+        );
+      } catch (_) {}
+    }
+    if (!mounted) return;
     widget.onSuccess();
+  }
+
+  Future<void> _pickGovIdFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _govIdFile = result.files.first);
+    }
   }
 
   @override
@@ -2224,6 +2380,34 @@ class _NgoStaffFormState extends State<_NgoStaffForm> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 20),
+              _SectionLabel(
+                icon: Icons.badge_outlined,
+                label: 'Government ID Verification',
+                color: const Color(0xFF37474F),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Upload a government-issued photo ID for admin verification. It will only be seen by the NGO admin and will not be publicly displayed.',
+                style: TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 11.5,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _GovIdTypeDropdown(
+                value: _govIdType,
+                enabled: !loading,
+                onChanged: (v) => setState(() => _govIdType = v),
+              ),
+              const SizedBox(height: 10),
+              _GovIdFilePicker(
+                file: _govIdFile,
+                enabled: !loading,
+                onPick: _pickGovIdFile,
+                onClear: () => setState(() => _govIdFile = null),
               ),
               const SizedBox(height: 14),
               const _PendingNotice(),
@@ -3349,6 +3533,109 @@ class _DemoChip extends StatelessWidget {
       backgroundColor: Colors.white,
       side: BorderSide(color: color.withValues(alpha: 0.4)),
       padding: const EdgeInsets.symmetric(horizontal: 4),
+    );
+  }
+}
+
+// ── Shared gov ID widgets (used by Student, NGO Staff, and Counsellor forms) ──
+
+class _GovIdTypeDropdown extends StatelessWidget {
+  const _GovIdTypeDropdown({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String? value;
+  final bool enabled;
+  final ValueChanged<String?> onChanged;
+
+  static const _items = [
+    'Aadhaar Card',
+    'PAN Card',
+    'Voter ID',
+    'Passport',
+    'Driving License',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: _dec('ID Document Type', Icons.credit_card_outlined),
+      items: _items
+          .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+          .toList(),
+      onChanged: enabled ? onChanged : null,
+      validator: (v) => v == null ? 'Please select your ID type' : null,
+    );
+  }
+}
+
+class _GovIdFilePicker extends StatelessWidget {
+  const _GovIdFilePicker({
+    required this.file,
+    required this.enabled,
+    required this.onPick,
+    required this.onClear,
+  });
+
+  final PlatformFile? file;
+  final bool enabled;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onPick : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: file != null
+                ? AppColors.secondary.withValues(alpha: 0.6)
+                : AppColors.muted.withValues(alpha: 0.15),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              file != null
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.upload_file_outlined,
+              color: file != null ? AppColors.secondary : AppColors.muted,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                file != null
+                    ? file!.name
+                    : 'Tap to upload ID document (PDF / JPG / PNG)',
+                style: TextStyle(
+                  color: file != null
+                      ? AppColors.ink
+                      : AppColors.muted.withValues(alpha: 0.7),
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (file != null)
+              GestureDetector(
+                onTap: onClear,
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: AppColors.muted,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

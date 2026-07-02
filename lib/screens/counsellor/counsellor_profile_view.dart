@@ -5,12 +5,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../app_state.dart';
-import '../../core/colors.dart';
 import '../../models/counsellor_models.dart';
 import '../../repositories/api_client.dart';
 import '../../repositories/auth_repository.dart';
 import '../../viewmodels/counsellor_home_viewmodel.dart';
-import '../../widgets/app_card.dart';
+
+// ─── Palette ──────────────────────────────────────────────────────────────────
+
+const _kBlue   = Color(0xFF2563EB);
+const _kGreen  = Color(0xFF16A34A);
+const _kAmber  = Color(0xFFF59E0B);
+const _kPurple = Color(0xFF8B5CF6);
+const _kNavy   = Color(0xFF0A1F44);
+const _kInk    = Color(0xFF17324D);
+const _kMuted  = Color(0xFF8E96A3);
+const _kBg     = Color(0xFFFAF7F2);
+const _kCard   = Colors.white;
+
+// ─── Root View ────────────────────────────────────────────────────────────────
 
 class CounsellorProfileView extends StatelessWidget {
   const CounsellorProfileView({required this.vm, super.key});
@@ -20,192 +32,67 @@ class CounsellorProfileView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: vm,
-      builder: (context, _) => _buildContent(context),
-    );
-  }
-
-  Widget _buildContent(BuildContext context) {
-    final p = vm.profile;
-    return CustomScrollView(
-      slivers: [
-        _HeroAppBar(profile: p, onEdit: () => _openEditProfile(context)),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              _VerifiedBadge(profile: p),
-              const SizedBox(height: 14),
-              _PrivateAccountCard(vm: vm),
-              const SizedBox(height: 16),
-              _StatsRow(profile: p, vm: vm),
-              const SizedBox(height: 14),
-              _AvailabilityManagementSection(vm: vm),
-              const SizedBox(height: 18),
-              _Section(
-                icon: Icons.info_outline_rounded,
-                title: 'About',
-                child: Text(
-                  p.shortBio,
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 13,
-                    height: 1.6,
-                    fontWeight: FontWeight.w500,
-                  ),
+      builder: (context, _) {
+        final p = vm.profile;
+        return Scaffold(
+          backgroundColor: _kBg,
+          body: CustomScrollView(
+            slivers: [
+              _HeroSliver(
+                profile: p,
+                vm: vm,
+                onEdit: () => _openEdit(context),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // 1 — Overview stats
+                    _OverviewRow(profile: p, vm: vm),
+                    const SizedBox(height: 16),
+                    // 2 — Professional info
+                    _ProfessionalCard(profile: p),
+                    const SizedBox(height: 16),
+                    // 3 — About
+                    _AboutCard(bio: p.shortBio),
+                    const SizedBox(height: 16),
+                    // 4 — Expertise chips
+                    _ExpertiseCard(profile: p),
+                    if (p.qualifications.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _QualificationsCard(items: p.qualifications),
+                    ],
+                    if (p.recognitionProof.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _RecognitionCard(items: p.recognitionProof),
+                    ],
+                    // 5 — Availability
+                    const SizedBox(height: 16),
+                    _AvailabilityManagementSection(vm: vm),
+                    // 6 — Verification docs
+                    const SizedBox(height: 16),
+                    _VerificationDocsSection(vm: vm),
+                    // 7 — Privacy notice
+                    const SizedBox(height: 16),
+                    _PrivacyCard(vm: vm),
+                    // 8 — Public preview
+                    const SizedBox(height: 16),
+                    _PublicPreviewCard(profile: p),
+                    // 9 — Settings
+                    const SizedBox(height: 16),
+                    _SettingsCard(vm: vm),
+                    const SizedBox(height: 32),
+                  ]),
                 ),
               ),
-              const SizedBox(height: 14),
-              _Section(
-                icon: Icons.badge_rounded,
-                title: 'Designation & Background',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _row('Designation', p.designation),
-                    _row('Category', p.category.label),
-                    _row('Background', p.serviceBackground),
-                    if (p.showRetiredStatus && p.publicStatusLabel.isNotEmpty)
-                      _row('Service Status', p.publicStatusLabel),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              _Section(
-                icon: Icons.workspace_premium_rounded,
-                title: 'Qualifications & Certifications',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: p.qualifications
-                      .map(
-                        (q) => Padding(
-                          padding: const EdgeInsets.only(bottom: 7),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                size: 15,
-                                color: Color(0xFF2E7D32),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  q,
-                                  style: const TextStyle(
-                                    color: AppColors.muted,
-                                    fontSize: 12,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _Section(
-                icon: Icons.star_rounded,
-                title: 'Areas of Expertise',
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: p.expertiseAreas
-                      .map(
-                        (e) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: p.category.color.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: p.category.color.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          child: Text(
-                            e,
-                            style: TextStyle(
-                              color: p.category.color,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _Section(
-                icon: Icons.calendar_month_rounded,
-                title: 'Session Details',
-                child: Column(
-                  children: [
-                    _row('Mode', p.sessionMode.label),
-                    _row('Languages', p.languages.join(', ')),
-                    _row('Experience', '${p.yearsOfExperience} years'),
-                    for (final slot in p.availableSlots)
-                      _row('Available', slot),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              if (p.recognitionProof.isNotEmpty)
-                _Section(
-                  icon: Icons.emoji_events_rounded,
-                  title: 'Recognition & Appreciation',
-                  child: Column(
-                    children: p.recognitionProof
-                        .map(
-                          (r) => Padding(
-                            padding: const EdgeInsets.only(bottom: 7),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.military_tech_rounded,
-                                  size: 15,
-                                  color: Color(0xFFF57F17),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    r,
-                                    style: const TextStyle(
-                                      color: AppColors.muted,
-                                      fontSize: 12,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              const SizedBox(height: 14),
-              _VerificationDocsSection(vm: vm),
-              const SizedBox(height: 14),
-              _PrivacySection(),
-              const SizedBox(height: 14),
-              _PublicPreviewSection(profile: p),
-              const SizedBox(height: 14),
-              _AccountSettingsSection(vm: vm),
-              const SizedBox(height: 40),
-            ]),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Future<void> _openEditProfile(BuildContext context) async {
+  Future<void> _openEdit(BuildContext context) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -213,130 +100,150 @@ class CounsellorProfileView extends StatelessWidget {
       builder: (_) => _EditCounsellorProfileSheet(vm: vm),
     );
   }
-
-  Widget _row(String label, String value) => Padding(
-    padding: const EdgeInsets.only(bottom: 7),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 110,
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.ink,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
-// ─── Hero App Bar ─────────────────────────────────────────────────────────────
+// ─── Hero Sliver ──────────────────────────────────────────────────────────────
 
-class _HeroAppBar extends StatelessWidget {
-  const _HeroAppBar({required this.profile, required this.onEdit});
+class _HeroSliver extends StatelessWidget {
+  const _HeroSliver({
+    required this.profile,
+    required this.vm,
+    required this.onEdit,
+  });
   final CounsellorProfile profile;
+  final CounsellorHomeViewModel vm;
   final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
     final p = profile;
     return SliverAppBar(
-      expandedHeight: 260,
+      expandedHeight: 240,
       pinned: true,
       automaticallyImplyLeading: false,
-      backgroundColor: p.category.color,
+      backgroundColor: _kNavy,
+      surfaceTintColor: _kNavy,
       flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [const Color(0xFF0A1F44), p.category.color],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        collapseMode: CollapseMode.pin,
+        background: Stack(
+          children: [
+            // Gradient background
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [_kNavy, Color(0xFF1565C0)],
+                ),
+              ),
             ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 64, 20, 16),
+            // NGO watermark
+            Positioned(
+              right: -20,
+              bottom: -20,
+              child: Opacity(
+                opacity: 0.06,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    'assests/ngo_logo.jpeg',
+                    width: 160,
+                    height: 160,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const Icon(
+                      Icons.volunteer_activism_rounded,
+                      color: Colors.white,
+                      size: 160,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 56, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Avatar
+                      // Avatar with camera button
                       Stack(
                         clipBehavior: Clip.none,
                         children: [
                           Container(
-                            width: 72,
-                            height: 72,
+                            width: 80,
+                            height: 80,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: Colors.white.withValues(alpha: .15),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.5),
-                                width: 2.5,
-                              ),
-                              image: p.photoUrl == null
-                                  ? null
-                                  : DecorationImage(
+                                  color: Colors.white.withValues(alpha: .4),
+                                  width: 2.5),
+                            ),
+                            foregroundDecoration: p.photoUrl != null
+                                ? BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    image: DecorationImage(
                                       image: NetworkImage(
-                                        ApiClient.resolveUrl(p.photoUrl!),
-                                      ),
+                                          ApiClient.resolveUrl(p.photoUrl!)),
                                       fit: BoxFit.cover,
                                     ),
-                            ),
+                                  )
+                                : null,
                             child: p.photoUrl == null
                                 ? Center(
                                     child: Text(
                                       p.initialsAvatar,
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 26,
+                                        fontSize: 28,
                                         fontWeight: FontWeight.w900,
                                       ),
                                     ),
                                   )
                                 : null,
                           ),
+                          // Online dot
                           Positioned(
-                            right: -3,
-                            bottom: -3,
-                            child: Material(
-                              color: Colors.white,
-                              shape: const CircleBorder(),
-                              child: InkWell(
-                                onTap: onEdit,
-                                customBorder: const CircleBorder(),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(6),
-                                  child: Icon(
-                                    Icons.photo_camera_rounded,
-                                    size: 15,
-                                    color: Color(0xFF126BFF),
-                                  ),
+                            top: 2,
+                            right: 2,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4CAF50),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: _kNavy, width: 2),
+                              ),
+                            ),
+                          ),
+                          // Camera edit
+                          Positioned(
+                            bottom: -2,
+                            right: -2,
+                            child: GestureDetector(
+                              onTap: onEdit,
+                              child: Container(
+                                width: 26,
+                                height: 26,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
                                 ),
+                                child: const Icon(
+                                    Icons.photo_camera_rounded,
+                                    size: 14,
+                                    color: _kBlue),
                               ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(width: 16),
+                      // Name + designation + badges
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,81 +252,140 @@ class _HeroAppBar extends StatelessWidget {
                               p.name,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 18,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w900,
-                                height: 1.2,
+                                height: 1.1,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
                               p.designation,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
+                                color: Colors.white.withValues(alpha: .75),
                                 fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            // Verified badge
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.verified_rounded,
-                                  color: Color(0xFF81C784),
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 4),
-                                const Expanded(
-                                  child: Text(
+                            const SizedBox(height: 10),
+                            // Verified chip
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _kGreen.withValues(alpha: .2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: const Color(0xFF81C784)
+                                        .withValues(alpha: .4)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.verified_rounded,
+                                      color: Color(0xFF81C784), size: 12),
+                                  SizedBox(width: 5),
+                                  Text(
                                     'Verified NGO Counsellor',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: Color(0xFF81C784),
-                                      fontSize: 11,
+                                      color: Color(0xFFB9F6CA),
+                                      fontSize: 10,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 6),
+                            // ID badge
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
+                                  horizontal: 9, vertical: 3),
                               decoration: BoxDecoration(
-                                color: p.category.color.withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(20),
+                                color: Colors.white.withValues(alpha: .12),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                p.category.label,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                p.ngoVerificationId,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: .9),
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
+                                  letterSpacing: .4,
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      IconButton.filledTonal(
+                      // Edit button
+                      OutlinedButton.icon(
                         onPressed: onEdit,
-                        tooltip: 'Edit profile',
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.16),
-                          foregroundColor: Colors.white,
+                        icon: const Icon(Icons.edit_rounded,
+                            size: 13, color: Colors.white),
+                        label: const Text('Edit',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700)),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                              color: Colors.white.withValues(alpha: .5)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
                         ),
-                        icon: const Icon(Icons.edit_rounded, size: 19),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Category chip + NGO name
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: p.category.color.withValues(alpha: .3),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(p.category.icon,
+                                color: Colors.white, size: 11),
+                            const SizedBox(width: 5),
+                            Text(
+                              p.category.label,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Punjabi Welfare Service Organisation',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: .6),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-          ),
+          ],
         ),
       ),
       title: const Text(
@@ -434,293 +400,529 @@ class _HeroAppBar extends StatelessWidget {
   }
 }
 
-// ─── Verified Badge ───────────────────────────────────────────────────────────
+// ─── Overview Row ─────────────────────────────────────────────────────────────
 
-class _VerifiedBadge extends StatelessWidget {
-  const _VerifiedBadge({required this.profile});
-  final CounsellorProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = profile;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8F5E9),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF2E7D32).withValues(alpha: 0.25),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.verified_rounded,
-            color: Color(0xFF2E7D32),
-            size: 28,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Verified by Punjabi Welfare Trust',
-                  style: TextStyle(
-                    color: Color(0xFF1B5E20),
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'NGO ID: ${p.ngoVerificationId}',
-                  style: const TextStyle(
-                    color: Color(0xFF2E7D32),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color: p.isActive
-                  ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
-                  : AppColors.muted.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              p.isActive ? 'Public' : 'Hidden',
-              style: TextStyle(
-                color: p.isActive ? const Color(0xFF2E7D32) : AppColors.muted,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Stats Row ────────────────────────────────────────────────────────────────
-
-class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.profile, required this.vm});
+class _OverviewRow extends StatelessWidget {
+  const _OverviewRow({required this.profile, required this.vm});
   final CounsellorProfile profile;
   final CounsellorHomeViewModel vm;
 
   @override
   Widget build(BuildContext context) {
     final p = profile;
-    final avgRating = vm.stats.avgRating;
+    final stats = [
+      (
+        value: '${p.yearsOfExperience}',
+        label: 'Yrs Exp.',
+        icon: Icons.military_tech_rounded,
+        color: _kBlue,
+      ),
+      (
+        value: '${p.schoolSessionsCompleted}',
+        label: 'Sessions',
+        icon: Icons.people_rounded,
+        color: _kGreen,
+      ),
+      (
+        value: '${p.studentsGuided}+',
+        label: 'Students',
+        icon: Icons.school_rounded,
+        color: _kPurple,
+      ),
+      (
+        value: vm.stats.avgRating > 0
+            ? vm.stats.avgRating.toStringAsFixed(1)
+            : '—',
+        label: 'Rating',
+        icon: Icons.star_rounded,
+        color: _kAmber,
+      ),
+    ];
     return Row(
-      children: [
-        _stat(
-          '${p.yearsOfExperience}',
-          'Yrs Experience',
-          const Color(0xFF1565C0),
-        ),
-        _stat(
-          '${p.schoolSessionsCompleted}',
-          'School Sessions',
-          const Color(0xFF2E7D32),
-        ),
-        _stat('${p.studentsGuided}+', 'Students', const Color(0xFF6A1B9A)),
-        if (avgRating > 0)
-          _stat(
-            avgRating.toStringAsFixed(1),
-            'Rating',
-            const Color(0xFFF57F17),
-          ),
-      ],
-    );
-  }
-
-  Widget _stat(String value, String label, Color color) => Expanded(
-    child: Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
+      children: stats.map((s) {
+        final idx = stats.indexOf(s);
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(right: idx < stats.length - 1 ? 10 : 0),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+            decoration: BoxDecoration(
+              color: s.color.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: s.color.withValues(alpha: .15)),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 9.5,
-              fontWeight: FontWeight.w600,
-              height: 1.2,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-// ─── Section ──────────────────────────────────────────────────────────────────
-
-class _Section extends StatelessWidget {
-  const _Section({
-    required this.icon,
-    required this.title,
-    required this.child,
-  });
-
-  final IconData icon;
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 18, color: AppColors.ink),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Privacy Section ──────────────────────────────────────────────────────────
-
-class _PrivacySection extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF3E0),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFF57F17).withValues(alpha: 0.25),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.lock_outline_rounded,
-                color: Color(0xFFF57F17),
-                size: 18,
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Your Privacy is Protected',
+            child: Column(
+              children: [
+                Icon(s.icon, color: s.color, size: 20),
+                const SizedBox(height: 5),
+                Text(
+                  s.value,
                   style: TextStyle(
-                    color: Color(0xFFE65100),
+                    color: s.color,
+                    fontSize: 17,
                     fontWeight: FontWeight.w900,
-                    fontSize: 13,
+                    height: 1,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'The following information is NEVER shown publicly:',
-            style: TextStyle(
-              color: Color(0xFF795548),
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+                const SizedBox(height: 3),
+                Text(
+                  s.label,
+                  style: const TextStyle(
+                    color: _kMuted,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          for (final item in [
-            'Army / Air Force / Government Service ID',
-            'Aadhaar card number',
-            'PAN card number',
-            'Personal phone number',
-            'Home address or personal location',
-            'Verification documents (admin use only)',
-          ])
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.remove_circle_outline_rounded,
-                    size: 13,
-                    color: Color(0xFFC62828),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: const TextStyle(
-                        color: Color(0xFF795548),
-                        fontSize: 11,
-                        height: 1.3,
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ─── Professional Info Card ───────────────────────────────────────────────────
+
+class _ProfessionalCard extends StatelessWidget {
+  const _ProfessionalCard({required this.profile});
+  final CounsellorProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = profile;
+    final rows = [
+      (Icons.badge_rounded, 'Designation', p.designation),
+      (Icons.category_rounded, 'Category', p.category.label),
+      (Icons.history_rounded, 'Experience', '${p.yearsOfExperience} years'),
+      (Icons.translate_rounded, 'Languages', p.languages.join(' • ')),
+      (Icons.swap_horiz_rounded, 'Mode', p.sessionMode.label),
+      if (p.serviceBackground.isNotEmpty)
+        (Icons.work_rounded, 'Background', p.serviceBackground),
+      if (p.showRetiredStatus && p.publicStatusLabel.isNotEmpty)
+        (Icons.info_rounded, 'Status', p.publicStatusLabel),
+    ];
+    return _ProfileCard(
+      icon: Icons.person_pin_rounded,
+      title: 'Professional Information',
+      color: _kBlue,
+      child: Column(
+        children: rows.map((r) {
+          final isLast = r == rows.last;
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: _kBlue.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      child: Icon(r.$1, color: _kBlue, size: 15),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            r.$2,
+                            style: const TextStyle(
+                              color: _kMuted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: .3,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            r.$3,
+                            style: const TextStyle(
+                              color: _kInk,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isLast)
+                Divider(
+                  height: 1,
+                  color: _kMuted.withValues(alpha: .1),
+                  indent: 44,
+                ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ─── About Card ───────────────────────────────────────────────────────────────
+
+class _AboutCard extends StatefulWidget {
+  const _AboutCard({required this.bio});
+  final String bio;
+
+  @override
+  State<_AboutCard> createState() => _AboutCardState();
+}
+
+class _AboutCardState extends State<_AboutCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileCard(
+      icon: Icons.info_outline_rounded,
+      title: 'About Me',
+      color: _kGreen,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.bio.isNotEmpty
+                ? widget.bio
+                : 'No bio added yet. Tap Edit Profile to add one.',
+            style: TextStyle(
+              color: widget.bio.isNotEmpty ? _kInk : _kMuted,
+              fontSize: 13,
+              height: 1.6,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: _expanded ? null : 4,
+            overflow: _expanded ? null : TextOverflow.ellipsis,
+          ),
+          if (widget.bio.length > 200) ...[
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Text(
+                _expanded ? 'Show less' : 'Read more',
+                style: const TextStyle(
+                  color: _kGreen,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Expertise Card ───────────────────────────────────────────────────────────
+
+class _ExpertiseCard extends StatelessWidget {
+  const _ExpertiseCard({required this.profile});
+  final CounsellorProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = profile;
+    if (p.expertiseAreas.isEmpty) return const SizedBox.shrink();
+    return _ProfileCard(
+      icon: Icons.star_rounded,
+      title: 'Areas of Expertise',
+      color: _kAmber,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: p.expertiseAreas.map((e) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: p.category.color.withValues(alpha: .09),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                  color: p.category.color.withValues(alpha: .2)),
+            ),
+            child: Text(
+              e,
+              style: TextStyle(
+                color: p.category.color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ─── Qualifications Card ──────────────────────────────────────────────────────
+
+class _QualificationsCard extends StatelessWidget {
+  const _QualificationsCard({required this.items});
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileCard(
+      icon: Icons.workspace_premium_rounded,
+      title: 'Qualifications & Certifications',
+      color: _kPurple,
+      child: Column(
+        children: items.asMap().entries.map((e) {
+          final isLast = e.key == items.length - 1;
+          return Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: _kGreen.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.check_rounded,
+                      color: _kGreen, size: 15),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Text(
+                      e.value,
+                      style: const TextStyle(
+                        color: _kInk,
+                        fontSize: 12.5,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ─── Recognition Card ────────────────────────────────────────────────────────
+
+class _RecognitionCard extends StatelessWidget {
+  const _RecognitionCard({required this.items});
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileCard(
+      icon: Icons.emoji_events_rounded,
+      title: 'Recognition & Appreciation',
+      color: _kAmber,
+      child: Column(
+        children: items.asMap().entries.map((e) {
+          final isLast = e.key == items.length - 1;
+          return Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.military_tech_rounded,
+                    size: 18, color: _kAmber),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    e.value,
+                    style: const TextStyle(
+                      color: _kInk,
+                      fontSize: 12.5,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ─── Privacy Card ─────────────────────────────────────────────────────────────
+
+class _PrivacyCard extends StatelessWidget {
+  const _PrivacyCard({required this.vm});
+  final CounsellorHomeViewModel vm;
+
+  @override
+  Widget build(BuildContext context) {
+    final phone = vm.user?.phone?.trim();
+    final location = vm.user?.location?.trim();
+    final privateItems = [
+      'Government / Army Service ID',
+      'Aadhaar & PAN card numbers',
+      'Personal phone number',
+      'Home address / personal location',
+      'Verification documents (admin only)',
+    ];
+    final publicItems = [
+      'Name, photo, designation',
+      'NGO verification ID & category',
+      'Qualifications & certifications',
+      'Approved recognition / awards',
+      'Public bio & areas of expertise',
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Private details
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8F0),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color: _kAmber.withValues(alpha: .25)),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: _kAmber.withValues(alpha: .15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.lock_outline_rounded,
+                        color: _kAmber, size: 17),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Your Privacy is Protected',
+                          style: TextStyle(
+                            color: _kInk,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        if (phone?.isNotEmpty == true ||
+                            location?.isNotEmpty == true)
+                          Text(
+                            [
+                              if (phone?.isNotEmpty == true) phone!,
+                              if (location?.isNotEmpty == true) location!,
+                            ].join(' • '),
+                            style: const TextStyle(
+                                color: _kMuted, fontSize: 11),
+                          ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-          const SizedBox(height: 8),
-          const Divider(color: Color(0xFFFFCC80), height: 1),
-          const SizedBox(height: 8),
-          const Text(
-            'Only your verified designation, NGO verification ID, qualifications, approved recognition, and public bio are visible to schools and students.',
-            style: TextStyle(
-              color: Color(0xFF795548),
-              fontSize: 11,
-              height: 1.4,
-              fontStyle: FontStyle.italic,
-            ),
+              const SizedBox(height: 12),
+              const Text(
+                'PRIVATE — never shown publicly:',
+                style: TextStyle(
+                  color: Color(0xFFE65100),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...privateItems.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 5),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.remove_circle_outline_rounded,
+                          size: 13, color: Color(0xFFC62828)),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          item,
+                          style: const TextStyle(
+                            color: Color(0xFF795548),
+                            fontSize: 11.5,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Divider(color: Color(0xFFFFCC80), height: 1),
+              const SizedBox(height: 12),
+              const Text(
+                'PUBLIC — visible to schools & students:',
+                style: TextStyle(
+                  color: _kGreen,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...publicItems.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 5),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.check_circle_rounded,
+                          size: 13, color: _kGreen),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          item,
+                          style: const TextStyle(
+                            color: Color(0xFF2D6A4F),
+                            fontSize: 11.5,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-// ─── Public Profile Preview ───────────────────────────────────────────────────
+// ─── Public Profile Preview Card ─────────────────────────────────────────────
 
-class _PublicPreviewSection extends StatelessWidget {
-  const _PublicPreviewSection({required this.profile});
+class _PublicPreviewCard extends StatelessWidget {
+  const _PublicPreviewCard({required this.profile});
   final CounsellorProfile profile;
 
   @override
@@ -729,85 +931,85 @@ class _PublicPreviewSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
-          children: [
-            Icon(Icons.preview_rounded, size: 18, color: AppColors.ink),
-            SizedBox(width: 8),
-            Text(
-              'Public Profile Preview',
-              style: TextStyle(
-                color: AppColors.ink,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: _kBlue.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child:
+                    const Icon(Icons.preview_rounded, color: _kBlue, size: 15),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'This is what schools and students see',
-          style: TextStyle(color: AppColors.muted, fontSize: 12),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: p.category.color.withValues(alpha: 0.2)),
-            boxShadow: [
-              BoxShadow(
-                color: p.category.color.withValues(alpha: 0.08),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Public Profile Preview',
+                  style: TextStyle(
+                    color: _kInk,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _kGreen.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'What schools see',
+                  style: TextStyle(
+                    color: _kGreen,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: _kCard,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: p.category.color.withValues(alpha: .2)),
+            boxShadow: [
+              BoxShadow(
+                color: p.category.color.withValues(alpha: .08),
+                blurRadius: 18,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Category strip
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: p.category.color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(p.category.icon, size: 13, color: p.category.color),
-                    const SizedBox(width: 5),
-                    Text(
-                      p.category.label,
-                      style: TextStyle(
-                        color: p.category.color,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
+              // Header row: avatar + name + designation + category chip
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
-                    radius: 26,
-                    backgroundColor: p.category.color.withValues(alpha: 0.15),
-                    backgroundImage: p.photoUrl == null
-                        ? null
-                        : NetworkImage(ApiClient.resolveUrl(p.photoUrl!)),
+                    radius: 28,
+                    backgroundColor:
+                        p.category.color.withValues(alpha: .15),
+                    backgroundImage: p.photoUrl != null
+                        ? NetworkImage(
+                            ApiClient.resolveUrl(p.photoUrl!))
+                        : null,
                     child: p.photoUrl == null
                         ? Text(
                             p.initialsAvatar,
                             style: TextStyle(
                               color: p.category.color,
                               fontWeight: FontWeight.w900,
-                              fontSize: 16,
+                              fontSize: 18,
                             ),
                           )
                         : null,
@@ -822,28 +1024,48 @@ class _PublicPreviewSection extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 p.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  color: AppColors.ink,
+                                  color: _kInk,
                                   fontWeight: FontWeight.w900,
                                   fontSize: 15,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Icons.verified_rounded,
-                              size: 15,
-                              color: Color(0xFF2E7D32),
-                            ),
+                            const SizedBox(width: 5),
+                            const Icon(Icons.verified_rounded,
+                                size: 14, color: _kGreen),
                           ],
                         ),
                         Text(
                           p.designation,
                           style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 11,
+                              color: _kMuted, fontSize: 11),
+                        ),
+                        const SizedBox(height: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: p.category.color.withValues(alpha: .1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(p.category.icon,
+                                  size: 11, color: p.category.color),
+                              const SizedBox(width: 4),
+                              Text(
+                                p.category.label,
+                                style: TextStyle(
+                                  color: p.category.color,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -851,79 +1073,84 @@ class _PublicPreviewSection extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                p.shortBio,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.muted,
-                  fontSize: 12,
-                  height: 1.4,
+              const SizedBox(height: 12),
+              // Bio
+              if (p.shortBio.isNotEmpty)
+                Text(
+                  p.shortBio,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _kMuted,
+                    fontSize: 12,
+                    height: 1.5,
+                  ),
                 ),
-              ),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: p.expertiseAreas
-                    .take(3)
-                    .map(
-                      (e) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: p.category.color.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          e,
-                          style: TextStyle(
-                            color: p.category.color,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
+              // Top 3 skills
+              if (p.expertiseAreas.isNotEmpty)
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: p.expertiseAreas.take(3).map((e) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: p.category.color.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        e,
+                        style: TextStyle(
+                          color: p.category.color,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 10),
+                    );
+                  }).toList(),
+                ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              // Stats row
               Row(
                 children: [
+                  _previewStat(Icons.timer_rounded,
+                      '${p.yearsOfExperience} yrs', 'Experience'),
+                  _previewStat(Icons.event_rounded,
+                      '${p.schoolSessionsCompleted}', 'Sessions'),
                   _previewStat(
-                    Icons.school_rounded,
-                    '${p.schoolSessionsCompleted}',
-                    'Sessions',
-                  ),
-                  _previewStat(
-                    Icons.people_rounded,
-                    '${p.studentsGuided}+',
-                    'Students',
-                  ),
-                  _previewStat(
-                    Icons.timer_rounded,
-                    '${p.yearsOfExperience} yrs',
-                    'Experience',
-                  ),
+                      Icons.people_rounded, '${p.studentsGuided}+', 'Students'),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
+              // NGO badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D32).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
+                  color: _kGreen.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: _kGreen.withValues(alpha: .2)),
                 ),
-                child: Text(
-                  'Verified by PWT · ${p.ngoVerificationId}',
-                  style: const TextStyle(
-                    color: Color(0xFF2E7D32),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.shield_rounded,
+                        size: 13, color: _kGreen),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Verified by Punjabi Welfare Trust · ${p.ngoVerificationId}',
+                      style: const TextStyle(
+                        color: _kGreen,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -933,100 +1160,749 @@ class _PublicPreviewSection extends StatelessWidget {
     );
   }
 
-  Widget _previewStat(IconData icon, String value, String label) => Expanded(
-    child: Row(
-      children: [
-        Icon(icon, size: 13, color: AppColors.muted),
-        const SizedBox(width: 3),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _previewStat(IconData icon, String value, String label) =>
+      Expanded(
+        child: Row(
           children: [
-            Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.ink,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            Text(
-              label,
-              style: const TextStyle(color: AppColors.muted, fontSize: 9),
+            Icon(icon, size: 14, color: _kMuted),
+            const SizedBox(width: 4),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value,
+                    style: const TextStyle(
+                        color: _kInk,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900)),
+                Text(label,
+                    style: const TextStyle(
+                        color: _kMuted, fontSize: 9.5)),
+              ],
             ),
           ],
         ),
-      ],
-    ),
-  );
+      );
 }
 
-class _PrivateAccountCard extends StatelessWidget {
-  const _PrivateAccountCard({required this.vm});
+// ─── Settings Card ────────────────────────────────────────────────────────────
 
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({required this.vm});
   final CounsellorHomeViewModel vm;
 
   @override
   Widget build(BuildContext context) {
-    final phone = vm.user?.phone?.trim();
-    final location = vm.user?.location?.trim();
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF4FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF126BFF).withValues(alpha: 0.18),
-        ),
+        color: _kCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _kMuted.withValues(alpha: .12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lock_person_rounded, color: Color(0xFF126BFF)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
               children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: _kMuted.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.settings_rounded,
+                      size: 16, color: _kMuted),
+                ),
+                const SizedBox(width: 10),
                 const Text(
-                  'Private account details',
+                  'Account Settings',
                   style: TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 13,
+                    color: _kInk,
+                    fontSize: 14,
                     fontWeight: FontWeight.w900,
                   ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  [
-                        if (phone?.isNotEmpty == true) phone!,
-                        if (location?.isNotEmpty == true) location!,
-                      ].isEmpty
-                      ? 'Add your phone and location'
-                      : [
-                          if (phone?.isNotEmpty == true) phone!,
-                          if (location?.isNotEmpty == true) location!,
-                        ].join(' • '),
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 11.5,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  'Visible only to you and authorised NGO staff.',
-                  style: TextStyle(color: Color(0xFF126BFF), fontSize: 10.5),
                 ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: () => showModalBottomSheet<void>(
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          _SettingsTile(
+            icon: Icons.lock_outline_rounded,
+            color: _kBlue,
+            label: 'Change Password',
+            onTap: () => showModalBottomSheet<void>(
               context: context,
               isScrollControlled: true,
               backgroundColor: Colors.transparent,
-              builder: (_) => _EditCounsellorProfileSheet(vm: vm),
+              builder: (_) => const _ChangePasswordSheet(),
             ),
-            tooltip: 'Edit details',
-            icon: const Icon(Icons.edit_outlined, color: Color(0xFF126BFF)),
+          ),
+          const Divider(height: 1, indent: 58),
+          _SettingsTile(
+            icon: Icons.logout_rounded,
+            color: const Color(0xFFC62828),
+            label: 'Logout',
+            isDestructive: true,
+            onTap: () => _logout(context),
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Logout',
+            style: TextStyle(fontWeight: FontWeight.w900)),
+        content: const Text(
+            'Are you sure you want to logout from your account?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFC62828)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Logout',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      final nav = Navigator.of(context);
+      try {
+        await AuthRepository.logout();
+      } catch (_) {}
+      AppState.clear();
+      nav.pushNamedAndRemoveUntil('/login', (route) => false);
+    }
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+  final IconData icon;
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 17, color: color),
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: isDestructive ? color : _kInk,
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+        ),
+      ),
+      trailing: Icon(Icons.chevron_right_rounded,
+          color: _kMuted.withValues(alpha: .5)),
+      onTap: onTap,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+    );
+  }
+}
+
+// ─── Shared profile card shell ────────────────────────────────────────────────
+
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.child,
+  });
+  final IconData icon;
+  final String title;
+  final Color color;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: .12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: _kInk,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: _kMuted.withValues(alpha: .1)),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Availability Management Section ─────────────────────────────────────────
+
+class _AvailabilityManagementSection extends StatefulWidget {
+  const _AvailabilityManagementSection({required this.vm});
+  final CounsellorHomeViewModel vm;
+
+  @override
+  State<_AvailabilityManagementSection> createState() =>
+      _AvailabilityManagementSectionState();
+}
+
+class _AvailabilityManagementSectionState
+    extends State<_AvailabilityManagementSection> {
+  static const _dayNames = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+    'Saturday', 'Sunday',
+  ];
+
+  bool _loading = false;
+
+  Future<void> _refresh() async {
+    setState(() => _loading = true);
+    await widget.vm.fetchWeeklyAvailability();
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _addSlot() async {
+    int dayOfWeek = 0;
+    String startTime = '09:00';
+    String endTime = '10:00';
+    String mode = 'both';
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          title: const Text('Add Weekly Slot',
+              style: TextStyle(fontWeight: FontWeight.w900)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  initialValue: dayOfWeek,
+                  decoration:
+                      _inputDecoration('Day', Icons.calendar_today_rounded),
+                  items: List.generate(
+                    7,
+                    (i) => DropdownMenuItem(
+                        value: i, child: Text(_dayNames[i])),
+                  ),
+                  onChanged: (v) => setS(() => dayOfWeek = v ?? 0),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: startTime,
+                  decoration: _inputDecoration(
+                      'Start (HH:MM)', Icons.access_time_rounded),
+                  onChanged: (v) => startTime = v,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: endTime,
+                  decoration: _inputDecoration(
+                      'End (HH:MM)', Icons.access_time_filled_rounded),
+                  onChanged: (v) => endTime = v,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: mode,
+                  decoration:
+                      _inputDecoration('Mode', Icons.swap_horiz_rounded),
+                  items: const [
+                    DropdownMenuItem(value: 'online', child: Text('Online')),
+                    DropdownMenuItem(
+                        value: 'offline', child: Text('Offline')),
+                    DropdownMenuItem(value: 'both', child: Text('Both')),
+                  ],
+                  onChanged: (v) => setS(() => mode = v ?? 'both'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _kBlue),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Add Slot'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (ok != true || !mounted) return;
+    setState(() => _loading = true);
+    await widget.vm.addWeeklySlot({
+      'day_of_week': dayOfWeek,
+      'start_time': startTime,
+      'end_time': endTime,
+      'mode': mode,
+    });
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _deleteSlot(int slotId) async {
+    setState(() => _loading = true);
+    await widget.vm.deleteWeeklySlot(slotId);
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final slots = widget.vm.weeklySlots;
+    return _ProfileCard(
+      icon: Icons.event_repeat_rounded,
+      title: 'Weekly Availability',
+      color: _kGreen,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Your available session slots for schools.',
+                  style: TextStyle(color: _kMuted, fontSize: 11.5),
+                ),
+              ),
+              IconButton(
+                onPressed: _loading ? null : _refresh,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                color: _kMuted,
+                tooltip: 'Refresh',
+              ),
+              FilledButton.icon(
+                onPressed: _loading ? null : _addSlot,
+                icon: const Icon(Icons.add_rounded, size: 14),
+                label: const Text('Add Slot',
+                    style: TextStyle(fontSize: 12)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _kGreen,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_loading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (slots == null || slots.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _kBg,
+                borderRadius: BorderRadius.circular(12),
+                border:
+                    Border.all(color: _kMuted.withValues(alpha: .1)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.event_busy_rounded,
+                      color: _kMuted, size: 18),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'No slots set. Tap "Add Slot" to add your availability.',
+                      style: TextStyle(color: _kMuted, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ...slots.map((slot) {
+              final day = (slot['day_of_week'] as int?) ?? 0;
+              final dayName =
+                  day >= 0 && day < 7 ? _dayNames[day] : 'Day $day';
+              final start = slot['start_time'] as String? ?? '';
+              final end = slot['end_time'] as String? ?? '';
+              final mode = slot['mode'] as String? ?? 'both';
+              final slotId = slot['id'] as int? ?? 0;
+              final modeColor = mode == 'online'
+                  ? _kBlue
+                  : mode == 'offline'
+                      ? _kGreen
+                      : _kPurple;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _kBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: _kGreen.withValues(alpha: .15)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _kGreen.withValues(alpha: .1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          dayName,
+                          style: const TextStyle(
+                            color: _kGreen,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '$start – $end',
+                          style: const TextStyle(
+                            color: _kInk,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: modeColor.withValues(alpha: .1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          mode,
+                          style: TextStyle(
+                            color: modeColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        onPressed:
+                            _loading ? null : () => _deleteSlot(slotId),
+                        icon: const Icon(
+                            Icons.delete_outline_rounded, size: 17),
+                        color: const Color(0xFFC62828),
+                        tooltip: 'Remove slot',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 32, minHeight: 32),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Verification Docs Section ────────────────────────────────────────────────
+
+class _VerificationDocsSection extends StatefulWidget {
+  const _VerificationDocsSection({required this.vm});
+  final CounsellorHomeViewModel vm;
+
+  @override
+  State<_VerificationDocsSection> createState() =>
+      _VerificationDocsSectionState();
+}
+
+class _VerificationDocsSectionState
+    extends State<_VerificationDocsSection> {
+  bool _uploading = false;
+
+  Color _statusColor(String? s) {
+    return switch (s) {
+      'verified' => _kGreen,
+      'rejected' => const Color(0xFFC62828),
+      'correction_required' => _kAmber,
+      _ => _kMuted,
+    };
+  }
+
+  String _statusLabel(String? s) {
+    return switch (s) {
+      'verified' => 'Verified',
+      'rejected' => 'Rejected',
+      'correction_required' => 'Correction Required',
+      _ => 'Pending Review',
+    };
+  }
+
+  IconData _statusIcon(String? s) {
+    return switch (s) {
+      'verified' => Icons.verified_rounded,
+      'rejected' => Icons.cancel_rounded,
+      'correction_required' => Icons.warning_amber_rounded,
+      _ => Icons.hourglass_top_rounded,
+    };
+  }
+
+  Future<void> _uploadDoc(String docType) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty || !mounted) return;
+    final file = result.files.single;
+    if (file.bytes == null && file.path == null) return;
+
+    setState(() => _uploading = true);
+    try {
+      if (file.bytes != null) {
+        await ApiClient.postMultipart(
+          '/counsellor/upload-verification-doc',
+          fields: {'doc_type': docType},
+          fileBytes: file.bytes!,
+          fileName: file.name,
+          fileField: 'file',
+        );
+      } else {
+        await ApiClient.postMultipartFromPath(
+          '/counsellor/upload-verification-doc',
+          fields: {'doc_type': docType},
+          filePath: file.path!,
+          fileName: file.name,
+          fileField: 'file',
+        );
+      }
+      await widget.vm.fetchExtendedProfile();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(children: [
+              const Icon(Icons.check_circle_rounded,
+                  color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                '${docType == 'id_proof' ? 'ID proof' : 'Certificate'} uploaded.',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ]),
+            backgroundColor: _kGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Upload failed. Please try again.'),
+            backgroundColor: Color(0xFFC62828),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = widget.vm.extendedProfile;
+    final status = ext?['verification_status'] as String? ?? 'pending';
+    final idProofDocUrl = ext?['id_proof_doc_url'] as String?;
+    final certUrl = ext?['professional_cert_url'] as String?;
+    final adminRemark = ext?['admin_remark'] as String?;
+    final idProofType = ext?['id_proof_type'] as String?;
+    final idProofNumber = ext?['id_proof_number'] as String?;
+    final sc = _statusColor(status);
+
+    return _ProfileCard(
+      icon: Icons.verified_user_rounded,
+      title: 'Verification Documents',
+      color: _kPurple,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Verification status banner
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: sc.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: sc.withValues(alpha: .2)),
+            ),
+            child: Row(
+              children: [
+                Icon(_statusIcon(status), color: sc, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _statusLabel(status),
+                        style: TextStyle(
+                          color: sc,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (adminRemark != null && adminRemark.isNotEmpty)
+                        Text(
+                          adminRemark,
+                          style: const TextStyle(
+                              color: _kMuted, fontSize: 11),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (idProofType != null && idProofType.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Text('ID Type:',
+                    style: TextStyle(
+                        color: _kMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(width: 8),
+                Text(idProofType,
+                    style: const TextStyle(
+                        color: _kInk,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+                if (idProofNumber != null && idProofNumber.isNotEmpty) ...[
+                  const Text(' · ',
+                      style:
+                          TextStyle(color: _kMuted, fontSize: 12)),
+                  Expanded(
+                    child: Text(
+                      idProofNumber,
+                      style: const TextStyle(
+                          color: _kInk,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+          const SizedBox(height: 14),
+          // Doc upload rows
+          _DocUploadCard(
+            label: 'Government ID Proof',
+            icon: Icons.badge_rounded,
+            color: _kBlue,
+            hasDoc: idProofDocUrl != null && idProofDocUrl.isNotEmpty,
+            uploading: _uploading,
+            onUpload: () => _uploadDoc('id_proof'),
+          ),
+          const SizedBox(height: 10),
+          _DocUploadCard(
+            label: 'Professional Certificate',
+            icon: Icons.workspace_premium_rounded,
+            color: _kPurple,
+            hasDoc: certUrl != null && certUrl.isNotEmpty,
+            uploading: _uploading,
+            onUpload: () => _uploadDoc('professional_cert'),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Documents are for NGO admin verification only and are never shown publicly.',
+            style: TextStyle(
+                color: _kMuted,
+                fontSize: 11,
+                fontStyle: FontStyle.italic),
           ),
         ],
       ),
@@ -1034,9 +1910,101 @@ class _PrivateAccountCard extends StatelessWidget {
   }
 }
 
+class _DocUploadCard extends StatelessWidget {
+  const _DocUploadCard({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.hasDoc,
+    required this.uploading,
+    required this.onUpload,
+  });
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool hasDoc;
+  final bool uploading;
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: .15)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 17),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        color: _kInk,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700)),
+                Text(
+                  hasDoc ? 'Document uploaded' : 'No document uploaded',
+                  style: TextStyle(
+                    color: hasDoc ? _kGreen : _kMuted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasDoc)
+            const Icon(Icons.check_circle_rounded,
+                size: 16, color: _kGreen),
+          const SizedBox(width: 6),
+          uploading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: _kBlue),
+                )
+              : TextButton(
+                  onPressed: onUpload,
+                  style: TextButton.styleFrom(
+                    foregroundColor: color,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    textStyle: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.upload_rounded, size: 13),
+                      const SizedBox(width: 4),
+                      Text(hasDoc ? 'Replace' : 'Upload'),
+                    ],
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Edit Profile Sheet ───────────────────────────────────────────────────────
+
 class _EditCounsellorProfileSheet extends StatefulWidget {
   const _EditCounsellorProfileSheet({required this.vm});
-
   final CounsellorHomeViewModel vm;
 
   @override
@@ -1068,9 +2036,15 @@ class _EditCounsellorProfileSheetState
   String? _photoName;
   bool _saving = false;
 
-  static const _genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
+  static const _genderOptions = [
+    'Male', 'Female', 'Other', 'Prefer not to say',
+  ];
   static const _modeOptions = ['online', 'offline', 'both'];
-  static const _modeLabels = {'online': 'Online', 'offline': 'Offline', 'both': 'Both'};
+  static const _modeLabels = {
+    'online': 'Online',
+    'offline': 'Offline',
+    'both': 'Both',
+  };
 
   @override
   void initState() {
@@ -1078,29 +2052,39 @@ class _EditCounsellorProfileSheetState
     final profile = widget.vm.profile;
     final ext = widget.vm.extendedProfile;
     _nameController = TextEditingController(text: profile.name);
-    _phoneController = TextEditingController(text: widget.vm.user?.phone ?? '');
-    _locationController = TextEditingController(
-      text: widget.vm.user?.location ?? '',
-    );
+    _phoneController =
+        TextEditingController(text: widget.vm.user?.phone ?? '');
+    _locationController =
+        TextEditingController(text: widget.vm.user?.location ?? '');
     _bioController = TextEditingController(
       text: widget.vm.mentorProfile?.bio ?? profile.shortBio,
     );
     _expertiseController = TextEditingController(
       text: widget.vm.mentorProfile?.expertise ?? '',
     );
-    _dobController = TextEditingController(text: ext?['date_of_birth'] as String? ?? '');
-    _qualificationController = TextEditingController(text: ext?['qualification'] as String? ?? '');
+    _dobController = TextEditingController(
+        text: ext?['date_of_birth'] as String? ?? '');
+    _qualificationController = TextEditingController(
+        text: ext?['qualification'] as String? ?? '');
     _experienceController = TextEditingController(
-      text: ext?['years_of_experience'] != null ? '${ext!['years_of_experience']}' : '',
+      text: ext?['years_of_experience'] != null
+          ? '${ext!['years_of_experience']}'
+          : '',
     );
-    _organizationController = TextEditingController(text: ext?['organization'] as String? ?? '');
-    _languagesController = TextEditingController(text: ext?['languages_known'] as String? ?? '');
-    _cityController = TextEditingController(text: ext?['city'] as String? ?? '');
-    _stateController = TextEditingController(text: ext?['state'] as String? ?? '');
-    _pinCodeController = TextEditingController(text: ext?['pin_code'] as String? ?? '');
+    _organizationController = TextEditingController(
+        text: ext?['organization'] as String? ?? '');
+    _languagesController = TextEditingController(
+        text: ext?['languages_known'] as String? ?? '');
+    _cityController =
+        TextEditingController(text: ext?['city'] as String? ?? '');
+    _stateController =
+        TextEditingController(text: ext?['state'] as String? ?? '');
+    _pinCodeController =
+        TextEditingController(text: ext?['pin_code'] as String? ?? '');
     _category = profile.category;
     _gender = ext?['gender'] as String?;
-    _counsellingMode = ext?['counselling_mode'] as String? ?? 'both';
+    _counsellingMode =
+        ext?['counselling_mode'] as String? ?? 'both';
   }
 
   @override
@@ -1137,14 +2121,12 @@ class _EditCounsellorProfileSheetState
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
-            SizedBox(width: 8),
-            Text('Photo selected — tap Save to apply'),
-          ],
-        ),
-        backgroundColor: Color(0xFF2E7D32),
+        content: Row(children: [
+          Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+          SizedBox(width: 8),
+          Text('Photo selected — tap Save to apply'),
+        ]),
+        backgroundColor: _kGreen,
         behavior: SnackBarBehavior.floating,
         duration: Duration(seconds: 2),
       ),
@@ -1176,7 +2158,6 @@ class _EditCounsellorProfileSheetState
       photoFileName: _photoName,
     );
     if (ok) {
-      // Also save extended profile fields
       final extData = <String, dynamic>{
         if (_gender != null) 'gender': _gender,
         if (_dobController.text.trim().isNotEmpty)
@@ -1184,7 +2165,8 @@ class _EditCounsellorProfileSheetState
         if (_qualificationController.text.trim().isNotEmpty)
           'qualification': _qualificationController.text.trim(),
         if (_experienceController.text.trim().isNotEmpty)
-          'years_of_experience': int.tryParse(_experienceController.text.trim()),
+          'years_of_experience':
+              int.tryParse(_experienceController.text.trim()),
         if (_organizationController.text.trim().isNotEmpty)
           'organization': _organizationController.text.trim(),
         if (_counsellingMode != null) 'counselling_mode': _counsellingMode,
@@ -1207,15 +2189,13 @@ class _EditCounsellorProfileSheetState
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
-              SizedBox(width: 8),
-              Text('Profile updated successfully!',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-            ],
-          ),
-          backgroundColor: Color(0xFF2E7D32),
+          content: Row(children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+            SizedBox(width: 8),
+            Text('Profile updated!',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ]),
+          backgroundColor: _kGreen,
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 3),
         ),
@@ -1223,8 +2203,10 @@ class _EditCounsellorProfileSheetState
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.vm.profileError ?? 'Could not update profile.'),
-          backgroundColor: AppColors.softRed,
+          content:
+              Text(widget.vm.profileError ?? 'Could not update profile.'),
+          backgroundColor: const Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -1234,922 +2216,360 @@ class _EditCounsellorProfileSheetState
   Widget build(BuildContext context) {
     final provider = _photoProvider;
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.93,
         ),
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD6DCEA),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Edit Counsellor Profile',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Public bio fields are visible to schools. Phone and location remain private.',
-                  style: TextStyle(color: AppColors.muted, fontSize: 12),
-                ),
-                const SizedBox(height: 18),
-                Center(
-                  child: InkWell(
-                    onTap: _saving ? null : _pickPhoto,
-                    customBorder: const CircleBorder(),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        CircleAvatar(
-                          radius: 46,
-                          backgroundColor: const Color(0xFFEAF4FF),
-                          backgroundImage: provider,
-                          child: provider == null
-                              ? Text(
-                                  widget.vm.profile.initialsAvatar,
-                                  style: const TextStyle(
-                                    color: Color(0xFF126BFF),
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        const Positioned(
-                          right: -2,
-                          bottom: 2,
-                          child: CircleAvatar(
-                            radius: 15,
-                            backgroundColor: Color(0xFF126BFF),
-                            child: Icon(
-                              Icons.photo_camera_rounded,
-                              color: Colors.white,
-                              size: 15,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                _EditField(
-                  controller: _nameController,
-                  label: 'Full name',
-                  icon: Icons.person_outline_rounded,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Name is required'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<CounsellorCategory>(
-                  initialValue: _category,
-                  decoration: _inputDecoration(
-                    'Counsellor category',
-                    Icons.category_outlined,
-                  ),
-                  isExpanded: true,
-                  items: CounsellorCategory.values
-                      .map(
-                        (item) => DropdownMenuItem(
-                          value: item,
-                          child: Text(
-                            item.label,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: _saving
-                      ? null
-                      : (value) {
-                          if (value != null) setState(() => _category = value);
-                        },
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _bioController,
-                  label: 'Public bio',
-                  icon: Icons.info_outline_rounded,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _expertiseController,
-                  label: 'Expertise (comma separated)',
-                  icon: Icons.star_outline_rounded,
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _phoneController,
-                  label: 'Private phone',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _locationController,
-                  label: 'Private location',
-                  icon: Icons.location_on_outlined,
-                ),
-                const SizedBox(height: 18),
-                const Divider(),
-                const SizedBox(height: 8),
-                const Text(
-                  'Professional Details',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _gender,
-                  decoration: _inputDecoration('Gender', Icons.person_outline_rounded),
-                  isExpanded: true,
-                  hint: const Text('Select gender'),
-                  items: _genderOptions
-                      .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                      .toList(),
-                  onChanged: _saving
-                      ? null
-                      : (v) => setState(() => _gender = v),
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _dobController,
-                  label: 'Date of birth (yyyy-mm-dd)',
-                  icon: Icons.cake_outlined,
-                  keyboardType: TextInputType.datetime,
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _qualificationController,
-                  label: 'Qualification',
-                  icon: Icons.school_outlined,
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _experienceController,
-                  label: 'Years of experience',
-                  icon: Icons.timeline_rounded,
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _organizationController,
-                  label: 'Organization',
-                  icon: Icons.business_outlined,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _counsellingMode,
-                  decoration: _inputDecoration(
-                    'Counselling mode',
-                    Icons.swap_horiz_rounded,
-                  ),
-                  isExpanded: true,
-                  items: _modeOptions
-                      .map((m) => DropdownMenuItem(
-                            value: m,
-                            child: Text(_modeLabels[m] ?? m),
-                          ))
-                      .toList(),
-                  onChanged: _saving
-                      ? null
-                      : (v) => setState(() => _counsellingMode = v),
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _languagesController,
-                  label: 'Languages known (comma separated)',
-                  icon: Icons.language_rounded,
-                ),
-                const SizedBox(height: 18),
-                const Divider(),
-                const SizedBox(height: 8),
-                const Text(
-                  'Location Details',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _cityController,
-                  label: 'City',
-                  icon: Icons.location_city_outlined,
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _stateController,
-                  label: 'State',
-                  icon: Icons.map_outlined,
-                ),
-                const SizedBox(height: 12),
-                _EditField(
-                  controller: _pinCodeController,
-                  label: 'Pin code',
-                  icon: Icons.pin_drop_outlined,
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: _saving ? null : _save,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF126BFF),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.3,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Save Profile',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EditField extends StatelessWidget {
-  const _EditField({
-    required this.controller,
-    required this.label,
-    required this.icon,
-    this.validator,
-    this.keyboardType,
-    this.maxLines = 1,
-  });
-
-  final TextEditingController controller;
-  final String label;
-  final IconData icon;
-  final String? Function(String?)? validator;
-  final TextInputType? keyboardType;
-  final int maxLines;
-
-  @override
-  Widget build(BuildContext context) => TextFormField(
-    controller: controller,
-    validator: validator,
-    keyboardType: keyboardType,
-    maxLines: maxLines,
-    decoration: _inputDecoration(label, icon),
-  );
-}
-
-InputDecoration _inputDecoration(String label, IconData icon) =>
-    InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon, color: const Color(0xFF4A587C)),
-      filled: true,
-      fillColor: const Color(0xFFF7FAFF),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide.none,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFF126BFF), width: 1.5),
-      ),
-    );
-
-// ─── Availability Management Section ─────────────────────────────────────────
-
-class _AvailabilityManagementSection extends StatefulWidget {
-  const _AvailabilityManagementSection({required this.vm});
-  final CounsellorHomeViewModel vm;
-
-  @override
-  State<_AvailabilityManagementSection> createState() =>
-      _AvailabilityManagementSectionState();
-}
-
-class _AvailabilityManagementSectionState
-    extends State<_AvailabilityManagementSection> {
-  static const _dayNames = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
-  ];
-
-  bool _loading = false;
-
-  Future<void> _refresh() async {
-    setState(() => _loading = true);
-    await widget.vm.fetchWeeklyAvailability();
-    if (mounted) setState(() => _loading = false);
-  }
-
-  Future<void> _addSlot() async {
-    int dayOfWeek = 0;
-    String startTime = '09:00';
-    String endTime = '10:00';
-    String mode = 'both';
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: const Text('Add Weekly Slot'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<int>(
-                  initialValue: dayOfWeek,
-                  decoration: _inputDecoration('Day', Icons.calendar_today_rounded),
-                  items: List.generate(
-                    7,
-                    (i) => DropdownMenuItem(value: i, child: Text(_dayNames[i])),
-                  ),
-                  onChanged: (v) => setS(() => dayOfWeek = v ?? 0),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: startTime,
-                  decoration: _inputDecoration('Start time (HH:MM)', Icons.access_time_rounded),
-                  onChanged: (v) => startTime = v,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: endTime,
-                  decoration: _inputDecoration('End time (HH:MM)', Icons.access_time_filled_rounded),
-                  onChanged: (v) => endTime = v,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: mode,
-                  decoration: _inputDecoration('Mode', Icons.swap_horiz_rounded),
-                  items: const [
-                    DropdownMenuItem(value: 'online', child: Text('Online')),
-                    DropdownMenuItem(value: 'offline', child: Text('Offline')),
-                    DropdownMenuItem(value: 'both', child: Text('Both')),
-                  ],
-                  onChanged: (v) => setS(() => mode = v ?? 'both'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Add'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (ok != true || !mounted) return;
-    setState(() => _loading = true);
-    await widget.vm.addWeeklySlot({
-      'day_of_week': dayOfWeek,
-      'start_time': startTime,
-      'end_time': endTime,
-      'mode': mode,
-    });
-    if (mounted) setState(() => _loading = false);
-  }
-
-  Future<void> _deleteSlot(int slotId) async {
-    setState(() => _loading = true);
-    await widget.vm.deleteWeeklySlot(slotId);
-    if (mounted) setState(() => _loading = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final slots = widget.vm.weeklySlots;
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.event_repeat_rounded, size: 18, color: AppColors.ink),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Weekly Availability',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: _loading ? null : _refresh,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                tooltip: 'Refresh',
-              ),
-              TextButton.icon(
-                onPressed: _loading ? null : _addSlot,
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Add Slot'),
-              ),
-            ],
-          ),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else if (slots == null || slots.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                'No weekly availability set. Tap "Add Slot" to add one.',
-                style: TextStyle(color: AppColors.muted, fontSize: 12),
-              ),
-            )
-          else
-            ...slots.map((slot) {
-              final day = (slot['day_of_week'] as int?) ?? 0;
-              final dayName = day >= 0 && day < 7 ? _dayNames[day] : 'Day $day';
-              final start = slot['start_time'] as String? ?? '';
-              final end = slot['end_time'] as String? ?? '';
-              final mode = slot['mode'] as String? ?? 'both';
-              final slotId = slot['id'] as int? ?? 0;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        dayName,
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '$start – $end',
-                        style: const TextStyle(
-                          color: AppColors.ink,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.muted.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        mode,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _loading ? null : () => _deleteSlot(slotId),
-                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                      color: AppColors.softRed,
-                      tooltip: 'Remove slot',
-                    ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Verification Docs Section ────────────────────────────────────────────────
-
-class _VerificationDocsSection extends StatefulWidget {
-  const _VerificationDocsSection({required this.vm});
-  final CounsellorHomeViewModel vm;
-
-  @override
-  State<_VerificationDocsSection> createState() => _VerificationDocsSectionState();
-}
-
-class _VerificationDocsSectionState extends State<_VerificationDocsSection> {
-  bool _uploading = false;
-
-
-  Color _statusColor(String? status) {
-    switch (status) {
-      case 'verified': return const Color(0xFF2E7D32);
-      case 'rejected': return AppColors.softRed;
-      case 'correction_required': return const Color(0xFFF57F17);
-      default: return AppColors.muted;
-    }
-  }
-
-  String _statusLabel(String? status) {
-    switch (status) {
-      case 'verified': return 'Verified';
-      case 'rejected': return 'Rejected';
-      case 'correction_required': return 'Correction Required';
-      default: return 'Pending';
-    }
-  }
-
-  Future<void> _uploadDoc(String docType) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty || !mounted) return;
-    final file = result.files.single;
-    if (file.bytes == null && file.path == null) return;
-
-    setState(() => _uploading = true);
-    try {
-      if (file.bytes != null) {
-        await ApiClient.postMultipart(
-          '/counsellor/upload-verification-doc',
-          fields: {'doc_type': docType},
-          fileBytes: file.bytes!,
-          fileName: file.name,
-          fileField: 'file',
-        );
-      } else {
-        await ApiClient.postMultipartFromPath(
-          '/counsellor/upload-verification-doc',
-          fields: {'doc_type': docType},
-          filePath: file.path!,
-          fileName: file.name,
-          fileField: 'file',
-        );
-      }
-      await widget.vm.fetchExtendedProfile();
-      final label = docType == 'id_proof' ? 'ID proof' : 'Certificate';
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$label uploaded.')),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Upload failed. Please try again.'),
-            backgroundColor: AppColors.softRed,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ext = widget.vm.extendedProfile;
-    final status = ext?['verification_status'] as String? ?? 'pending';
-    final idProofDocUrl = ext?['id_proof_doc_url'] as String?;
-    final certUrl = ext?['professional_cert_url'] as String?;
-    final adminRemark = ext?['admin_remark'] as String?;
-    final idProofType = ext?['id_proof_type'] as String?;
-    final idProofNumber = ext?['id_proof_number'] as String?;
-
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.verified_user_rounded, size: 18, color: AppColors.ink),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Verification Documents',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _statusColor(status).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _statusLabel(status),
-                  style: TextStyle(
-                    color: _statusColor(status),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-
-          // ID Proof type & number (read-only display from extended profile)
-          if (idProofType != null && idProofType.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  const Text(
-                    'ID Type: ',
-                    style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  Expanded(
-                    child: Text(
-                      idProofType,
-                      style: const TextStyle(color: AppColors.ink, fontSize: 12, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          if (idProofNumber != null && idProofNumber.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Text(
-                    'ID Number: ',
-                    style: TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  Expanded(
-                    child: Text(
-                      idProofNumber,
-                      style: const TextStyle(color: AppColors.ink, fontSize: 12, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // ID Proof upload
-          _DocRow(
-            label: 'ID Proof Document',
-            icon: Icons.badge_rounded,
-            hasDoc: idProofDocUrl != null && idProofDocUrl.isNotEmpty,
-            uploading: _uploading,
-            onUpload: () => _uploadDoc('id_proof'),
-          ),
-          const SizedBox(height: 8),
-
-          // Professional cert upload
-          _DocRow(
-            label: 'Professional Certificate',
-            icon: Icons.workspace_premium_rounded,
-            hasDoc: certUrl != null && certUrl.isNotEmpty,
-            uploading: _uploading,
-            onUpload: () => _uploadDoc('professional_cert'),
-          ),
-
-          if (adminRemark != null && adminRemark.isNotEmpty) ...[
-            const SizedBox(height: 12),
+        child: Column(
+          children: [
+            // Handle + header (sticky)
             Container(
-              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 12, 12),
+              child: Column(
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD6DCEA),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: _kBlue.withValues(alpha: .1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.edit_rounded,
+                            color: _kBlue, size: 17),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Edit Profile',
+                              style: TextStyle(
+                                color: _kInk,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              'Public fields visible to schools. Phone & location are private.',
+                              style: TextStyle(
+                                  color: _kMuted, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                        color: _kMuted,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Scrollable form
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                  children: [
+                    // Photo
+                    Center(
+                      child: GestureDetector(
+                        onTap: _saving ? null : _pickPhoto,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            CircleAvatar(
+                              radius: 48,
+                              backgroundColor: _kBlue.withValues(alpha: .1),
+                              backgroundImage: provider,
+                              child: provider == null
+                                  ? Text(
+                                      widget.vm.profile.initialsAvatar,
+                                      style: const TextStyle(
+                                        color: _kBlue,
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const Positioned(
+                              right: -2,
+                              bottom: 2,
+                              child: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: _kBlue,
+                                child: Icon(
+                                  Icons.photo_camera_rounded,
+                                  color: Colors.white,
+                                  size: 15,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _sectionLabel('Basic Information'),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _nameController,
+                      label: 'Full name',
+                      icon: Icons.person_outline_rounded,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Name is required'
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<CounsellorCategory>(
+                      initialValue: _category,
+                      decoration: _inputDecoration(
+                          'Category', Icons.category_outlined),
+                      isExpanded: true,
+                      items: CounsellorCategory.values
+                          .map((item) => DropdownMenuItem(
+                                value: item,
+                                child: Text(item.label,
+                                    overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
+                      onChanged: _saving
+                          ? null
+                          : (v) {
+                              if (v != null) setState(() => _category = v);
+                            },
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _phoneController,
+                      label: 'Private phone number',
+                      icon: Icons.phone_outlined,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _locationController,
+                      label: 'Private location',
+                      icon: Icons.location_on_outlined,
+                    ),
+                    const SizedBox(height: 24),
+                    _sectionLabel('Professional Details'),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _gender,
+                      decoration:
+                          _inputDecoration('Gender', Icons.person_outline_rounded),
+                      isExpanded: true,
+                      hint: const Text('Select gender'),
+                      items: _genderOptions
+                          .map((g) =>
+                              DropdownMenuItem(value: g, child: Text(g)))
+                          .toList(),
+                      onChanged: _saving
+                          ? null
+                          : (v) => setState(() => _gender = v),
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _dobController,
+                      label: 'Date of birth (yyyy-mm-dd)',
+                      icon: Icons.cake_outlined,
+                      keyboardType: TextInputType.datetime,
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _experienceController,
+                      label: 'Years of experience',
+                      icon: Icons.timeline_rounded,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _organizationController,
+                      label: 'Organization',
+                      icon: Icons.business_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _counsellingMode,
+                      decoration: _inputDecoration(
+                          'Counselling mode', Icons.swap_horiz_rounded),
+                      isExpanded: true,
+                      items: _modeOptions
+                          .map((m) => DropdownMenuItem(
+                                value: m,
+                                child: Text(_modeLabels[m] ?? m),
+                              ))
+                          .toList(),
+                      onChanged: _saving
+                          ? null
+                          : (v) => setState(() => _counsellingMode = v),
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _languagesController,
+                      label: 'Languages (comma separated)',
+                      icon: Icons.language_rounded,
+                    ),
+                    const SizedBox(height: 24),
+                    _sectionLabel('Public Bio & Expertise'),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _bioController,
+                      label: 'Public bio',
+                      icon: Icons.info_outline_rounded,
+                      maxLines: 4,
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _expertiseController,
+                      label: 'Expertise areas (comma separated)',
+                      icon: Icons.star_outline_rounded,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 24),
+                    _sectionLabel('Qualifications & Location'),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _qualificationController,
+                      label: 'Qualification',
+                      icon: Icons.school_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _cityController,
+                      label: 'City',
+                      icon: Icons.location_city_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _stateController,
+                      label: 'State',
+                      icon: Icons.map_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    _EditField(
+                      controller: _pinCodeController,
+                      label: 'Pin code',
+                      icon: Icons.pin_drop_outlined,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Sticky save bar
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                20, 12, 20,
+                12 + MediaQuery.paddingOf(context).bottom,
+              ),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF3E0),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFF57F17).withValues(alpha: 0.3)),
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: .06),
+                    blurRadius: 10,
+                    offset: const Offset(0, -3),
+                  ),
+                ],
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFFE65100)),
-                  const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      'Admin remark: $adminRemark',
-                      style: const TextStyle(color: Color(0xFF795548), fontSize: 11, height: 1.4),
+                    child: OutlinedButton(
+                      onPressed:
+                          _saving ? null : () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kMuted,
+                        side: BorderSide(
+                            color: _kMuted.withValues(alpha: .3)),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Cancel',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: _saving ? null : _save,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _kBlue,
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2.5, color: Colors.white),
+                            )
+                          : const Text(
+                              'Save Changes',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15),
+                            ),
                     ),
                   ),
                 ],
               ),
             ),
           ],
-          const SizedBox(height: 10),
-          const Text(
-            'Documents submitted for admin verification only. Not shown publicly.',
-            style: TextStyle(color: AppColors.muted, fontSize: 11, fontStyle: FontStyle.italic),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DocRow extends StatelessWidget {
-  const _DocRow({
-    required this.label,
-    required this.icon,
-    required this.hasDoc,
-    required this.uploading,
-    required this.onUpload,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool hasDoc;
-  final bool uploading;
-  final VoidCallback onUpload;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppColors.muted),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(color: AppColors.ink, fontSize: 12, fontWeight: FontWeight.w700),
-          ),
         ),
-        if (hasDoc)
-          const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF2E7D32)),
-        const SizedBox(width: 6),
-        uploading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : TextButton.icon(
-                onPressed: onUpload,
-                icon: const Icon(Icons.upload_rounded, size: 14),
-                label: Text(hasDoc ? 'Replace' : 'Upload'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                ),
-              ),
-      ],
-    );
-  }
-}
-
-// ─── Account Settings Section ─────────────────────────────────────────────────
-
-class _AccountSettingsSection extends StatelessWidget {
-  const _AccountSettingsSection({required this.vm});
-  final CounsellorHomeViewModel vm;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E9F2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Row(
-              children: [
-                Icon(Icons.settings_rounded, size: 18, color: AppColors.ink),
-                SizedBox(width: 8),
-                Text(
-                  'Account Settings',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 24),
-          ListTile(
-            leading: const Icon(Icons.lock_outline_rounded, color: AppColors.primary),
-            title: const Text(
-              'Change Password',
-              style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700, fontSize: 14),
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => const _ChangePasswordSheet(),
-            ),
-          ),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-          ListTile(
-            leading: const Icon(Icons.logout_rounded, color: AppColors.softRed),
-            title: const Text(
-              'Logout',
-              style: TextStyle(color: AppColors.softRed, fontWeight: FontWeight.w700, fontSize: 14),
-            ),
-            onTap: () => _logout(context),
-          ),
-          const SizedBox(height: 4),
-        ],
       ),
     );
   }
 
-  Future<void> _logout(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.softRed),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Logout', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+  Widget _sectionLabel(String label) {
+    return Text(
+      label.toUpperCase(),
+      style: const TextStyle(
+        color: _kMuted,
+        fontSize: 10.5,
+        fontWeight: FontWeight.w800,
+        letterSpacing: .8,
       ),
     );
-    if (ok == true && context.mounted) {
-      final nav = Navigator.of(context);
-      try {
-        await AuthRepository.logout();
-      } catch (_) {}
-      AppState.clear();
-      nav.pushNamedAndRemoveUntil('/login', (route) => false);
-    }
   }
 }
 
@@ -2191,14 +2611,20 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password changed successfully.')),
+        const SnackBar(
+          content: Text('Password changed successfully.'),
+          backgroundColor: _kGreen,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not change password. Check your current password.'),
-          backgroundColor: AppColors.softRed,
+          content:
+              Text('Could not change password. Check your current password.'),
+          backgroundColor: Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
@@ -2209,9 +2635,11 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.7),
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -2225,38 +2653,52 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
               children: [
                 Center(
                   child: Container(
-                    width: 42, height: 4,
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD6DCEA),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+                        color: const Color(0xFFD6DCEA),
+                        borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
                   'Change Password',
-                  style: TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                      color: _kInk,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 18),
                 TextFormField(
                   controller: _currentCtrl,
                   obscureText: _obscureCurrent,
-                  decoration: _inputDecoration('Current password', Icons.lock_outline_rounded).copyWith(
+                  decoration:
+                      _inputDecoration('Current password', Icons.lock_outline_rounded)
+                          .copyWith(
                     suffixIcon: IconButton(
-                      icon: Icon(_obscureCurrent ? Icons.visibility_off_rounded : Icons.visibility_rounded),
-                      onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                      icon: Icon(_obscureCurrent
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded),
+                      onPressed: () => setState(
+                          () => _obscureCurrent = !_obscureCurrent),
                     ),
                   ),
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _newCtrl,
                   obscureText: _obscureNew,
-                  decoration: _inputDecoration('New password', Icons.lock_rounded).copyWith(
+                  decoration:
+                      _inputDecoration('New password', Icons.lock_rounded)
+                          .copyWith(
                     suffixIcon: IconButton(
-                      icon: Icon(_obscureNew ? Icons.visibility_off_rounded : Icons.visibility_rounded),
-                      onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                      icon: Icon(_obscureNew
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded),
+                      onPressed: () =>
+                          setState(() => _obscureNew = !_obscureNew),
                     ),
                   ),
                   validator: (v) {
@@ -2269,10 +2711,15 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: _obscureConfirm,
-                  decoration: _inputDecoration('Confirm new password', Icons.lock_rounded).copyWith(
+                  decoration: _inputDecoration(
+                          'Confirm new password', Icons.lock_rounded)
+                      .copyWith(
                     suffixIcon: IconButton(
-                      icon: Icon(_obscureConfirm ? Icons.visibility_off_rounded : Icons.visibility_rounded),
-                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                      icon: Icon(_obscureConfirm
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded),
+                      onPressed: () => setState(
+                          () => _obscureConfirm = !_obscureConfirm),
                     ),
                   ),
                   validator: (v) {
@@ -2285,16 +2732,19 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 FilledButton(
                   onPressed: _saving ? null : _save,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: _kBlue,
                     padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
                   child: _saving
                       ? const SizedBox(
-                          width: 20, height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2.3, color: Colors.white),
-                        )
-                      : const Text('Change Password', style: TextStyle(fontWeight: FontWeight.w800)),
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2.3, color: Colors.white))
+                      : const Text('Change Password',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ],
             ),
@@ -2304,3 +2754,49 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     );
   }
 }
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+class _EditField extends StatelessWidget {
+  const _EditField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.validator,
+    this.keyboardType,
+    this.maxLines = 1,
+  });
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final String? Function(String?)? validator;
+  final TextInputType? keyboardType;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) => TextFormField(
+        controller: controller,
+        validator: validator,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        decoration: _inputDecoration(label, icon),
+      );
+}
+
+InputDecoration _inputDecoration(String label, IconData icon) =>
+    InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: const Color(0xFF4A587C), size: 18),
+      filled: true,
+      fillColor: _kBg,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _kBlue, width: 1.5),
+      ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );

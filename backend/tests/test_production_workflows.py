@@ -65,6 +65,39 @@ def test_published_impact_feed_reaction_and_share(client, admin_headers, student
     assert f"/public/impact/{post_id}" in shared.json()["public_url"]
 
 
+def test_mentor_can_create_and_only_sees_own_drafts(client, admin_headers, mentor_headers, student_headers, school_partner_headers):
+    # School partner and student remain excluded from creating impact posts.
+    assert client.post("/impact/posts", headers=school_partner_headers, json={
+        "category": "achievement", "title": "Should be denied", "description": "n/a",
+    }).status_code == 403
+    assert client.post("/impact/posts", headers=student_headers, json={
+        "category": "achievement", "title": "Should be denied", "description": "n/a",
+    }).status_code == 403
+
+    # Mentor (counsellor) can create their own draft.
+    mentor_post = client.post("/impact/posts", headers=mentor_headers, json={
+        "category": "achievement",
+        "title": "Counselling drive outcomes",
+        "description": "Summary of a school counselling session.",
+        "people_reached": 15,
+    })
+    assert mentor_post.status_code == 201, mentor_post.text
+    mentor_post_id = mentor_post.json()["id"]
+
+    # Admin creates an unrelated draft that the mentor should not see via `mine`.
+    admin_post = client.post("/impact/posts", headers=admin_headers, json={
+        "category": "achievement", "title": "Admin's own draft", "description": "n/a",
+    })
+    assert admin_post.status_code == 201, admin_post.text
+
+    mine = client.get("/impact/posts?mine=true", headers=mentor_headers)
+    assert mine.status_code == 200
+    assert [item["id"] for item in mine.json()] == [mentor_post_id]
+
+    # `mine=true` is unavailable to roles below mentor in the hierarchy.
+    assert client.get("/impact/posts?mine=true", headers=student_headers).status_code == 403
+
+
 def test_notifications_and_settings_persist(client, db, student_user, student_headers):
     from app.services.notification_service import notify
     notify(db, student_user.id, "assignment_update", "Assignment updated", "You were assigned to an activity.")

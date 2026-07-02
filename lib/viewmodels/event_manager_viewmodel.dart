@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/event_manager_models.dart';
 import '../repositories/event_manager_repository.dart';
+import '../repositories/impact_repository.dart';
 
 enum EMLoadState { idle, loading, error }
 
@@ -13,6 +14,10 @@ class EventManagerViewModel extends ChangeNotifier {
   List<EMStudentAssignment> _assignments = [];
   List<EMImpactPost> _impactPosts = [];
   List<EMActivity> _activities = [];
+
+  // True once loadImpactOnly() has been used instead of load() — keeps
+  // subsequent refreshes from hitting the event-manager-only dashboard.
+  bool _impactOnlyMode = false;
 
   // Activities loading is separate so the main dashboard doesn't block on it
   bool _activitiesLoading = false;
@@ -83,6 +88,29 @@ class EventManagerViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Lightweight counterpart to [load] for roles (e.g. counsellor) that can
+  /// create impact posts but shouldn't see the full event-manager dashboard
+  /// (events, assignments, student submissions). Only populates impact posts.
+  Future<void> loadImpactOnly() async {
+    _impactOnlyMode = true;
+    _state = EMLoadState.loading;
+    _error = null;
+    notifyListeners();
+    try {
+      final posts = await ImpactRepository.getMine();
+      _impactPosts = posts.map(EMImpactPost.fromImpactPost).toList();
+      _state = EMLoadState.idle;
+    } catch (error) {
+      _error = error.toString();
+      _state = EMLoadState.error;
+    }
+    notifyListeners();
+  }
+
+  /// Refreshes impact posts after a mutation, using whichever load path this
+  /// view model was initialized with.
+  Future<void> _refreshImpact() => _impactOnlyMode ? loadImpactOnly() : load();
+
   Future<void> updateAssignmentStatus(
     int id,
     AssignmentStatus status, {
@@ -108,12 +136,12 @@ class EventManagerViewModel extends ChangeNotifier {
 
   Future<void> submitImpactPostForApproval(int postId) async {
     await EventManagerRepository.submitImpact(postId);
-    await load();
+    await _refreshImpact();
   }
 
   Future<void> approveAndPublishImpactPost(int postId) async {
     await EventManagerRepository.publishImpact(postId);
-    await load();
+    await _refreshImpact();
   }
 
   Future<void> deleteImpactPost(int postId) async {
@@ -235,7 +263,7 @@ class EventManagerViewModel extends ChangeNotifier {
       post,
       mediaList: mediaList,
     );
-    await load();
+    await _refreshImpact();
     return id;
   }
 
@@ -249,6 +277,6 @@ class EventManagerViewModel extends ChangeNotifier {
       post,
       mediaList: mediaList,
     );
-    await load();
+    await _refreshImpact();
   }
 }
