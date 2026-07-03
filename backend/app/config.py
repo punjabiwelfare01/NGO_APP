@@ -25,14 +25,34 @@ class Settings:
     # Google Calendar / Meet — set these env vars to enable calendar sync
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    # GOOGLE_REDIRECT_URI can be overridden in .env with your ngrok URL, e.g.
+
+    # ── Backend environment switch ───────────────────────────────────────────
+    # BACKEND_ENV picks a preset for public_url/google_redirect_uri so you
+    # don't have to hand-edit both URLs every time you switch between running
+    # locally and testing against the deployed Railway backend.
+    #   BACKEND_ENV=dev      -> http://localhost:8000 (default)
+    #   BACKEND_ENV=railway  -> the deployed Railway URL below
+    # PUBLIC_URL / GOOGLE_REDIRECT_URI in .env still take priority when set
+    # explicitly (e.g. for an ngrok tunnel), overriding whichever preset
+    # BACKEND_ENV picked.
+    _BACKEND_ENV_PUBLIC_URLS = {
+        "dev": "http://localhost:8000",
+        "railway": "https://ngoapp-production.up.railway.app",
+    }
+    _backend_env: str = os.getenv("BACKEND_ENV", "dev").strip().lower()
+    _default_public_url: str = _BACKEND_ENV_PUBLIC_URLS.get(
+        _backend_env, _BACKEND_ENV_PUBLIC_URLS["dev"]
+    )
+
+    # Public base URL — used to build absolute links (e.g. OAuth callbacks,
+    # PDF report links, QR codes). Set PUBLIC_URL explicitly in .env to
+    # override the BACKEND_ENV preset (e.g. for an ngrok tunnel).
+    public_url: str = os.getenv("PUBLIC_URL", _default_public_url)
+    # GOOGLE_REDIRECT_URI can likewise be overridden explicitly in .env, e.g.
     # GOOGLE_REDIRECT_URI=https://xxxx.ngrok-free.app/auth/google/callback
     google_redirect_uri: str = os.getenv(
-        "GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback"
+        "GOOGLE_REDIRECT_URI", f"{_default_public_url}/auth/google/callback"
     )
-    # Public base URL — used to build absolute links (e.g. OAuth callbacks via ngrok).
-    # Set PUBLIC_URL=https://xxxx.ngrok-free.app in .env when tunnelling.
-    public_url: str = os.getenv("PUBLIC_URL", "http://localhost:8000")
 
     # Auth0 — set AUTH0_DOMAIN and AUTH0_CLIENT_ID in .env
     # Domain:    your Auth0 tenant, e.g. dev-abc123.us.auth0.com
