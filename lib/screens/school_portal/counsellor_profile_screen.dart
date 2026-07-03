@@ -1209,7 +1209,8 @@ class _BookingFormState extends State<_BookingForm> {
                 key: _formKey,
                 child: ListView(
                   controller: ctrl,
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+                  padding: EdgeInsets.fromLTRB(18, 16, 18,
+                      24 + MediaQuery.of(context).viewInsets.bottom),
                   children: [
                     // Counsellor summary tile
                     Container(
@@ -1522,6 +1523,10 @@ class _BookingFormState extends State<_BookingForm> {
     controller: ctrl,
     maxLines: maxLines,
     keyboardType: keyboardType,
+    textInputAction: maxLines <= 1 ? TextInputAction.next : null,
+    onEditingComplete: maxLines <= 1
+        ? () => FocusScope.of(context).nextFocus()
+        : null,
     decoration: InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(

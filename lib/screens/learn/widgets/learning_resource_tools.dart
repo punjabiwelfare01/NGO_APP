@@ -501,6 +501,10 @@ class _AddResourceSheetState extends State<AddResourceSheet> {
               const SizedBox(height: 6),
               TextFormField(
                 controller: _titleCtrl,
+                textInputAction: _needsFilePick ? null : TextInputAction.next,
+                onEditingComplete: _needsFilePick
+                    ? null
+                    : () => FocusScope.of(context).nextFocus(),
                 decoration: _inputDeco('e.g. Android Basics PDF'),
                 validator: (v) => (v == null || v.trim().isEmpty)
                     ? 'Title is required'

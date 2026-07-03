@@ -749,11 +749,26 @@ class _EditCreatorProfileSheetState extends State<_EditCreatorProfileSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            _EditField(controller: _nameCtrl, label: 'Name'),
+            _EditField(
+              controller: _nameCtrl,
+              label: 'Name',
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
+            ),
             const SizedBox(height: 12),
-            _EditField(controller: _phoneCtrl, label: 'Phone'),
+            _EditField(
+              controller: _phoneCtrl,
+              label: 'Phone',
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
+            ),
             const SizedBox(height: 12),
-            _EditField(controller: _locationCtrl, label: 'Location'),
+            _EditField(
+              controller: _locationCtrl,
+              label: 'Location',
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
+            ),
             const SizedBox(height: 12),
             _EditField(controller: _orgCtrl, label: 'Organization'),
             const SizedBox(height: 18),
@@ -796,15 +811,24 @@ class _EditCreatorProfileSheetState extends State<_EditCreatorProfileSheet> {
 }
 
 class _EditField extends StatelessWidget {
-  const _EditField({required this.controller, required this.label});
+  const _EditField({
+    required this.controller,
+    required this.label,
+    this.textInputAction,
+    this.onEditingComplete,
+  });
 
   final TextEditingController controller;
   final String label;
+  final TextInputAction? textInputAction;
+  final VoidCallback? onEditingComplete;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      textInputAction: textInputAction,
+      onEditingComplete: onEditingComplete,
       decoration: InputDecoration(
         labelText: label,
         filled: true,

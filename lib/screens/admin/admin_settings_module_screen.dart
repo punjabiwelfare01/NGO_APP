@@ -189,12 +189,21 @@ class _AdminSettingsModuleScreenState extends State<AdminSettingsModuleScreen> {
           child: SingleChildScrollView(
             child: Column(
               children: keys
+                  .asMap()
+                  .entries
                   .map(
-                    (key) => Padding(
+                    (entry) => Padding(
                       padding: const EdgeInsets.only(bottom: 9),
                       child: TextField(
-                        controller: controllers[key],
-                        decoration: InputDecoration(labelText: _label(key)),
+                        controller: controllers[entry.value],
+                        textInputAction: entry.key < keys.length - 1
+                            ? TextInputAction.next
+                            : TextInputAction.done,
+                        onEditingComplete: entry.key < keys.length - 1
+                            ? () => FocusScope.of(ctx).nextFocus()
+                            : null,
+                        decoration:
+                            InputDecoration(labelText: _label(entry.value)),
                       ),
                     ),
                   )
@@ -275,11 +284,16 @@ class _AdminSettingsModuleScreenState extends State<AdminSettingsModuleScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Permissions: ${_label(role)}'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            helperText: 'Comma-separated permission identifiers',
+        content: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+          child: SingleChildScrollView(
+            child: TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                helperText: 'Comma-separated permission identifiers',
+              ),
+            ),
           ),
         ),
         actions: [
@@ -392,37 +406,44 @@ class _AdminSettingsModuleScreenState extends State<AdminSettingsModuleScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
           title: const Text('New Announcement'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: title,
-                decoration: const InputDecoration(labelText: 'Title'),
-              ),
-              TextField(
-                controller: message,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Message'),
-              ),
-              DropdownButtonFormField<String>(
-                initialValue: role,
-                decoration: const InputDecoration(labelText: 'Audience'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('All roles')),
-                  DropdownMenuItem(value: 'student', child: Text('Students')),
-                  DropdownMenuItem(value: 'mentor', child: Text('Counsellors')),
-                  DropdownMenuItem(
-                    value: 'event_manager',
-                    child: Text('Event Managers'),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: title,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () => FocusScope.of(ctx).nextFocus(),
+                    decoration: const InputDecoration(labelText: 'Title'),
                   ),
-                  DropdownMenuItem(
-                    value: 'content_creator',
-                    child: Text('Content Creators'),
+                  TextField(
+                    controller: message,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'Message'),
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: role,
+                    decoration: const InputDecoration(labelText: 'Audience'),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('All roles')),
+                      DropdownMenuItem(value: 'student', child: Text('Students')),
+                      DropdownMenuItem(value: 'mentor', child: Text('Counsellors')),
+                      DropdownMenuItem(
+                        value: 'event_manager',
+                        child: Text('Event Managers'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'content_creator',
+                        child: Text('Content Creators'),
+                      ),
+                    ],
+                    onChanged: (v) => setLocal(() => role = v),
                   ),
                 ],
-                onChanged: (v) => setLocal(() => role = v),
               ),
-            ],
+            ),
           ),
           actions: [
             TextButton(
@@ -484,18 +505,26 @@ class _AdminSettingsModuleScreenState extends State<AdminSettingsModuleScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Application Setting'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: key,
-              decoration: const InputDecoration(labelText: 'Key'),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: key,
+                  textInputAction: TextInputAction.next,
+                  onEditingComplete: () => FocusScope.of(ctx).nextFocus(),
+                  decoration: const InputDecoration(labelText: 'Key'),
+                ),
+                TextField(
+                  controller: value,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(labelText: 'Value'),
+                ),
+              ],
             ),
-            TextField(
-              controller: value,
-              decoration: const InputDecoration(labelText: 'Value'),
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(

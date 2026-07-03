@@ -1125,13 +1125,16 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                 key: _formKey,
                 child: ListView(
                   controller: ctrl,
-                  padding:
-                      const EdgeInsets.fromLTRB(18, 16, 18, 28),
+                  padding: EdgeInsets.fromLTRB(18, 16, 18,
+                      28 + MediaQuery.of(context).viewInsets.bottom),
                   children: [
                     _label('Event Title *'),
                     _field(_titleCtrl,
                         'e.g. Cyber Safety Awareness Camp',
-                        required: true),
+                        required: true,
+                        textInputAction: TextInputAction.next,
+                        onEditingComplete: () =>
+                            FocusScope.of(context).nextFocus()),
                     const SizedBox(height: 14),
                     _label('Category *'),
                     Wrap(
@@ -1184,10 +1187,16 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                     _label('Location *'),
                     _field(_locationCtrl,
                         'e.g. Delhi Public School, Cantt',
-                        required: true),
+                        required: true,
+                        textInputAction: TextInputAction.next,
+                        onEditingComplete: () =>
+                            FocusScope.of(context).nextFocus()),
                     const SizedBox(height: 14),
                     _label('Partner School / Organisation'),
-                    _field(_schoolCtrl, 'Optional'),
+                    _field(_schoolCtrl, 'Optional',
+                        textInputAction: TextInputAction.next,
+                        onEditingComplete: () =>
+                            FocusScope.of(context).nextFocus()),
                     const SizedBox(height: 14),
                     _label('Description *'),
                     _field(_descCtrl, 'What is this event about?',
@@ -1196,11 +1205,17 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                     _label('Max Volunteers *'),
                     _field(_maxVolCtrl, 'e.g. 25',
                         required: true,
-                        keyboardType: TextInputType.number),
+                        keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.next,
+                        onEditingComplete: () =>
+                            FocusScope.of(context).nextFocus()),
                     const SizedBox(height: 14),
                     _label('Student Eligibility'),
                     _field(_eligibilityCtrl,
-                        'e.g. All enrolled volunteers'),
+                        'e.g. All enrolled volunteers',
+                        textInputAction: TextInputAction.next,
+                        onEditingComplete: () =>
+                            FocusScope.of(context).nextFocus()),
                     const SizedBox(height: 14),
                     _label('Expected Work'),
                     _field(_expectedWorkCtrl,
@@ -1291,11 +1306,15 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
     bool required = false,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    TextInputAction? textInputAction,
+    VoidCallback? onEditingComplete,
   }) =>
       TextFormField(
         controller: ctrl,
         maxLines: maxLines,
         keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        onEditingComplete: onEditingComplete,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(

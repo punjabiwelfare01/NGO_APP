@@ -164,6 +164,9 @@ class _EventRegistrationFormScreenState
                   children: [
                     TextFormField(
                       controller: _studentName,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Student name',
                         prefixIcon: Icon(Icons.person_outline_rounded),
@@ -174,6 +177,9 @@ class _EventRegistrationFormScreenState
                     TextFormField(
                       controller: _age,
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Age',
                         prefixIcon: Icon(Icons.cake_outlined),
@@ -183,6 +189,9 @@ class _EventRegistrationFormScreenState
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _guardianName,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Parent / guardian name',
                         prefixIcon: Icon(Icons.family_restroom_rounded),
@@ -193,6 +202,9 @@ class _EventRegistrationFormScreenState
                     TextFormField(
                       controller: _guardianContact,
                       keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Guardian contact',
                         prefixIcon: Icon(Icons.call_outlined),
@@ -202,6 +214,9 @@ class _EventRegistrationFormScreenState
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _school,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'School / learning center',
                         prefixIcon: Icon(Icons.school_outlined),

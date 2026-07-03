@@ -281,6 +281,8 @@ class _OptionField extends StatelessWidget {
         Expanded(
           child: TextFormField(
             controller: controller,
+            textInputAction: TextInputAction.next,
+            onEditingComplete: () => FocusScope.of(context).nextFocus(),
             decoration: InputDecoration(
               labelText: 'Option ${optionKey.toUpperCase()}',
               border: const OutlineInputBorder(),

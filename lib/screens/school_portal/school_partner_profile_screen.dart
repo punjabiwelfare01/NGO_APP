@@ -258,54 +258,70 @@ class _SchoolPartnerProfileScreenState
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           title: const Text('Change Password'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentCtrl,
-                obscureText: obscureCurrent,
-                decoration: InputDecoration(
-                  labelText: 'Current Password',
-                  suffixIcon: IconButton(
-                    icon: Icon(obscureCurrent
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_rounded),
-                    onPressed: () => setDialogState(
-                        () => obscureCurrent = !obscureCurrent),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: currentCtrl,
+                    obscureText: obscureCurrent,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () => FocusScope.of(ctx).nextFocus(),
+                    decoration: InputDecoration(
+                      labelText: 'Current Password',
+                      suffixIcon: ExcludeFocus(
+                        child: IconButton(
+                          icon: Icon(obscureCurrent
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded),
+                          onPressed: () => setDialogState(
+                              () => obscureCurrent = !obscureCurrent),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: newCtrl,
-                obscureText: obscureNew,
-                decoration: InputDecoration(
-                  labelText: 'New Password',
-                  suffixIcon: IconButton(
-                    icon: Icon(obscureNew
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_rounded),
-                    onPressed: () =>
-                        setDialogState(() => obscureNew = !obscureNew),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: newCtrl,
+                    obscureText: obscureNew,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () => FocusScope.of(ctx).nextFocus(),
+                    decoration: InputDecoration(
+                      labelText: 'New Password',
+                      suffixIcon: ExcludeFocus(
+                        child: IconButton(
+                          icon: Icon(obscureNew
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded),
+                          onPressed: () =>
+                              setDialogState(() => obscureNew = !obscureNew),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: confirmCtrl,
-                obscureText: obscureConfirm,
-                decoration: InputDecoration(
-                  labelText: 'Confirm New Password',
-                  suffixIcon: IconButton(
-                    icon: Icon(obscureConfirm
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_rounded),
-                    onPressed: () => setDialogState(
-                        () => obscureConfirm = !obscureConfirm),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: confirmCtrl,
+                    obscureText: obscureConfirm,
+                    textInputAction: TextInputAction.done,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm New Password',
+                      suffixIcon: ExcludeFocus(
+                        child: IconButton(
+                          icon: Icon(obscureConfirm
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded),
+                          onPressed: () => setDialogState(
+                              () => obscureConfirm = !obscureConfirm),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
           actions: [
             TextButton(
@@ -488,7 +504,8 @@ class _SchoolPartnerProfileScreenState
             const SizedBox(height: 12),
             _field('Alternate Phone', _altPhoneCtrl,
                 enabled: _isEditing,
-                keyboardType: TextInputType.phone),
+                keyboardType: TextInputType.phone,
+                isLastField: true),
             const SizedBox(height: 12),
             _readOnlyRow('Email', p.email ?? '—'),
           ],
@@ -792,12 +809,18 @@ class _SchoolPartnerProfileScreenState
     bool enabled = false,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    bool isLastField = false,
   }) =>
       TextField(
         controller: controller,
         enabled: enabled,
         maxLines: maxLines,
         keyboardType: keyboardType,
+        textInputAction:
+            (maxLines <= 1 && !isLastField) ? TextInputAction.next : null,
+        onEditingComplete: (maxLines <= 1 && !isLastField)
+            ? () => FocusScope.of(context).nextFocus()
+            : null,
         style: const TextStyle(color: AppColors.ink, fontSize: 14),
         decoration: InputDecoration(
           labelText: label,

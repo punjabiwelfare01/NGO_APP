@@ -258,6 +258,9 @@ class _Field extends StatelessWidget {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
+      textInputAction: maxLines == 1 ? TextInputAction.next : null,
+      onEditingComplete:
+          maxLines == 1 ? () => FocusScope.of(context).nextFocus() : null,
       validator: validator,
       style: const TextStyle(fontSize: 13, color: AppColors.ink),
       decoration: InputDecoration(

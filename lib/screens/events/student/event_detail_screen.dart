@@ -1089,36 +1089,44 @@ class _CreateSlotDialogState extends State<_CreateSlotDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Create Slot'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _titleCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Slot title',
-              border: OutlineInputBorder(),
-            ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: _titleCtrl,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                decoration: const InputDecoration(
+                  labelText: 'Slot title',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _capacityCtrl,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'Capacity',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _pickStart,
+                icon: const Icon(Icons.schedule_rounded),
+                label: Text(
+                  '${_startsAt.day}/${_startsAt.month}/${_startsAt.year} '
+                  '${_startsAt.hour.toString().padLeft(2, '0')}:'
+                  '${_startsAt.minute.toString().padLeft(2, '0')}',
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _capacityCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Capacity',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _pickStart,
-            icon: const Icon(Icons.schedule_rounded),
-            label: Text(
-              '${_startsAt.day}/${_startsAt.month}/${_startsAt.year} '
-              '${_startsAt.hour.toString().padLeft(2, '0')}:'
-              '${_startsAt.minute.toString().padLeft(2, '0')}',
-            ),
-          ),
-        ],
+        ),
       ),
       actions: [
         TextButton(

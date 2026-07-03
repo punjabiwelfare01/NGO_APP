@@ -357,13 +357,18 @@ class _CounsellorAdminScreenState extends State<CounsellorAdminScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text('Availability — ${c.name}'),
-        content: TextField(
-          controller: controller,
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            labelText: 'One public time slot per line',
-            border: OutlineInputBorder(),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+          child: SingleChildScrollView(
+            child: TextField(
+              controller: controller,
+              minLines: 3,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                labelText: 'One public time slot per line',
+                border: OutlineInputBorder(),
+              ),
+            ),
           ),
         ),
         actions: [
@@ -581,7 +586,8 @@ class _AddCounsellorSheetState extends State<_AddCounsellorSheet> {
         key: _key,
         child: ListView(
           controller: scroll,
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.fromLTRB(20, 20, 20,
+              20 + MediaQuery.of(context).viewInsets.bottom),
           children: [
             const Text(
               'Add Counsellor Profile',
@@ -660,6 +666,9 @@ class _AddCounsellorSheetState extends State<_AddCounsellorSheet> {
         child: TextFormField(
           controller: c,
           maxLines: lines,
+          textInputAction: lines == 1 ? TextInputAction.next : null,
+          onEditingComplete:
+              lines == 1 ? () => FocusScope.of(context).nextFocus() : null,
           validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
           decoration: InputDecoration(
             labelText: label,

@@ -2212,13 +2212,17 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                 key: _formKey,
                 child: ListView(
                   controller: ctrl,
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+                  padding: EdgeInsets.fromLTRB(18, 16, 18,
+                      28 + MediaQuery.of(context).viewInsets.bottom),
                   children: [
                     _formLabel('Event Title *'),
                     _field(
                       _titleCtrl,
                       'e.g. Cyber Safety Awareness Camp',
                       required: true,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                     ),
                     const SizedBox(height: 14),
                     _formLabel('Category *'),
@@ -2287,10 +2291,19 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                       _locationCtrl,
                       'e.g. Delhi Public School, Cantt',
                       required: true,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                     ),
                     const SizedBox(height: 14),
                     _formLabel('Partner School / Organisation'),
-                    _field(_schoolCtrl, 'Optional'),
+                    _field(
+                      _schoolCtrl,
+                      'Optional',
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
+                    ),
                     const SizedBox(height: 14),
                     _formLabel('Description *'),
                     _field(
@@ -2306,10 +2319,19 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                       'e.g. 25',
                       required: true,
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                     ),
                     const SizedBox(height: 14),
                     _formLabel('Student Eligibility'),
-                    _field(_eligibilityCtrl, 'e.g. All enrolled volunteers'),
+                    _field(
+                      _eligibilityCtrl,
+                      'e.g. All enrolled volunteers',
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
+                    ),
                     const SizedBox(height: 14),
                     _formLabel('Expected Work'),
                     _field(
@@ -2400,10 +2422,14 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
     bool required = false,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    TextInputAction? textInputAction,
+    VoidCallback? onEditingComplete,
   }) => TextFormField(
     controller: ctrl,
     maxLines: maxLines,
     keyboardType: keyboardType,
+    textInputAction: textInputAction,
+    onEditingComplete: onEditingComplete,
     decoration: InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(
@@ -2682,6 +2708,8 @@ class _CreateActivitySheetState extends State<_CreateActivitySheet> {
             const SizedBox(height: 8),
             TextFormField(
               controller: _titleCtrl,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               decoration: InputDecoration(
                 hintText: _role.label,
                 filled: true,
@@ -2882,6 +2910,8 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
             const SizedBox(height: 8),
             TextFormField(
               controller: _titleCtrl,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               decoration: InputDecoration(
                 hintText: 'e.g. Stationery Drive — 150 Kits Distributed',
                 filled: true,

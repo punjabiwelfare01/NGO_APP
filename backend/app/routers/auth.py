@@ -76,15 +76,24 @@ async def upload_gov_id(
     import pathlib, tempfile
     from ..config import settings as cfg
 
-    allowed_types = {"application/pdf", "image/jpeg", "image/jpg", "image/png"}
-    if file.content_type and file.content_type not in allowed_types:
+    # Clients (browsers, file pickers) often send a generic
+    # "application/octet-stream" content type instead of the real one, so
+    # content_type alone is not a reliable filter. Validate by file extension
+    # first, and only use content_type to reject a type it explicitly and
+    # unambiguously claims to be disallowed.
+    allowed_extensions = {".pdf", ".jpg", ".jpeg", ".png"}
+    allowed_types = {
+        "application/pdf", "image/jpeg", "image/jpg", "image/png",
+        "application/octet-stream", "",
+    }
+    ext = pathlib.Path(file.filename or "").suffix.lower()
+    if ext not in allowed_extensions or (file.content_type and file.content_type not in allowed_types):
         raise HTTPException(status_code=400, detail="Only PDF, JPG, and PNG files are allowed.")
 
     contents = await file.read()
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Maximum 10 MB allowed.")
 
-    ext = pathlib.Path(file.filename or "id").suffix.lower() or ".pdf"
     safe_name = f"{secrets.token_urlsafe(18)}{ext}"
 
     # ── Route to Hostinger SFTP when configured, else local fallback ──────────

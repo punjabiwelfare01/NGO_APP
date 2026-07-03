@@ -1297,6 +1297,7 @@ class _DonationSheetState extends State<_DonationSheet> {
                     label: 'Transaction ID / UPI Ref',
                     hint: 'Optional — paste from payment app',
                     icon: Icons.receipt_long_outlined,
+                    isLastField: true,
                   ),
                   const SizedBox(height: 26),
 
@@ -1431,6 +1432,7 @@ class _Field extends StatelessWidget {
     required this.icon,
     this.keyboard = TextInputType.text,
     this.maxLines = 1,
+    this.isLastField = false,
   });
   final TextEditingController ctrl;
   final String label;
@@ -1438,6 +1440,7 @@ class _Field extends StatelessWidget {
   final IconData icon;
   final TextInputType keyboard;
   final int maxLines;
+  final bool isLastField;
 
   @override
   Widget build(BuildContext context) {
@@ -1457,6 +1460,12 @@ class _Field extends StatelessWidget {
           controller: ctrl,
           keyboardType: keyboard,
           maxLines: maxLines,
+          textInputAction: (maxLines <= 1 && !isLastField)
+              ? TextInputAction.next
+              : null,
+          onEditingComplete: (maxLines <= 1 && !isLastField)
+              ? () => FocusScope.of(context).nextFocus()
+              : null,
           style: const TextStyle(
               color: _ink, fontWeight: FontWeight.w600, fontSize: 14),
           decoration: InputDecoration(

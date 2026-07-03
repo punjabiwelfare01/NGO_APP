@@ -617,6 +617,8 @@ class _LessonUploadWizardScreenState extends State<LessonUploadWizardScreen> {
           label: 'Lesson Title *',
           controller: _titleCtrl,
           hint: 'Introduction to Light',
+          textInputAction: TextInputAction.next,
+          onEditingComplete: () => FocusScope.of(context).nextFocus(),
         ),
         _TextInput(
           label: 'Short Description',
@@ -635,6 +637,8 @@ class _LessonUploadWizardScreenState extends State<LessonUploadWizardScreen> {
           controller: _orderCtrl,
           hint: '1',
           keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+          onEditingComplete: () => FocusScope.of(context).nextFocus(),
         ),
         _TextInput(
           label: 'Duration (minutes)',
@@ -1170,6 +1174,8 @@ class _TextInput extends StatelessWidget {
     this.maxLines = 1,
     this.keyboardType,
     this.prefixIcon,
+    this.textInputAction,
+    this.onEditingComplete,
   });
 
   final String label;
@@ -1178,6 +1184,8 @@ class _TextInput extends StatelessWidget {
   final int maxLines;
   final TextInputType? keyboardType;
   final IconData? prefixIcon;
+  final TextInputAction? textInputAction;
+  final VoidCallback? onEditingComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -1190,6 +1198,8 @@ class _TextInput extends StatelessWidget {
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          onEditingComplete: onEditingComplete,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: prefixIcon == null ? null : Icon(prefixIcon),

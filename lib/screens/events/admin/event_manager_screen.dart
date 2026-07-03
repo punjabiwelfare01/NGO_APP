@@ -1123,6 +1123,9 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                     // Title
                     TextFormField(
                       controller: _titleCtrl,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Event Title *',
                         hintText: 'e.g. Cyber Safety Awareness Camp',
@@ -1184,6 +1187,9 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                     // Custom category text field
                     TextFormField(
                       controller: _categoryCtrl,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: InputDecoration(
                         labelText: 'Or type a custom category',
                         hintText: 'e.g. Blood Donation Camp',
@@ -1241,6 +1247,9 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                     // Location
                     TextFormField(
                       controller: _locationCtrl,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Location *',
                         hintText: 'e.g. Delhi Public School, Cantt',
@@ -1256,6 +1265,9 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                     // Partner School / Organisation
                     TextFormField(
                       controller: _partnerCtrl,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Partner School / Organisation',
                         hintText: 'Optional',
@@ -1284,6 +1296,9 @@ class _CreateEventSheetState extends State<_CreateEventSheet> {
                     // Max Volunteers
                     TextFormField(
                       controller: _maxVolCtrl,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Max Volunteers *',
                         border: OutlineInputBorder(),

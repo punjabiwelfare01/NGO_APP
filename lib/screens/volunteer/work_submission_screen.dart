@@ -640,6 +640,10 @@ class _Field extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
+      textInputAction: maxLines <= 1 ? TextInputAction.next : null,
+      onEditingComplete: maxLines <= 1
+          ? () => FocusScope.of(context).nextFocus()
+          : null,
       validator: validator,
       decoration: InputDecoration(
         hintText: hint,

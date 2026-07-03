@@ -259,6 +259,8 @@ class _CreateCourseScreenState extends State<CreateCourseScreen> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _titleCtrl,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               decoration: _deco('e.g. Web Development Basics'),
               onChanged: (_) => setState(() {}),
               validator: (v) =>

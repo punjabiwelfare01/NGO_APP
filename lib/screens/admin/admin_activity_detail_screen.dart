@@ -101,12 +101,17 @@ class _AdminActivityDetailScreenState
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Add Remarks'),
-          content: TextField(
-            controller: ctrl,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'Reason...',
-              border: OutlineInputBorder(),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+            child: SingleChildScrollView(
+              child: TextField(
+                controller: ctrl,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: 'Reason...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
             ),
           ),
           actions: [

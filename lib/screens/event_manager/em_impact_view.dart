@@ -1981,7 +1981,8 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
   Widget _buildStep1(ScrollController ctrl) {
     return ListView(
       controller: ctrl,
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+      padding: EdgeInsets.fromLTRB(
+          18, 20, 18, 28 + MediaQuery.of(context).viewInsets.bottom),
       children: [
         _StepSectionTitle(
           icon: Icons.category_outlined,
@@ -2151,7 +2152,8 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
 
     return ListView(
       controller: ctrl,
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+      padding: EdgeInsets.fromLTRB(
+          18, 20, 18, 28 + MediaQuery.of(context).viewInsets.bottom),
       children: [
         _StepSectionTitle(
           icon: Icons.photo_library_rounded,
@@ -2336,7 +2338,8 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
   Widget _buildStep3(ScrollController ctrl) {
     return ListView(
       controller: ctrl,
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+      padding: EdgeInsets.fromLTRB(
+          18, 20, 18, 28 + MediaQuery.of(context).viewInsets.bottom),
       children: [
         _StepSectionTitle(
           icon: Icons.auto_stories_rounded,
@@ -2366,6 +2369,8 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
           decoration: _inputDecoration(
               'e.g. We reached 200 students in 3 hours'),
           textCapitalization: TextCapitalization.sentences,
+          textInputAction: TextInputAction.next,
+          onEditingComplete: () => FocusScope.of(context).nextFocus(),
         ),
         const SizedBox(height: 24),
         _StepSectionTitle(
@@ -2396,7 +2401,8 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
 
     return ListView(
       controller: ctrl,
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+      padding: EdgeInsets.fromLTRB(
+          18, 20, 18, 28 + MediaQuery.of(context).viewInsets.bottom),
       children: [
         _StepSectionTitle(
           icon: Icons.preview_rounded,

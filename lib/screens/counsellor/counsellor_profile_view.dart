@@ -1463,6 +1463,8 @@ class _AvailabilityManagementSectionState
                 const SizedBox(height: 12),
                 TextFormField(
                   initialValue: startTime,
+                  textInputAction: TextInputAction.next,
+                  onEditingComplete: () => FocusScope.of(ctx).nextFocus(),
                   decoration: _inputDecoration(
                       'Start (HH:MM)', Icons.access_time_rounded),
                   onChanged: (v) => startTime = v,
@@ -2484,6 +2486,7 @@ class _EditCounsellorProfileSheetState
                       label: 'Pin code',
                       icon: Icons.pin_drop_outlined,
                       keyboardType: TextInputType.number,
+                      isLast: true,
                     ),
                   ],
                 ),
@@ -2672,15 +2675,19 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 TextFormField(
                   controller: _currentCtrl,
                   obscureText: _obscureCurrent,
+                  textInputAction: TextInputAction.next,
+                  onEditingComplete: () => FocusScope.of(context).nextFocus(),
                   decoration:
                       _inputDecoration('Current password', Icons.lock_outline_rounded)
                           .copyWith(
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureCurrent
-                          ? Icons.visibility_off_rounded
-                          : Icons.visibility_rounded),
-                      onPressed: () => setState(
-                          () => _obscureCurrent = !_obscureCurrent),
+                    suffixIcon: ExcludeFocus(
+                      child: IconButton(
+                        icon: Icon(_obscureCurrent
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded),
+                        onPressed: () => setState(
+                            () => _obscureCurrent = !_obscureCurrent),
+                      ),
                     ),
                   ),
                   validator: (v) =>
@@ -2690,15 +2697,19 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 TextFormField(
                   controller: _newCtrl,
                   obscureText: _obscureNew,
+                  textInputAction: TextInputAction.next,
+                  onEditingComplete: () => FocusScope.of(context).nextFocus(),
                   decoration:
                       _inputDecoration('New password', Icons.lock_rounded)
                           .copyWith(
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureNew
-                          ? Icons.visibility_off_rounded
-                          : Icons.visibility_rounded),
-                      onPressed: () =>
-                          setState(() => _obscureNew = !_obscureNew),
+                    suffixIcon: ExcludeFocus(
+                      child: IconButton(
+                        icon: Icon(_obscureNew
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded),
+                        onPressed: () =>
+                            setState(() => _obscureNew = !_obscureNew),
+                      ),
                     ),
                   ),
                   validator: (v) {
@@ -2714,12 +2725,14 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                   decoration: _inputDecoration(
                           'Confirm new password', Icons.lock_rounded)
                       .copyWith(
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscureConfirm
-                          ? Icons.visibility_off_rounded
-                          : Icons.visibility_rounded),
-                      onPressed: () => setState(
-                          () => _obscureConfirm = !_obscureConfirm),
+                    suffixIcon: ExcludeFocus(
+                      child: IconButton(
+                        icon: Icon(_obscureConfirm
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded),
+                        onPressed: () => setState(
+                            () => _obscureConfirm = !_obscureConfirm),
+                      ),
                     ),
                   ),
                   validator: (v) {
@@ -2765,6 +2778,7 @@ class _EditField extends StatelessWidget {
     this.validator,
     this.keyboardType,
     this.maxLines = 1,
+    this.isLast = false,
   });
   final TextEditingController controller;
   final String label;
@@ -2772,6 +2786,7 @@ class _EditField extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
   final int maxLines;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) => TextFormField(
@@ -2779,6 +2794,11 @@ class _EditField extends StatelessWidget {
         validator: validator,
         keyboardType: keyboardType,
         maxLines: maxLines,
+        textInputAction:
+            (maxLines == 1 && !isLast) ? TextInputAction.next : null,
+        onEditingComplete: (maxLines == 1 && !isLast)
+            ? () => FocusScope.of(context).nextFocus()
+            : null,
         decoration: _inputDecoration(label, icon),
       );
 }

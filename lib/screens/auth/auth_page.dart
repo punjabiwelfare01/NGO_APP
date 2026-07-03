@@ -937,7 +937,20 @@ class _StudentVolunteerFormState extends State<_StudentVolunteerForm> {
           fileBytes: _govIdFile!.bytes!,
           fileName: _govIdFile!.name,
         );
-      } catch (_) {}
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Your account was created, but the government ID upload failed ($e). '
+                'Please upload it again from your profile so admin can verify you.',
+              ),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+      }
     }
     if (!mounted) return;
     if (status == AccessStatus.approved) {
@@ -1616,6 +1629,7 @@ class _SchoolPartnerFormState extends State<_SchoolPartnerForm> {
                     setState(() => _obscureConfirm = !_obscureConfirm),
                 validator: (v) =>
                     v != _passwordCtrl.text ? 'Passwords do not match' : null,
+                isLast: true,
               ),
               const SizedBox(height: 18),
               const _PendingNotice(),
@@ -1785,7 +1799,20 @@ class _CounsellorFormState extends State<_CounsellorForm> {
           fileBytes: _govIdFile!.bytes!,
           fileName: _govIdFile!.name,
         );
-      } catch (_) {}
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Your account was created, but the government ID upload failed ($e). '
+                'Please upload it again from your profile so admin can verify you.',
+              ),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+      }
     }
 
     if (!mounted) return;
@@ -2013,6 +2040,7 @@ class _CounsellorFormState extends State<_CounsellorForm> {
                     setState(() => _obscureConfirm = !_obscureConfirm),
                 validator: (v) =>
                     v != _passwordCtrl.text ? 'Passwords do not match' : null,
+                isLast: true,
               ),
               const SizedBox(height: 20),
               _SectionLabel(
@@ -2174,7 +2202,20 @@ class _NgoStaffFormState extends State<_NgoStaffForm> {
           fileBytes: _govIdFile!.bytes!,
           fileName: _govIdFile!.name,
         );
-      } catch (_) {}
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Your account was created, but the government ID upload failed ($e). '
+                'Please upload it again from your profile so admin can verify you.',
+              ),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+      }
     }
     if (!mounted) return;
     widget.onSuccess();
@@ -2347,6 +2388,7 @@ class _NgoStaffFormState extends State<_NgoStaffForm> {
                     setState(() => _obscureConfirm = !_obscureConfirm),
                 validator: (v) =>
                     v != _passwordCtrl.text ? 'Passwords do not match' : null,
+                isLast: true,
               ),
               const SizedBox(height: 18),
               Container(
@@ -2972,6 +3014,7 @@ class _ForgotPasswordFlowState extends State<_ForgotPasswordFlow> {
             onToggle: () => setState(() => _showConfirm = !_showConfirm),
             validator: (v) =>
                 v != _newPwCtrl.text ? 'Passwords do not match' : null,
+            isLast: true,
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
@@ -3301,6 +3344,7 @@ class _PasswordField extends StatelessWidget {
     required this.obscure,
     required this.onToggle,
     this.validator,
+    this.isLast = false,
   });
 
   final TextEditingController controller;
@@ -3309,17 +3353,20 @@ class _PasswordField extends StatelessWidget {
   final bool obscure;
   final VoidCallback onToggle;
   final String? Function(String?)? validator;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
     final dec = _dec(label, Icons.lock_outline_rounded).copyWith(
-      suffixIcon: IconButton(
-        icon: Icon(
-          obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-          color: AppColors.muted,
-          size: 20,
+      suffixIcon: ExcludeFocus(
+        child: IconButton(
+          icon: Icon(
+            obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            color: AppColors.muted,
+            size: 20,
+          ),
+          onPressed: onToggle,
         ),
-        onPressed: onToggle,
       ),
     );
     if (validator != null) {
@@ -3327,6 +3374,9 @@ class _PasswordField extends StatelessWidget {
         controller: controller,
         obscureText: obscure,
         enabled: enabled,
+        textInputAction: isLast ? null : TextInputAction.next,
+        onEditingComplete:
+            isLast ? null : () => FocusScope.of(context).nextFocus(),
         decoration: dec,
         validator: validator,
       );

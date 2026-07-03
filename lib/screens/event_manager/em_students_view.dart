@@ -294,40 +294,45 @@ class _ApplicationCard extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Assign Student'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Assigning ${assignment.student.name} to "${assignment.activity.title}"',
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontSize: 13,
-              ),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Assigning ${assignment.student.name} to "${assignment.activity.title}"',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Instructions (optional)',
+                  style: TextStyle(
+                      color: AppColors.ink,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: instrCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Please arrive by 8:30 AM...',
+                    filled: true,
+                    fillColor: const Color(0xFFF8F9FA),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            const Text(
-              'Instructions (optional)',
-              style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: instrCtrl,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'e.g. Please arrive by 8:30 AM...',
-                filled: true,
-                fillColor: const Color(0xFFF8F9FA),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
-              ),
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -514,12 +519,17 @@ class _AssignedCard extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Send Instructions'),
-        content: TextField(
-          controller: ctrl,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            hintText: 'Type instructions for this volunteer...',
-            border: OutlineInputBorder(),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+          child: SingleChildScrollView(
+            child: TextField(
+              controller: ctrl,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                hintText: 'Type instructions for this volunteer...',
+                border: OutlineInputBorder(),
+              ),
+            ),
           ),
         ),
         actions: [

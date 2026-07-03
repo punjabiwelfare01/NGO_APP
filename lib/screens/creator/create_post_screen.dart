@@ -172,6 +172,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 TextFormField(
                   controller: _titleCtrl,
                   decoration: _inputDecoration(hint: 'Post title'),
+                  textInputAction: TextInputAction.next,
+                  onEditingComplete: () => FocusScope.of(context).nextFocus(),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Title is required'
                       : null,

@@ -812,32 +812,40 @@ class _ApproveDialogState extends State<_ApproveDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Approve Certificate', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Optionally add signatory details that will appear on the certificate.',
-            style: TextStyle(color: AppColors.muted, fontSize: 12),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Optionally add signatory details that will appear on the certificate.',
+                style: TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _nameCtrl,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
+                decoration: const InputDecoration(
+                  labelText: 'Signatory Name (optional)',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _titleCtrl,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'Signatory Title (optional)',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _nameCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Signatory Name (optional)',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _titleCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Signatory Title (optional)',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
-          ),
-        ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
@@ -879,24 +887,29 @@ class _RejectDialogState extends State<_RejectDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'Provide a reason. The student will be notified.',
-            style: TextStyle(color: AppColors.muted, fontSize: 12),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Provide a reason. The student will be notified.',
+                style: TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _ctrl,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: 'Enter reason…',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _ctrl,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'Enter reason…',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
-          ),
-        ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
@@ -953,24 +966,29 @@ class _ImpactStoryDialogState extends State<_ImpactStoryDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Create Impact Story', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'An impact story draft will be created using the certificate data. Edit the summary below before publishing.',
-            style: TextStyle(color: AppColors.muted, fontSize: 12),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'An impact story draft will be created using the certificate data. Edit the summary below before publishing.',
+                style: TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _ctrl,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  hintText: 'Impact summary…',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _ctrl,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              hintText: 'Impact summary…',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
-          ),
-        ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),

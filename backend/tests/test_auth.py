@@ -241,6 +241,84 @@ class TestAuth:
         assert after.status_code == 401
 
 
+# ── government ID upload ─────────────────────────────────────────────────────
+#
+# Regression coverage for a bug where the registration flow's government-ID
+# upload silently failed for every user: the client always sent
+# "application/octet-stream" (browsers/file pickers rarely set a real MIME
+# type), and the endpoint rejected any content type outside an explicit
+# {pdf, jpeg, png} allow-list — so uploads 400'd every time and the admin
+# dashboard always showed "No government ID uploaded".
+
+class TestGovIdUpload:
+    def _use_local_storage(self, monkeypatch, tmp_path):
+        # Force the endpoint's local-disk fallback instead of a real SFTP
+        # upload, and keep the write inside a throwaway directory.
+        monkeypatch.setattr(settings, "hostinger_host", "")
+        monkeypatch.chdir(tmp_path)
+
+    def test_upload_with_octet_stream_content_type_succeeds(
+        self, client, db, student_user, student_headers, monkeypatch, tmp_path
+    ):
+        self._use_local_storage(monkeypatch, tmp_path)
+        resp = client.post(
+            "/auth/upload-gov-id",
+            headers=student_headers,
+            data={"id_type": "Aadhaar Card"},
+            files={"file": ("id.pdf", b"%PDF-1.4 fake", "application/octet-stream")},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["doc_url"]
+
+        db.refresh(student_user)
+        assert student_user.gov_id_type == "Aadhaar Card"
+        assert student_user.gov_id_doc_url is not None
+
+    def test_upload_with_no_content_type_succeeds(
+        self, client, db, student_user, student_headers, monkeypatch, tmp_path
+    ):
+        self._use_local_storage(monkeypatch, tmp_path)
+        resp = client.post(
+            "/auth/upload-gov-id",
+            headers=student_headers,
+            data={"id_type": "Voter ID"},
+            files={"file": ("id.jpg", b"\xff\xd8\xff fake-jpeg", "")},
+        )
+        assert resp.status_code == 200, resp.text
+        db.refresh(student_user)
+        assert student_user.gov_id_doc_url is not None
+
+    def test_upload_rejects_disallowed_extension(
+        self, client, student_headers, monkeypatch, tmp_path
+    ):
+        self._use_local_storage(monkeypatch, tmp_path)
+        resp = client.post(
+            "/auth/upload-gov-id",
+            headers=student_headers,
+            data={"id_type": "Aadhaar Card"},
+            files={"file": ("id.exe", b"not an id", "application/octet-stream")},
+        )
+        assert resp.status_code == 400
+
+    def test_uploaded_gov_id_visible_to_admin(
+        self, client, db, student_user, student_headers, admin_headers, monkeypatch, tmp_path
+    ):
+        self._use_local_storage(monkeypatch, tmp_path)
+        upload = client.post(
+            "/auth/upload-gov-id",
+            headers=student_headers,
+            data={"id_type": "Aadhaar Card"},
+            files={"file": ("id.png", b"\x89PNG fake", "application/octet-stream")},
+        )
+        assert upload.status_code == 200, upload.text
+
+        detail = client.get(f"/admin/users/{student_user.id}", headers=admin_headers)
+        assert detail.status_code == 200, detail.text
+        body = detail.json()
+        assert body["gov_id_doc_url"] is not None
+        assert body["gov_id_type"] == "Aadhaar Card"
+
+
 # ── role-based access ──────────────────────────────────────────────────────────
 
 class TestRoleAccess:

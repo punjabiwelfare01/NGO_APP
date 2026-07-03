@@ -284,6 +284,8 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _titleCtrl,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               decoration: _inputDeco('e.g. Introduction to Variables'),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Title is required' : null,
@@ -305,6 +307,8 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
               controller: _orderCtrl,
               decoration: _inputDeco('e.g. 1'),
               keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
             ),
             const SizedBox(height: 24),
 
@@ -319,6 +323,8 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _subjectCtrl,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () => FocusScope.of(context).nextFocus(),
                     decoration: _inputDeco('Subject, e.g. Mathematics'),
                     validator: (v) => v == null || v.trim().isEmpty
                         ? 'Subject is required'
@@ -329,6 +335,8 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _chapterCtrl,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () => FocusScope.of(context).nextFocus(),
                     decoration: _inputDeco('Chapter, e.g. Algebra'),
                     validator: (v) => v == null || v.trim().isEmpty
                         ? 'Chapter is required'
@@ -350,6 +358,8 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _videoUrlCtrl,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               decoration: _inputDeco('https://...'),
               keyboardType: TextInputType.url,
               onChanged: (_) => setState(() {}),
@@ -395,6 +405,8 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _pdfUrlCtrl,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               decoration: _inputDeco('https://… (direct PDF link)'),
               keyboardType: TextInputType.url,
               onChanged: (_) => setState(() {}),
@@ -404,6 +416,8 @@ class _CreateLessonScreenState extends State<CreateLessonScreen> {
             const SizedBox(height: 6),
             TextFormField(
               controller: _notesUrlCtrl,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
               decoration: _inputDeco('https://… (Google Docs, Notion, etc.)'),
               keyboardType: TextInputType.url,
               onChanged: (_) => setState(() {}),

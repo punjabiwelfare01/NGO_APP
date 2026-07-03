@@ -150,16 +150,20 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen> {
                     controller: _passwordCtrl,
                     obscureText: _obscurePassword,
                     enabled: !loading,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () => FocusScope.of(context).nextFocus(),
                     decoration: _inputDec('Password', Icons.lock_outline_rounded).copyWith(
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          color: AppColors.muted,
+                      suffixIcon: ExcludeFocus(
+                        child: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            color: AppColors.muted,
+                          ),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                         ),
-                        onPressed: () =>
-                            setState(() => _obscurePassword = !_obscurePassword),
                       ),
                     ),
                     validator: (v) {
@@ -175,16 +179,20 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen> {
                     controller: _confirmCtrl,
                     obscureText: _obscureConfirm,
                     enabled: !loading,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () => FocusScope.of(context).nextFocus(),
                     decoration: _inputDec('Confirm Password', Icons.lock_rounded).copyWith(
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirm
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          color: AppColors.muted,
+                      suffixIcon: ExcludeFocus(
+                        child: IconButton(
+                          icon: Icon(
+                            _obscureConfirm
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            color: AppColors.muted,
+                          ),
+                          onPressed: () =>
+                              setState(() => _obscureConfirm = !_obscureConfirm),
                         ),
-                        onPressed: () =>
-                            setState(() => _obscureConfirm = !_obscureConfirm),
                       ),
                     ),
                     validator: (v) {

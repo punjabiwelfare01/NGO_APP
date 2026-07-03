@@ -192,6 +192,9 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                   children: [
                     TextFormField(
                       controller: _title,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Quiz title',
                         prefixIcon: Icon(Icons.title_rounded),
@@ -212,6 +215,9 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _category,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         prefixIcon: Icon(Icons.category_rounded),
@@ -244,6 +250,9 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                           child: TextFormField(
                             controller: _xpReward,
                             keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.next,
+                            onEditingComplete: () =>
+                                FocusScope.of(context).nextFocus(),
                             decoration: const InputDecoration(
                               labelText: 'XP',
                               prefixIcon: Icon(Icons.star_rounded),
@@ -256,6 +265,9 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                           child: TextFormField(
                             controller: _timeLimit,
                             keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.next,
+                            onEditingComplete: () =>
+                                FocusScope.of(context).nextFocus(),
                             decoration: const InputDecoration(
                               labelText: 'Seconds',
                               prefixIcon: Icon(Icons.timer_rounded),
@@ -312,6 +324,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
                   onRemove: () => _removeQuestion(index),
                   requiredValidator: _required,
                   numberValidator: _positiveInt,
+                  isLastQuestion: index == _questions.length - 1,
                 ),
               ),
               FilledButton.icon(
@@ -340,6 +353,7 @@ class _QuestionEditor extends StatelessWidget {
     required this.onRemove,
     required this.requiredValidator,
     required this.numberValidator,
+    required this.isLastQuestion,
   });
 
   final int index;
@@ -348,6 +362,7 @@ class _QuestionEditor extends StatelessWidget {
   final VoidCallback onRemove;
   final FormFieldValidator<String> requiredValidator;
   final FormFieldValidator<String> numberValidator;
+  final bool isLastQuestion;
 
   @override
   Widget build(BuildContext context) {
@@ -391,6 +406,9 @@ class _QuestionEditor extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: TextFormField(
                 controller: draft.options[optionIndex],
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () =>
+                    FocusScope.of(context).nextFocus(),
                 decoration: InputDecoration(
                   labelText: 'Option ${optionIndex + 1}',
                   prefixIcon: const Icon(Icons.list_alt_rounded),
@@ -415,6 +433,11 @@ class _QuestionEditor extends StatelessWidget {
           TextFormField(
             controller: draft.points,
             keyboardType: TextInputType.number,
+            textInputAction:
+                isLastQuestion ? TextInputAction.done : TextInputAction.next,
+            onEditingComplete: isLastQuestion
+                ? null
+                : () => FocusScope.of(context).nextFocus(),
             decoration: const InputDecoration(
               labelText: 'Points',
               prefixIcon: Icon(Icons.control_point_rounded),

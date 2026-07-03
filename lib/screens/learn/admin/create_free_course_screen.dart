@@ -368,6 +368,8 @@ class _CreateFreeCourseScreenState extends State<CreateFreeCourseScreen> {
               Expanded(
                 child: TextFormField(
                   controller: subject.name,
+                  textInputAction: TextInputAction.next,
+                  onEditingComplete: () => FocusScope.of(context).nextFocus(),
                   validator: (v) => v == null || v.trim().isEmpty
                       ? 'Subject name required'
                       : null,
@@ -397,6 +399,16 @@ class _CreateFreeCourseScreenState extends State<CreateFreeCourseScreen> {
                   Expanded(
                     child: TextField(
                       controller: subject.chapters[j],
+                      textInputAction:
+                          (index == _subjects.length - 1 &&
+                              j == subject.chapters.length - 1)
+                          ? TextInputAction.done
+                          : TextInputAction.next,
+                      onEditingComplete:
+                          (index == _subjects.length - 1 &&
+                              j == subject.chapters.length - 1)
+                          ? null
+                          : () => FocusScope.of(context).nextFocus(),
                       decoration: InputDecoration(
                         labelText: 'Chapter ${j + 1}',
                         hintText: 'e.g. Algebra',
@@ -438,6 +450,10 @@ class _CreateFreeCourseScreenState extends State<CreateFreeCourseScreen> {
     child: TextFormField(
       controller: controller,
       maxLines: lines,
+      textInputAction: lines <= 1 ? TextInputAction.next : null,
+      onEditingComplete: lines <= 1
+          ? () => FocusScope.of(context).nextFocus()
+          : null,
       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
       decoration: InputDecoration(
         labelText: label,

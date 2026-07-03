@@ -197,6 +197,8 @@ class _EMEditActivityScreenState extends State<EMEditActivityScreen> {
               icon: Icons.title_rounded,
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
             ),
             const SizedBox(height: 12),
             _field(
@@ -232,6 +234,8 @@ class _EMEditActivityScreenState extends State<EMEditActivityScreen> {
               controller: _location,
               label: 'Location',
               icon: Icons.place_rounded,
+              textInputAction: TextInputAction.next,
+              onEditingComplete: () => FocusScope.of(context).nextFocus(),
             ),
             const SizedBox(height: 12),
             Row(
@@ -280,6 +284,9 @@ class _EMEditActivityScreenState extends State<EMEditActivityScreen> {
                     label: 'Reward Hours',
                     icon: Icons.access_time_rounded,
                     keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    onEditingComplete: () =>
+                        FocusScope.of(context).nextFocus(),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -345,12 +352,16 @@ class _EMEditActivityScreenState extends State<EMEditActivityScreen> {
     int maxLines = 1,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    TextInputAction? textInputAction,
+    VoidCallback? onEditingComplete,
   }) =>
       TextFormField(
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
         validator: validator,
+        textInputAction: textInputAction,
+        onEditingComplete: onEditingComplete,
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon, size: 18),

@@ -1927,7 +1927,8 @@ class _SheetField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: const Color(0xFF4A587C)),
-        suffixIcon: suffixIcon,
+        suffixIcon:
+            suffixIcon == null ? null : ExcludeFocus(child: suffixIcon!),
         filled: true,
         fillColor: enabled ? const Color(0xFFF7FAFF) : const Color(0xFFF0F0F0),
         border: OutlineInputBorder(

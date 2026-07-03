@@ -432,6 +432,8 @@ class _ContactFormSheetState extends State<_ContactFormSheet> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _name,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(
                   labelText: 'Contact Name *',
                   hintText: 'e.g. Child Helpline, Mental Health Support',
@@ -445,6 +447,8 @@ class _ContactFormSheetState extends State<_ContactFormSheet> {
               TextFormField(
                 controller: _phone,
                 keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(
                   labelText: 'Phone Number *',
                   hintText: 'e.g. 1098, +91 98765 43210',

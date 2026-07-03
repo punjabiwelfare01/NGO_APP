@@ -37,6 +37,9 @@ class RulesStep extends StatelessWidget {
                   Expanded(
                     child: TextFormField(
                       initialValue: vm.ageMin != null ? '${vm.ageMin}' : '',
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Min Age *',
                         border: OutlineInputBorder(),
@@ -49,6 +52,9 @@ class RulesStep extends StatelessWidget {
                   Expanded(
                     child: TextFormField(
                       initialValue: vm.ageMax != null ? '${vm.ageMax}' : '',
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Max Age *',
                         border: OutlineInputBorder(),
@@ -72,6 +78,8 @@ class RulesStep extends StatelessWidget {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 onChanged: (v) => vm.setMinQuizScore(double.tryParse(v)),
               ),
               const SizedBox(height: 16),
@@ -82,6 +90,8 @@ class RulesStep extends StatelessWidget {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 onChanged: (v) =>
                     vm.setRequiredChallenges(int.tryParse(v) ?? 0),
               ),

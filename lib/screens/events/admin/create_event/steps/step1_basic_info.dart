@@ -45,6 +45,9 @@ class BasicInfoStep extends StatelessWidget {
               const SizedBox(height: 20),
               TextFormField(
                 initialValue: vm.title,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () =>
+                    FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(
                   labelText: 'Event Title *',
                   border: OutlineInputBorder(),
@@ -54,6 +57,9 @@ class BasicInfoStep extends StatelessWidget {
               const SizedBox(height: 16),
               TextFormField(
                 initialValue: vm.subtitle,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () =>
+                    FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(
                   labelText: 'Subtitle',
                   border: OutlineInputBorder(),

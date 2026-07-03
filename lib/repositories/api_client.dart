@@ -1,10 +1,22 @@
 import 'dart:convert';
 import 'package:dio/dio.dart' as dio_pkg;
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
 
 import '../app_state.dart';
 import '../core/config.dart';
 import '../utils/logger.dart';
+
+/// Best-effort MIME type lookup from a filename, falling back to a generic
+/// binary type when the extension is unrecognized (e.g. no extension).
+/// Servers that whitelist specific content types (PDF/JPEG/PNG uploads)
+/// need this — without it, `http.MultipartFile` defaults to
+/// `application/octet-stream`, which such whitelists reject outright.
+MediaType _mediaTypeFor(String fileName) {
+  final mimeType = lookupMimeType(fileName) ?? 'application/octet-stream';
+  return MediaType.parse(mimeType);
+}
 
 class ApiClient {
   const ApiClient._();
@@ -107,7 +119,12 @@ class ApiClient {
     request.headers['ngrok-skip-browser-warning'] = 'true';
     request.fields.addAll(fields);
     request.files.add(
-      http.MultipartFile.fromBytes(fileField, fileBytes, filename: fileName),
+      http.MultipartFile.fromBytes(
+        fileField,
+        fileBytes,
+        filename: fileName,
+        contentType: _mediaTypeFor(fileName),
+      ),
     );
     final streamed = await request.send().timeout(timeout ?? AppConfig.apiTimeout);
     final res = await http.Response.fromStream(streamed);
@@ -136,7 +153,12 @@ class ApiClient {
     request.headers['ngrok-skip-browser-warning'] = 'true';
     request.fields.addAll(fields);
     request.files.add(
-      await http.MultipartFile.fromPath(fileField, filePath, filename: fileName),
+      await http.MultipartFile.fromPath(
+        fileField,
+        filePath,
+        filename: fileName,
+        contentType: _mediaTypeFor(fileName),
+      ),
     );
     final streamed = await request.send().timeout(timeout ?? AppConfig.apiTimeout);
     final res = await http.Response.fromStream(streamed);

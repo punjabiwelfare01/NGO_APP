@@ -370,6 +370,8 @@ class _MentorFormSheetState extends State<_MentorFormSheet> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _name,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(
                     labelText: 'Display Name *', border: OutlineInputBorder()),
                 validator: (v) => (v?.trim().isEmpty ?? true) ? 'Required' : null,
@@ -377,6 +379,8 @@ class _MentorFormSheetState extends State<_MentorFormSheet> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _expertise,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(
                     labelText: 'Expertise (e.g. Career, Mental Health)',
                     border: OutlineInputBorder()),

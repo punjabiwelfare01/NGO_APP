@@ -261,14 +261,14 @@ class _Step1BasicInfo extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
         _FieldLabel('Event Title *'),
-        _input(titleCtrl, 'e.g. Stationery Drive — Patiala', onChanged: onChanged),
+        _input(context, titleCtrl, 'e.g. Stationery Drive — Patiala', onChanged: onChanged),
         const SizedBox(height: 14),
         _FieldLabel('Category *'),
         const SizedBox(height: 6),
         _CategorySelector(value: category, onChanged: onCategoryChanged),
         const SizedBox(height: 14),
         _FieldLabel('Description'),
-        _input(descCtrl, 'Describe the event, goals and expected outcomes…', maxLines: 4),
+        _input(context, descCtrl, 'Describe the event, goals and expected outcomes…', maxLines: 4),
         const SizedBox(height: 14),
         _FieldLabel('Event Date *'),
         const SizedBox(height: 6),
@@ -285,18 +285,23 @@ class _Step1BasicInfo extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _FieldLabel(isOnline ? 'Meeting Link' : 'Location / Venue *'),
-        _input(locationCtrl, isOnline ? 'https://meet.google.com/…' : 'School name, city', onChanged: onChanged),
+        _input(context, locationCtrl, isOnline ? 'https://meet.google.com/…' : 'School name, city', onChanged: onChanged),
         const SizedBox(height: 14),
         _FieldLabel('Partner School (optional)'),
-        _input(partnerSchoolCtrl, 'School name if this is a school partnership event'),
+        _input(context, partnerSchoolCtrl, 'School name if this is a school partnership event', isLast: true),
       ],
     );
   }
 
-  Widget _input(TextEditingController ctrl, String hint, {int maxLines = 1, VoidCallback? onChanged}) {
+  Widget _input(BuildContext context, TextEditingController ctrl, String hint,
+      {int maxLines = 1, VoidCallback? onChanged, bool isLast = false}) {
+    final chainNext = maxLines == 1 && !isLast;
     return TextField(
       controller: ctrl,
       maxLines: maxLines,
+      textInputAction: chainNext ? TextInputAction.next : null,
+      onEditingComplete:
+          chainNext ? () => FocusScope.of(context).nextFocus() : null,
       onChanged: onChanged != null ? (_) => onChanged() : null,
       decoration: InputDecoration(
         hintText: hint,
@@ -427,6 +432,9 @@ class _Step2VolunteerSetup extends StatelessWidget {
                       Expanded(
                         child: TextField(
                           keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.next,
+                          onEditingComplete: () =>
+                              FocusScope.of(context).nextFocus(),
                           onChanged: (v) => onStipendAmountChanged(double.tryParse(v) ?? 0),
                           decoration: InputDecoration(
                             hintText: 'Stipend amount per volunteer',

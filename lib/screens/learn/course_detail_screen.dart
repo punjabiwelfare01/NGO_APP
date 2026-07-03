@@ -1144,6 +1144,9 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
                       Expanded(
                         child: TextField(
                           controller: entry.value,
+                          textInputAction: TextInputAction.next,
+                          onEditingComplete: () =>
+                              FocusScope.of(context).nextFocus(),
                           decoration: _fieldDecoration('Item ${entry.key + 1}'),
                         ),
                       ),
@@ -1179,6 +1182,9 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
                       Expanded(
                         child: TextField(
                           controller: entry.value,
+                          textInputAction: TextInputAction.next,
+                          onEditingComplete: () =>
+                              FocusScope.of(context).nextFocus(),
                           decoration: _fieldDecoration(
                             'Skill ${entry.key + 1}',
                           ),
@@ -1223,6 +1229,9 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
                     child: TextField(
                       controller: _offerPriceController,
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: _fieldDecoration('Offer price (₹)'),
                     ),
                   ),
@@ -1231,6 +1240,9 @@ class _EditSalesInfoDialogState extends State<_EditSalesInfoDialog> {
                     child: TextField(
                       controller: _originalPriceController,
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      onEditingComplete: () =>
+                          FocusScope.of(context).nextFocus(),
                       decoration: _fieldDecoration('Original price (₹)'),
                     ),
                   ),

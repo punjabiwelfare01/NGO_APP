@@ -657,6 +657,8 @@ class _CreateSlotSheetState extends State<_CreateSlotSheet> {
               // Topic
               TextFormField(
                 controller: _topic,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(
                   labelText: 'Session Topic (optional)',
                   hintText: 'e.g. Career Guidance, Mental Wellness',
@@ -732,6 +734,8 @@ class _CreateSlotSheetState extends State<_CreateSlotSheet> {
               TextFormField(
                 controller: _capacityController,
                 keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(
                   labelText: 'Capacity (max students)',
                   hintText: '1 – 100',

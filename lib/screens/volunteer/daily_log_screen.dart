@@ -39,9 +39,15 @@ class _DailyLogScreenState extends State<DailyLogScreen> {
           return Column(
             children: [
               if (_showForm)
-                _LogEntryForm(
-                  onSaved: () => setState(() => _showForm = false),
-                  vm: widget.vm,
+                Flexible(
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: _LogEntryForm(
+                      onSaved: () => setState(() => _showForm = false),
+                      vm: widget.vm,
+                    ),
+                  ),
                 ),
               Expanded(
                 child: widget.vm.logs.isEmpty
@@ -182,6 +188,8 @@ class _LogEntryFormState extends State<_LogEntryForm> {
           const SizedBox(height: 10),
           TextField(
             controller: _titleCtrl,
+            textInputAction: TextInputAction.next,
+            onEditingComplete: () => FocusScope.of(context).nextFocus(),
             decoration: _inputDeco('Log title (optional)'),
           ),
           const SizedBox(height: 10),

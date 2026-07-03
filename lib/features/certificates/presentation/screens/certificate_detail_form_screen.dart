@@ -512,6 +512,8 @@ class _CertificateDetailFormScreenState
         controller: ctrl,
         keyboardType: inputType,
         inputFormatters: inputFormatters,
+        textInputAction: TextInputAction.next,
+        onEditingComplete: () => FocusScope.of(context).nextFocus(),
         decoration: _dec(label, hint: hint),
         validator: required
             ? (v) => (v == null || v.trim().isEmpty) ? '$label is required' : null

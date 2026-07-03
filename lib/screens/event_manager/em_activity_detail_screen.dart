@@ -118,12 +118,17 @@ class _EMActivityDetailScreenState extends State<EMActivityDetailScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Add Remarks'),
-        content: TextField(
-          controller: ctrl,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Reason for rejection / correction needed...',
-            border: OutlineInputBorder(),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+          child: SingleChildScrollView(
+            child: TextField(
+              controller: ctrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Reason for rejection / correction needed...',
+                border: OutlineInputBorder(),
+              ),
+            ),
           ),
         ),
         actions: [
