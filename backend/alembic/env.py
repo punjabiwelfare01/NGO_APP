@@ -15,7 +15,9 @@ from app.database import Base
 import app.models  # noqa: F401 — side-effect import registers ORM models
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# configparser treats % as interpolation syntax — escape it so URL-encoded
+# characters in passwords (e.g. %40 for @) survive the round-trip.
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

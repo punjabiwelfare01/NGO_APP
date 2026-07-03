@@ -27,7 +27,27 @@ except Exception as ex:
 done
 
 echo "==> Running database migrations..."
-alembic upgrade head
+# Migration 001 is an empty baseline that assumes the schema was bootstrapped
+# by Base.metadata.create_all(). On a fresh database (no users table) we must
+# create the schema first and stamp head; otherwise the incremental
+# migrations reference tables that don't exist yet.
+DB_STATE=$(python -c "
+from sqlalchemy import inspect
+from app.database import engine
+print('fresh' if not inspect(engine).has_table('users') else 'existing')
+")
+if [ "$DB_STATE" = "fresh" ]; then
+    echo "==> Fresh database detected — creating full schema and stamping baseline..."
+    python -c "
+from app.database import Base, engine
+import app.models  # noqa: F401 — registers all ORM models
+Base.metadata.create_all(bind=engine)
+print('Schema created.')
+"
+    alembic stamp head
+else
+    alembic upgrade head
+fi
 
 echo "==> Starting CareSkill API..."
 # Railway injects $PORT at runtime and routes to whatever port the process binds —
