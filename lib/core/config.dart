@@ -60,7 +60,7 @@ class AppConfig {
   static const String testBackendUrl =
       'https://streak-pogo-bonded.ngrok-free.dev';
   static const String productionBackendUrl =
-      'https://streak-pogo-bonded.ngrok-free.dev';
+      'https://ngoapp-production.up.railway.app';
 
   /// Resolved API base URL.
   ///
