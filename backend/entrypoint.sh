@@ -52,9 +52,11 @@ fi
 echo "==> Starting CareSkill API..."
 # Railway injects $PORT at runtime and routes to whatever port the process binds —
 # a hardcoded port here would silently break the platform's health checks.
+# Locally $PORT is unset, so this runs on 8000 as expected.
+# Note: --reload is mutually exclusive with --workers, so workers are omitted.
 exec uvicorn app.main:app \
+    --reload \
     --host 0.0.0.0 \
     --port "${PORT:-8000}" \
-    --workers "${WEB_CONCURRENCY:-1}" \
     --proxy-headers \
     --forwarded-allow-ips='*'
