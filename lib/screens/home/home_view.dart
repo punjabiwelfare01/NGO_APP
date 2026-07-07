@@ -472,7 +472,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
               const SectionHeader(title: 'My Assignments'),
               _NGOAssignmentsSection(
                 assignments: _volunteerVm?.assignments
-                    .where((a) => !['completed', 'certificate_generated', 'rejected'].contains(a.status))
+                    .where((a) => !['completed', 'certificate_generated', 'admin_approved', 'rejected'].contains(a.status))
                     .toList() ?? const [],
                 vm: _volunteerVm,
                 isLoading: _volunteerVm?.state == VolunteerLoadState.loading,

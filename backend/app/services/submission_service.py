@@ -67,9 +67,14 @@ def _resolve_assignment(
             ActivityAssignment.student_id == student_id,
             ActivityAssignment.activity_id == activity_id,
         )
+        .order_by(ActivityAssignment.created_at.desc())
         .first()
     )
-    if assignment:
+    # A locked assignment represents a finished, already-certified cycle —
+    # start a fresh one instead of permanently blocking further
+    # participation in a recurring activity (e.g. a volunteer who tutors
+    # the same activity again after their first round was certified).
+    if assignment and assignment.status not in _LOCKED_ASSIGNMENT_STATUSES:
         return assignment
 
     assignment = ActivityAssignment(student_id=student_id, activity_id=activity_id, status="assigned")

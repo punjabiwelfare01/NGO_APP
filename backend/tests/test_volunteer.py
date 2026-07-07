@@ -114,6 +114,26 @@ class TestWorkSubmissions:
         assert resp.status_code == 200
         assert len(resp.json()) == 1
 
+    def test_can_submit_new_work_after_previous_round_was_approved(
+        self, client, admin_headers, student_headers,
+    ):
+        # A volunteer doing the same recurring activity again after an
+        # earlier round was already approved must not be permanently
+        # blocked with a 409 — a fresh assignment cycle should start
+        # instead of reusing the now-locked one.
+        activity = self._create_activity(client, admin_headers)
+        first = self._submit_work(client, student_headers, activity["id"]).json()
+        client.patch(
+            f"/volunteer/submissions/{first['id']}/review",
+            json={"status": "approved"},
+            headers=admin_headers,
+        )
+
+        second = self._submit_work(client, student_headers, activity["id"], title="Second round of cleanup")
+        assert second.status_code == 201, second.text
+        assert second.json()["id"] != first["id"]
+        assert second.json()["status"] == "submitted"
+
 
 class TestReviewerRouting:
     """review_target (Phase 3): submissions on an admin-created activity
