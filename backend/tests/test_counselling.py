@@ -84,7 +84,15 @@ class TestExtendedProfile:
             assert field in body2, f"expected {field} in extended profile response"
         assert body2["verification_status"] == "pending"
 
-    def test_upload_verification_doc_then_visible_via_extended_profile(self, client, mentor_headers):
+    def test_upload_verification_doc_then_visible_via_extended_profile(
+        self, client, mentor_headers, monkeypatch, tmp_path
+    ):
+        # Force the local-disk fallback instead of a real Hostinger SFTP
+        # upload, and keep the write inside a throwaway directory.
+        from app.config import settings
+        monkeypatch.setattr(settings, "hostinger_host", "")
+        monkeypatch.chdir(tmp_path)
+
         client.patch("/counselling/mentors/me/extended", json={"qualification": "MSc"}, headers=mentor_headers)
         resp = client.post(
             "/counsellor/upload-verification-doc",

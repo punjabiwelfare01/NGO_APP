@@ -27,6 +27,12 @@ class AppConfig {
   );
   static const Duration apiTimeout = Duration(seconds: 10);
 
+  // File uploads (images/documents) go through an SFTP hop to Hostinger on
+  // the backend — the connect+auth handshake alone regularly takes several
+  // seconds, on top of the actual transfer, so the plain 10s apiTimeout is
+  // too short and causes spurious client-side timeouts on real uploads.
+  static const Duration uploadTimeout = Duration(seconds: 45);
+
   // Large video files (100 MB+) can take many minutes over mobile connections.
   // 30 min allows ~155 MB even at a slow 700 kbps upload rate.
   static const Duration videoUploadTimeout = Duration(minutes: 30);

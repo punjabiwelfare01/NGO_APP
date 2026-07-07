@@ -126,7 +126,7 @@ class ApiClient {
         contentType: _mediaTypeFor(fileName),
       ),
     );
-    final streamed = await request.send().timeout(timeout ?? AppConfig.apiTimeout);
+    final streamed = await request.send().timeout(timeout ?? AppConfig.uploadTimeout);
     final res = await http.Response.fromStream(streamed);
     AppLogger.response(res.statusCode, path);
     _check(res);
@@ -160,7 +160,7 @@ class ApiClient {
         contentType: _mediaTypeFor(fileName),
       ),
     );
-    final streamed = await request.send().timeout(timeout ?? AppConfig.apiTimeout);
+    final streamed = await request.send().timeout(timeout ?? AppConfig.uploadTimeout);
     final res = await http.Response.fromStream(streamed);
     AppLogger.response(res.statusCode, path);
     _check(res);

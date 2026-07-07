@@ -25,9 +25,18 @@ import aiofiles
 from fastapi import HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
+from ..config import settings
 from . import storage_service
 
 DEFAULT_MAX_SIZE = 20 * 1024 * 1024  # 20 MB
+
+# Local fallback root — only used when Hostinger isn't configured (e.g. the
+# test suite, which monkeypatches settings.hostinger_host to "" to avoid
+# hitting real external storage). In any real deployment this branch never
+# runs, so it doesn't reintroduce the ephemeral-disk bug for production.
+# Deliberately relative to the CWD (not __file__) so tests can redirect it
+# into a throwaway tmp_path via monkeypatch.chdir().
+_LOCAL_FALLBACK_DIRNAME = "uploads"
 
 
 async def upload_to_hostinger(
@@ -38,7 +47,8 @@ async def upload_to_hostinger(
     max_size: int = DEFAULT_MAX_SIZE,
 ) -> str:
     """Streams `file` to Hostinger's <upload_root>/<subdir>/ and returns its
-    public URL."""
+    public URL. Falls back to local disk only if Hostinger isn't configured
+    at all (see _LOCAL_FALLBACK_ROOT)."""
     ext = pathlib.Path(file.filename or "").suffix.lower()
     if ext not in allowed_extensions:
         raise HTTPException(
@@ -63,6 +73,16 @@ async def upload_to_hostinger(
                         detail=f"File too large. Maximum {max_size // (1024 * 1024)} MB allowed.",
                     )
                 await out.write(chunk)
+
+        if not (settings.hostinger_host and settings.hostinger_username):
+            dest_dir = pathlib.Path(_LOCAL_FALLBACK_DIRNAME) / subdir
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / filename
+            async with aiofiles.open(local_path, "rb") as src:
+                content = await src.read()
+            async with aiofiles.open(dest, "wb") as out:
+                await out.write(content)
+            return f"/uploads/{subdir}/{filename}"
 
         try:
             await run_in_threadpool(storage_service.upload_local_file, local_path, subdir, filename)
