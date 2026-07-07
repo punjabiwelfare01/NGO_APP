@@ -816,8 +816,7 @@ class _GovIdDocumentCard extends StatelessWidget {
   final String? idType;
 
   Future<void> _open() async {
-    final fullUrl = '${ApiClient.baseUrl}$docUrl';
-    final uri = Uri.parse(fullUrl);
+    final uri = Uri.parse(ApiClient.resolveUrl(docUrl));
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
