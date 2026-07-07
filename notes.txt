@@ -190,3 +190,92 @@ currently their is no delete post  is present in admin role or event manager
 
 
 
+
+
+
+
+
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+Debug service listening on ws://127.0.0.1:45123/0-cwAscxyxc=/ws
+A Dart VM Service on Chrome is available at: http://127.0.0.1:45123/0-cwAscxyxc=
+The Flutter DevTools debugger and profiler on Chrome is available at: http://127.0.0.1:45123/0-cwAscxyxc=/devtools/?uri=ws://127.0.0.1:45123/0-cwAscxyxc=/ws
+Starting application from main method in: org-dartlang-app:/web_entrypoint.dart.
+23:28:52.056 [DEBUG] HTTP: → POST /auth/login
+23:28:55.109 [ERROR] HTTP: ← 401 /auth/login
+23:28:55.110 [ERROR] HTTP: API error 401
+  ↳ {"detail":"Invalid credentials"}
+23:29:15.518 [DEBUG] HTTP: → POST /auth/login
+23:29:16.720 [ERROR] HTTP: ← 401 /auth/login
+23:29:16.721 [ERROR] HTTP: API error 401
+  ↳ {"detail":"Invalid credentials"}
+23:29:30.903 [DEBUG] HTTP: → POST /auth/login
+23:29:32.593 [DEBUG] HTTP: ← 200 /auth/login
+23:29:32.637 [DEBUG] HTTP: → GET /counselling/mentors
+23:29:32.639 [DEBUG] HTTP: → GET /school/my-requests
+23:29:32.642 [DEBUG] HTTP: → GET /school/profile
+23:29:32.644 [DEBUG] HTTP: → GET /school/my-stats
+23:29:32.646 [DEBUG] HTTP: → GET /admin/settings/ngo-profile/public
+23:29:32.779 [DEBUG] HTTP: → GET /impact/posts?status=published
+23:29:32.782 [DEBUG] HTTP: → GET /impact/metrics
+23:29:33.761 [DEBUG] HTTP: ← 200 /school/profile
+23:29:33.765 [DEBUG] HTTP: ← 200 /admin/settings/ngo-profile/public
+23:29:33.767 [DEBUG] HTTP: ← 200 /impact/posts?status=published
+23:29:33.947 [DEBUG] HTTP: ← 200 /impact/metrics
+23:29:34.204 [DEBUG] HTTP: ← 200 /counselling/mentors
+23:29:34.722 [DEBUG] HTTP: ← 200 /school/my-requests
+23:29:35.039 [DEBUG] HTTP: ← 200 /school/my-stats
+══╡ EXCEPTION CAUGHT BY IMAGE RESOURCE SERVICE ╞════════════════════════════════════════════════════
+The following ImageCodecException was thrown resolving an image stream completer:
+Failed to detect image file format using the file header.
+File header was [0x3c 0x21 0x44 0x4f 0x43 0x54 0x59 0x50 0x45 0x20].
+Image source: encoded image bytes
+
+When the exception was thrown, this was the stack:
+dart-sdk/lib/_internal/js_dev_runtime/private/ddc_runtime/errors.dart 274:3       throw_
+lib/_engine/engine/canvaskit/image.dart 619:5                                     tryDetectImageType
+lib/_engine/engine/canvaskit/image.dart 19:31                                     <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 623:19               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 648:23               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 542:3                _asyncStartSync
+lib/_engine/engine/canvaskit/image.dart 10:18                                     skiaInstantiateImageCodec
+lib/_engine/engine/canvaskit/renderer.dart 198:15                                 <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 623:19               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 648:23               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 542:3                _asyncStartSync
+lib/_engine/engine/canvaskit/renderer.dart 193:20                                 instantiateImageCodec
+lib/ui/painting.dart 664:30                                                       <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 623:19               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 648:23               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 542:3                _asyncStartSync
+lib/ui/painting.dart 656:15                                                       instantiateImageCodecWithSize
+package:flutter/src/painting/binding.dart 147:15                                  instantiateImageCodecWithSize
+dart-sdk/lib/_internal/js_dev_runtime/private/ddc_runtime/operations.dart 118:77  tear
+package:flutter/src/painting/_network_image_web.dart 238:18                       <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 623:19               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 648:23               <fn>
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 594:19               <fn>
+dart-sdk/lib/async/zone.dart 962:54                                               runUnary
+dart-sdk/lib/async/future_impl.dart 222:18                                        handleValue
+dart-sdk/lib/async/future_impl.dart 948:44                                        handleValueCallback
+dart-sdk/lib/async/future_impl.dart 977:13                                        _propagateToListeners
+dart-sdk/lib/async/future_impl.dart 720:5                                         [_completeWithValue]
+dart-sdk/lib/async/future_impl.dart 804:7                                         <fn>
+dart-sdk/lib/async/schedule_microtask.dart 40:34                                  _microtaskLoop
+dart-sdk/lib/async/schedule_microtask.dart 49:5                                   _startMicrotaskLoop
+dart-sdk/lib/_internal/js_dev_runtime/private/ddc_runtime/operations.dart 118:77  tear
+dart-sdk/lib/_internal/js_dev_runtime/patch/async_patch.dart 188:69               <fn>
+
+Image provider: NetworkImage("/uploads/profile_photos/301a5b41-b39e-45e6-8bd8-0a626d4ae251.jpg",
+  scale: 1.0, webHtmlElementStrategy: never, headers: null)
+Image key: NetworkImage("/uploads/profile_photos/301a5b41-b39e-45e6-8bd8-0a626d4ae251.jpg", scale:
+  1.0, webHtmlElementStrategy: never, headers: null)
+════════════════════════════════════════════════════════════════════════════════════════════════════
+Another exception was thrown: ImageCodecException: Failed to detect image file format using the file header.
+Another exception was thrown: HTTP request failed, statusCode: 404, http://192.168.1.41:8000/uploads/profile_photos/301a5b41-b39e-45e6-8bd8-0a626d4ae251.jpg

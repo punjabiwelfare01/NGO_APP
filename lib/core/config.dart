@@ -41,7 +41,7 @@ class AppConfig {
   ///   `same-host`  -> Flutter Web host with port 8000
   ///   `test`       -> test/staging backend
   ///   `prod`       -> production backend
-  static const String _defaultBackendEnvironment = 'local';
+  static const String _defaultBackendEnvironment = 'prod';
 
   // ── Runtime override (preferred) ─────────────────────────────────────────
   // Pass at launch instead of editing this file:
