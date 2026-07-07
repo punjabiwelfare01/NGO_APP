@@ -5,7 +5,6 @@ import 'core/colors.dart';
 import 'core/config.dart';
 import 'models/auth_models.dart';
 import 'models/skill_category.dart';
-import 'repositories/auth0_strategy.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/api_client.dart';
 import 'screens/admin/pending_approvals_screen.dart';
@@ -33,8 +32,6 @@ import 'screens/school_portal/school_partner_portal_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initializes the Auth0 JS client on web (no-op on Android/iOS).
-  await initAuth0(AppConfig.auth0Domain, AppConfig.auth0ClientId);
   AppState.restore();
   // Reconcile the cached role with the backend before choosing a dashboard.
   // Admin approval may have changed a provisional student into a counsellor.
@@ -56,21 +53,6 @@ void main() async {
       // A temporary network outage should not destroy a valid saved session.
     }
   }
-  // Web only: if Auth0 just redirected back with a code, exchange it now.
-  // On Android/iOS this always returns null (login completes in loginWithAuth0).
-  try {
-    final result = await AuthRepository.handleAuth0RedirectCallback();
-    if (result != null) {
-      AppState.setFromLogin(
-        result.userId,
-        result.accessToken,
-        UserRole.fromString(result.role),
-      );
-    }
-  } catch (_) {
-    // Ignore — user will see the login screen and can retry.
-  }
-
   runApp(const PunjabiWelfareApp());
 }
 

@@ -54,12 +54,6 @@ class Settings:
         "GOOGLE_REDIRECT_URI", f"{_default_public_url}/auth/google/callback"
     )
 
-    # Auth0 — set AUTH0_DOMAIN and AUTH0_CLIENT_ID in .env
-    # Domain:    your Auth0 tenant, e.g. dev-abc123.us.auth0.com
-    # Client ID: the Client ID of your Auth0 Native application
-    auth0_domain: str = os.getenv("AUTH0_DOMAIN", "")
-    auth0_client_id: str = os.getenv("AUTH0_CLIENT_ID", "")
-
     # Private password-reset delivery. Configure these in production.
     smtp_host: str = os.getenv("SMTP_HOST", "")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))

@@ -1,8 +1,6 @@
-import '../core/config.dart';
 import '../models/auth_models.dart';
 import '../models/api_models.dart';
 import 'api_client.dart';
-import 'auth0_strategy.dart';
 
 class AuthRepository {
   const AuthRepository._();
@@ -152,40 +150,4 @@ class AuthRepository {
     } catch (_) {}
   }
 
-  // ── Auth0 ─────────────────────────────────────────────────────────────────
-
-  /// Web: called at startup by main() to exchange the redirect callback token.
-  /// Android: always returns null (login completes inside loginWithAuth0).
-  static Future<TokenResponse?> handleAuth0RedirectCallback() async {
-    final idToken = getRedirectIdToken();
-    if (idToken == null) return null;
-    final json =
-        await ApiClient.post('/auth/auth0', {'id_token': idToken})
-            as Map<String, dynamic>;
-    return TokenResponse.fromJson(json);
-  }
-
-  /// Initiates Auth0 login.
-  /// - Web: redirects the whole page to Auth0 (this future never resolves on web).
-  ///   The completed login is handled by handleAuth0RedirectCallback() in main().
-  /// - Android/iOS: opens Chrome Custom Tabs and returns a CareSkill JWT.
-  static Future<TokenResponse?> loginWithAuth0() async {
-    final idToken = await performAuth0Login(
-      AppConfig.auth0Domain,
-      AppConfig.auth0ClientId,
-      AppConfig.auth0CallbackScheme,
-    );
-    final json =
-        await ApiClient.post('/auth/auth0', {'id_token': idToken})
-            as Map<String, dynamic>;
-    return TokenResponse.fromJson(json);
-  }
-
-  static Future<void> auth0Logout() async {
-    await performAuth0Logout(
-      AppConfig.auth0Domain,
-      AppConfig.auth0ClientId,
-      AppConfig.auth0CallbackScheme,
-    );
-  }
 }

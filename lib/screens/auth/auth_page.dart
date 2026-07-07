@@ -334,7 +334,7 @@ class _TabToggle extends StatelessWidget {
         children: [
           Expanded(
             child: _ToggleBtn(
-              label: 'Sign In',
+              label: 'Login',
               icon: Icons.login_rounded,
               selected: selectedTab == 0,
               onTap: () => onSwitch(0),
@@ -477,16 +477,6 @@ class _SignInFormState extends State<_SignInForm> {
     }
   }
 
-  Future<void> _auth0SignIn() async {
-    setState(() {
-      _statusMessage = null;
-      _statusKind = null;
-    });
-    final status = await _vm.loginWithAuth0();
-    if (!mounted || status == null) return;
-    if (status == AccessStatus.approved) widget.onSuccess(status);
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -544,38 +534,9 @@ class _SignInFormState extends State<_SignInForm> {
               const SizedBox(height: 12),
             ],
             _PrimaryButton(
-              label: 'Sign In',
+              label: 'Login',
               loading: loading,
               onPressed: _submit,
-            ),
-            const SizedBox(height: 14),
-            const _OrDivider(),
-            const SizedBox(height: 14),
-            OutlinedButton(
-              onPressed: loading ? null : _auth0SignIn,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                side: const BorderSide(color: Color(0xFFDDDDDD)),
-                backgroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _Auth0Badge(),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Continue with Auth0',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 20),
             const SizedBox(height: 8),
@@ -2703,7 +2664,7 @@ class _RegistrationSuccess extends StatelessWidget {
         ),
         const SizedBox(height: 28),
         _PrimaryButton(
-          label: 'Go to Sign In',
+          label: 'Go to Login',
           loading: false,
           onPressed: onGoToSignIn,
         ),
@@ -2885,7 +2846,7 @@ class _ForgotPasswordFlowState extends State<_ForgotPasswordFlow> {
           Center(
             child: TextButton(
               onPressed: widget.onBackToLogin,
-              child: const Text('Back to Sign In'),
+              child: const Text('Back to Login'),
             ),
           ),
         ],
@@ -3032,7 +2993,7 @@ class _ForgotPasswordFlowState extends State<_ForgotPasswordFlow> {
         ),
         const SizedBox(height: 28),
         _PrimaryButton(
-          label: 'Back to Sign In',
+          label: 'Back to Login',
           loading: false,
           onPressed: widget.onBackToLogin,
         ),
@@ -3476,54 +3437,6 @@ class _InlineBanner extends StatelessWidget {
 }
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Expanded(child: Divider()),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'OR',
-            style: TextStyle(
-              color: AppColors.muted,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Expanded(child: Divider()),
-      ],
-    );
-  }
-}
-
-class _Auth0Badge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 20,
-      height: 20,
-      alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: Color(0xFFEB5424),
-      ),
-      child: const Text(
-        'A',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
 
 // ── Shared gov ID widgets (used by Student, NGO Staff, and Counsellor forms) ──
 

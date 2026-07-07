@@ -125,27 +125,6 @@ class AppConfig {
     return url;
   }
 
-  // ── Auth0 ─────────────────────────────────────────────────────────────────
-  // Set these via --dart-define at build time, or fill in the defaults below
-  // after creating your Auth0 application (Applications → Native).
-  //   flutter run --dart-define=AUTH0_DOMAIN=dev-xxxx.us.auth0.com \
-  //               --dart-define=AUTH0_CLIENT_ID=xxxxxxxxxxxxxxxx
-  static const String auth0Domain = String.fromEnvironment(
-    'AUTH0_DOMAIN',
-    defaultValue: 'dev-qbjxxdq7ztdlaohf.us.auth0.com',
-  );
-  static const String auth0ClientId = String.fromEnvironment(
-    'AUTH0_CLIENT_ID',
-    defaultValue: 'SiTtwlLQLL6pusF9Ov0qwpPNNCbQ29lv',
-  );
-
-  // Custom URI scheme for Android deep-link callback.
-  // Must match manifestPlaceholders["auth0Scheme"] in build.gradle.kts.
-  // Callback URL registered in Auth0 Dashboard:
-  //   com.careskill.app://{auth0Domain}/android/com.careskill.app/callback
-  //   https://android-app/android/com.careskill.app/callback  (HTTPS App Links)
-  static const String auth0CallbackScheme = 'com.careskill.app';
-
   // ── Default values ────────────────────────────────────────────────────────
   /// Default hex theme colour used when creating a new event.
   static const String defaultEventColor = '#41A7F5';

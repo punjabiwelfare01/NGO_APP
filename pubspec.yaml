@@ -39,7 +39,6 @@ dependencies:
   mime: ^2.0.0
   web: ^1.1.1
   file_picker: ^8.0.0
-  auth0_flutter: ^1.4.0
   url_launcher: ^6.3.0
   video_player: ^2.9.2
   dio: ^5.8.0+1

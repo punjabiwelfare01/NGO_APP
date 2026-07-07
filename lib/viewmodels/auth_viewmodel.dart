@@ -64,48 +64,6 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  /// Returns [AccessStatus] on success, null on failure.
-  Future<AccessStatus?> loginWithAuth0() async {
-    _state = ViewState.loading;
-    _errorMessage = null;
-    notifyListeners();
-    try {
-      final response = await AuthRepository.loginWithAuth0();
-      if (response == null) {
-        _state = ViewState.idle;
-        if (!_disposed) notifyListeners();
-        return null;
-      }
-      final role = UserRole.fromString(response.role);
-      final status = response.accessStatus != null
-          ? AccessStatus.fromString(response.accessStatus!)
-          : AccessStatus.approved;
-      AppState.setFromLogin(
-        response.userId,
-        response.accessToken,
-        role,
-        name: response.name,
-        status: status,
-        roles: response.roles.map(UserRole.fromString).toList(),
-      );
-      _state = ViewState.idle;
-      if (!_disposed) notifyListeners();
-      return AppState.accessStatus;
-    } on ApiException catch (e) {
-      _state = ViewState.error;
-      _errorMessage = e.statusCode == 401
-          ? 'Auth0 sign-in failed. Please try again.'
-          : 'Server error (${e.statusCode}). Please try again.';
-      if (!_disposed) notifyListeners();
-      return null;
-    } catch (e) {
-      _state = ViewState.error;
-      _errorMessage = 'Auth0 sign-in failed: ${e.toString()}';
-      if (!_disposed) notifyListeners();
-      return null;
-    }
-  }
-
   /// Registers a new user.
   /// Returns [AccessStatus] so the caller can route to the pending / home screen.
   /// requestedRole is stored server-side for admin review; it does NOT grant
@@ -306,7 +264,6 @@ class AuthViewModel extends ChangeNotifier {
 
   Future<void> logout() async {
     await AuthRepository.logout();
-    await AuthRepository.auth0Logout();
     AppState.clear();
     if (!_disposed) notifyListeners();
   }

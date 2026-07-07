@@ -97,24 +97,6 @@ def get_or_create_google_user(db: Session, email: str, name: str) -> User:
     return user
 
 
-def get_or_create_auth0_user(db: Session, email: str, name: str, auth0_sub: str) -> User:
-    """Find an existing user by email or create a new student account for Auth0 sign-in."""
-    user = get_user_by_email(db, email)
-    if user:
-        return user
-    user = User(
-        name=name,
-        email=email,
-        hashed_password=None,   # no password — Auth0-only account
-        age=13,                  # default; user can update in profile
-        role=UserRole.student,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
 def _requested_role(value: str | None) -> str:
     normalized = (value or "student").strip().lower().replace(" ", "_")
     return "mentor" if normalized == "counsellor" else normalized

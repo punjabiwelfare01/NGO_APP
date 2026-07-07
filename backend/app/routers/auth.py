@@ -12,12 +12,10 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-from ..auth0_validator import verify_auth0_token
 from ..config import settings
 from ..crud.auth_crud import (
     create_access_token,
     decode_token,
-    get_or_create_auth0_user,
     get_or_create_google_user,
     get_user_by_email,
     hash_password,
@@ -321,52 +319,6 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
         name=user.name,
     )
 
-
-class Auth0LoginRequest(BaseModel):
-    id_token: str
-
-
-@router.post("/auth0", response_model=TokenResponse,
-             summary="Sign in with Auth0 — verifies the ID token and returns a CareSkill JWT")
-def auth0_login(payload: Auth0LoginRequest, db: Session = Depends(get_db)):
-    if not settings.auth0_domain or not settings.auth0_client_id:
-        raise HTTPException(
-            status_code=503,
-            detail="AUTH0_DOMAIN and AUTH0_CLIENT_ID must be set in .env first.",
-        )
-    try:
-        id_info = verify_auth0_token(payload.id_token)
-    except Exception as exc:
-        logger.warning("Auth0 token verification failed: %s", exc)
-        raise HTTPException(status_code=401, detail="Invalid Auth0 token") from exc
-
-    email: str = id_info.get("email", "")
-    name: str = (
-        id_info.get("name")
-        or id_info.get("nickname")
-        or (email.split("@")[0] if email else "")
-    )
-    auth0_sub: str = id_info.get("sub", "")
-
-    if not email:
-        raise HTTPException(status_code=401, detail="Auth0 token missing email claim")
-    if not id_info.get("email_verified", False):
-        raise HTTPException(status_code=401, detail="Auth0 email is not verified")
-
-    user = get_or_create_auth0_user(db, email=email, name=name, auth0_sub=auth0_sub)
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail="Account is inactive")
-
-    user.last_login_at = datetime.now(timezone.utc)
-    db.commit()
-    token = create_access_token(user)
-    return TokenResponse(
-        access_token=token,
-        role=user.role.value,
-        roles=sorted(r.value for r in user.granted_roles),
-        user_id=user.id,
-        name=user.name,
-    )
 
 
 # ── Google Calendar OAuth2 setup (one-time, admin only) ───────────────────────
