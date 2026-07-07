@@ -121,7 +121,7 @@ class _CertificateCard extends StatelessWidget {
                 height: 96,
                 child: coverUrl != null
                     ? Image.network(
-                        '${ApiClient.baseUrl}$coverUrl',
+                        ApiClient.resolveUrl(coverUrl),
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => _placeholder(),
                       )

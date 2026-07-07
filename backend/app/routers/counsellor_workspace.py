@@ -1,7 +1,5 @@
 import os
-import uuid
 from datetime import datetime, timedelta
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -13,9 +11,9 @@ from ..models.platform import CounsellorSessionReport, ReminderJob, SchoolCounse
 from ..models.user import User, UserRole
 from ..models.wellness import CounsellingAvailability
 from ..services import notification_service
+from ..services.hostinger_upload import upload_to_hostinger
 
-_UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads" / "counsellor_docs"
-_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+_VERIFICATION_DOC_ALLOWED = {".pdf", ".jpg", ".jpeg", ".png"}
 
 router = APIRouter(tags=["Counsellor Workspace"])
 
@@ -204,19 +202,12 @@ async def upload_verification_doc(
     db: Session = Depends(get_db),
     user: User = Depends(_counsellor),
 ):
-    allowed_types = {"application/pdf", "image/jpeg", "image/png", "image/jpg"}
-    content_type = file.content_type or ""
-    if content_type not in allowed_types:
-        raise HTTPException(400, "Only PDF, JPEG, or PNG files are allowed")
+    if doc_type not in ("id_proof", "professional_cert"):
+        raise HTTPException(400, "doc_type must be 'id_proof' or 'professional_cert'")
 
-    ext = Path(file.filename or "file").suffix or ".pdf"
-    filename = f"counsellor_{user.id}_{uuid.uuid4().hex}{ext}"
-    dest = _UPLOADS_DIR / filename
-
-    contents = await file.read()
-    dest.write_bytes(contents)
-
-    relative_url = f"/uploads/counsellor_docs/{filename}"
+    relative_url = await upload_to_hostinger(
+        file, subdir="counsellor_docs", allowed_extensions=_VERIFICATION_DOC_ALLOWED,
+    )
 
     mentor = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
     if not mentor:
@@ -225,10 +216,8 @@ async def upload_verification_doc(
 
     if doc_type == "id_proof":
         mentor.id_proof_doc_url = relative_url
-    elif doc_type == "professional_cert":
-        mentor.professional_cert_url = relative_url
     else:
-        raise HTTPException(400, "doc_type must be 'id_proof' or 'professional_cert'")
+        mentor.professional_cert_url = relative_url
 
     db.commit()
     return {"url": relative_url, "doc_type": doc_type}

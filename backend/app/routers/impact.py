@@ -1,7 +1,3 @@
-import uuid
-from pathlib import Path
-
-import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 
@@ -12,10 +8,11 @@ from ..models.user import User, UserRole
 from ..repositories import impact_repository
 from ..schemas.impact import ImpactMetricsOut, ImpactPostCreate, ImpactPostOut, ImpactPostUpdate, ImpactShareOut
 from ..services import impact_service
+from ..services.hostinger_upload import upload_to_hostinger
 
 router = APIRouter(prefix="/impact", tags=["Impact"])
 
-_IMPACT_MEDIA_DIR = Path(__file__).parent.parent.parent / "uploads" / "impact"
+_ALLOWED_MEDIA_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".pdf"}
 
 
 def _base(request: Request) -> str:
@@ -73,13 +70,8 @@ async def upload_media(
     """Upload an impact media file immediately and return its URL.
     Pass the URL in the `media` list when creating or updating an impact post.
     """
-    _IMPACT_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-    ext = Path(file.filename or "file").suffix.lower() or ".jpg"
-    filename = f"{uuid.uuid4().hex}{ext}"
-    dest = _IMPACT_MEDIA_DIR / filename
-    async with aiofiles.open(dest, "wb") as out:
-        await out.write(await file.read())
-    return {"url": f"/uploads/impact/{filename}", "media_type": media_type}
+    url = await upload_to_hostinger(file, subdir="impact", allowed_extensions=_ALLOWED_MEDIA_EXTENSIONS)
+    return {"url": url, "media_type": media_type}
 
 
 @router.post("/posts/{post_id}/media", status_code=201)
@@ -99,15 +91,7 @@ async def add_media(
     if user.active_role in (UserRole.event_manager, UserRole.mentor) and item.created_by != user.id:
         raise HTTPException(403, "Access denied")
 
-    _IMPACT_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-    ext = Path(file.filename or "file").suffix.lower() or ".jpg"
-    filename = f"{uuid.uuid4().hex}{ext}"
-    dest = _IMPACT_MEDIA_DIR / filename
-
-    async with aiofiles.open(dest, "wb") as out:
-        await out.write(await file.read())
-
-    url = f"/uploads/impact/{filename}"
+    url = await upload_to_hostinger(file, subdir="impact", allowed_extensions=_ALLOWED_MEDIA_EXTENSIONS)
     media = ImpactPostMedia(
         post_id=post_id,
         media_type=media_type,

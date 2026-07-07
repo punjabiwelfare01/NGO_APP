@@ -1,8 +1,6 @@
-import uuid
 from pathlib import Path
 from typing import List
 
-import aiofiles
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -20,10 +18,10 @@ from ..schemas.volunteer import (
     StudentActivityOut,
     StudentWorkSummary,
 )
+from ..services.hostinger_upload import upload_to_hostinger
 
 router = APIRouter(prefix="/student", tags=["Student Work"])
 
-_UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
 _PROOF_ALLOWED = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov"}
 _PROOF_MAX_BYTES = 50 * 1024 * 1024  # 50 MB
 
@@ -41,22 +39,10 @@ async def upload_proof(
     user: User = Depends(get_current_user),
 ):
     original = Path(file.filename or "proof")
-    ext = original.suffix.lower()
-    if ext not in _PROOF_ALLOWED:
-        raise HTTPException(400, f"File type '{ext}' not allowed. Allowed: {', '.join(sorted(_PROOF_ALLOWED))}")
-
-    content = await file.read()
-    if len(content) > _PROOF_MAX_BYTES:
-        raise HTTPException(413, "File too large. Maximum size is 50 MB.")
-
-    _UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    filename = f"proof_{user.id}_{uuid.uuid4()}{ext}"
-    dest = _UPLOADS_DIR / filename
-
-    async with aiofiles.open(dest, "wb") as out:
-        await out.write(content)
-
-    return {"url": f"/uploads/{filename}", "original_name": original.name}
+    url = await upload_to_hostinger(
+        file, subdir="proof", allowed_extensions=_PROOF_ALLOWED, max_size=_PROOF_MAX_BYTES,
+    )
+    return {"url": url, "original_name": original.name}
 
 
 _VISIBLE_EVENT_STATUSES = [

@@ -1,8 +1,6 @@
-import uuid
 from datetime import datetime
 from pathlib import Path
 
-import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
@@ -12,11 +10,10 @@ from ..models.platform import SchoolCounsellorRequest
 from ..models.school_partner import SchoolPartnerProfile
 from ..models.user import User, UserRole
 from ..services import notification_service
+from ..services.hostinger_upload import upload_to_hostinger
 
 _UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads" / "school_logos"
-_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
-_CHUNK_SIZE = 1024 * 1024
 
 router = APIRouter(prefix="/school", tags=["School Partner"])
 
@@ -315,31 +312,14 @@ async def upload_logo(
 ):
     _require_school_partner(user)
 
-    original = Path(file.filename or "logo")
-    ext = original.suffix.lower()
-    if ext not in _IMAGE_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type '{ext}' not allowed. Use png/jpg/jpeg/gif/webp.",
-        )
-
-    # Remove old logo if stored locally
+    # Remove old logo if stored locally (legacy — logos uploaded before this
+    # endpoint moved to Hostinger).
     if user.photo_url and user.photo_url.startswith("/uploads/school_logos/"):
         old_path = _UPLOADS_DIR / Path(user.photo_url).name
         if old_path.exists():
             old_path.unlink(missing_ok=True)
 
-    filename = f"{uuid.uuid4()}{ext}"
-    dest = _UPLOADS_DIR / filename
-
-    async with aiofiles.open(dest, "wb") as out:
-        while True:
-            chunk = await file.read(_CHUNK_SIZE)
-            if not chunk:
-                break
-            await out.write(chunk)
-
-    url = f"/uploads/school_logos/{filename}"
+    url = await upload_to_hostinger(file, subdir="school_logos", allowed_extensions=_IMAGE_EXTENSIONS)
     user.photo_url = url
     db.commit()
     return {"url": url}
