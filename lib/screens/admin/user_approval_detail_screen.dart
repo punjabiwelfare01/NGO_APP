@@ -815,15 +815,36 @@ class _GovIdDocumentCard extends StatelessWidget {
   final String docUrl;
   final String? idType;
 
-  Future<void> _open() async {
+  static const _imageExtensions = {'.jpg', '.jpeg', '.png', '.webp'};
+
+  bool get _isImage {
+    final lower = docUrl.toLowerCase();
+    return _imageExtensions.any(lower.endsWith);
+  }
+
+  Future<void> _openExternally() async {
     final uri = Uri.parse(ApiClient.resolveUrl(docUrl));
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
+  void _openInAppPreview(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => _GovIdImagePreviewScreen(
+          resolvedUrl: ApiClient.resolveUrl(docUrl),
+          title: idType ?? 'Government ID',
+          onOpenExternally: _openExternally,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final resolved = ApiClient.resolveUrl(docUrl);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -833,16 +854,37 @@ class _GovIdDocumentCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.08),
+          GestureDetector(
+            onTap: _isImage ? () => _openInAppPreview(context) : _openExternally,
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.badge_outlined,
-              color: AppColors.primary,
-              size: 22,
+              child: _isImage
+                  ? Container(
+                      width: 48,
+                      height: 48,
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      child: Image.network(
+                        resolved,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.badge_outlined,
+                          color: AppColors.primary,
+                          size: 22,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.picture_as_pdf_rounded,
+                        color: AppColors.primary,
+                        size: 22,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 12),
@@ -859,17 +901,22 @@ class _GovIdDocumentCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  'Document uploaded — tap to view',
-                  style: TextStyle(color: AppColors.muted, fontSize: 12),
+                Text(
+                  _isImage
+                      ? 'Tap thumbnail to preview'
+                      : 'PDF document — tap to open',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
                 ),
               ],
             ),
           ),
           FilledButton.icon(
-            onPressed: _open,
-            icon: const Icon(Icons.open_in_new_rounded, size: 16),
-            label: const Text('View'),
+            onPressed: _isImage ? () => _openInAppPreview(context) : _openExternally,
+            icon: Icon(
+              _isImage ? Icons.zoom_in_rounded : Icons.open_in_new_rounded,
+              size: 16,
+            ),
+            label: Text(_isImage ? 'Preview' : 'View'),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -883,6 +930,58 @@ class _GovIdDocumentCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Full-screen, pinch-to-zoom preview for an uploaded government ID image.
+class _GovIdImagePreviewScreen extends StatelessWidget {
+  const _GovIdImagePreviewScreen({
+    required this.resolvedUrl,
+    required this.title,
+    required this.onOpenExternally,
+  });
+
+  final String resolvedUrl;
+  final String title;
+  final VoidCallback onOpenExternally;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.open_in_new_rounded),
+            tooltip: 'Open externally',
+            onPressed: onOpenExternally,
+          ),
+        ],
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          maxScale: 5,
+          child: Image.network(
+            resolvedUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'Could not load this document. Try "Open externally" instead.',
+                style: TextStyle(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            loadingBuilder: (_, child, progress) => progress == null
+                ? child
+                : const CircularProgressIndicator(color: Colors.white),
+          ),
+        ),
       ),
     );
   }
