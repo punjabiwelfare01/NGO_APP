@@ -232,6 +232,30 @@ class AdminViewModel extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> deleteNotification(int notificationId) async {
+    final previous = _notifications;
+    _notifications = _notifications.where((n) => n.id != notificationId).toList();
+    if (!_disposed) notifyListeners();
+    try {
+      await AdminRepository.deleteNotification(notificationId);
+    } catch (_) {
+      _notifications = previous;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> clearAllNotifications() async {
+    final previous = _notifications;
+    _notifications = [];
+    if (!_disposed) notifyListeners();
+    try {
+      await AdminRepository.deleteAllNotifications();
+    } catch (_) {
+      _notifications = previous;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
   /// Grants `role` to a user in addition to any roles it already holds.
   Future<bool> grantRole({required int userId, required String role}) async {
     try {

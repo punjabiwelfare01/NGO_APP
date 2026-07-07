@@ -386,6 +386,31 @@ def mark_all_read(
     return {"ok": True}
 
 
+@router.delete("/notifications/{notification_id}",
+                summary="Delete a notification [admin only]")
+def delete_notification(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(admin_only),
+):
+    db.query(AdminNotification).filter(
+        AdminNotification.id == notification_id
+    ).delete()
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/notifications",
+                summary="Delete all notifications [admin only]")
+def delete_all_notifications(
+    db: Session = Depends(get_db),
+    _: User = Depends(admin_only),
+):
+    db.query(AdminNotification).delete()
+    db.commit()
+    return {"ok": True}
+
+
 # ── internal helpers ──────────────────────────────────────────────────────────
 
 def _notify(db: Session, *, title: str, message: str,

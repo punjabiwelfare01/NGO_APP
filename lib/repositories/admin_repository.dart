@@ -126,6 +126,14 @@ class AdminRepository {
     await ApiClient.patch('/admin/notifications/read-all', {});
   }
 
+  static Future<void> deleteNotification(int notificationId) async {
+    await ApiClient.delete('/admin/notifications/$notificationId');
+  }
+
+  static Future<void> deleteAllNotifications() async {
+    await ApiClient.delete('/admin/notifications');
+  }
+
   // ── User detail ───────────────────────────────────────────────────────────
 
   static Future<AppUser> getUserDetail(int userId) async {

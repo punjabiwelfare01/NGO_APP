@@ -1173,27 +1173,62 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     context: context,
     showDragHandle: true,
     builder: (_) => SafeArea(
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text(
-            'Admin Notifications',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-          ),
-          for (final n in vm.notifications.take(10))
-            ListTile(
-              leading: Icon(
-                n.isRead
-                    ? Icons.notifications_none
-                    : Icons.notifications_active,
-                color: n.isRead ? AppColors.muted : AppColors.primary,
+      child: ListenableBuilder(
+        listenable: vm,
+        builder: (context, _) {
+          final items = vm.notifications.take(10).toList();
+          return ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(16),
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Admin Notifications',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                  if (items.isNotEmpty)
+                    TextButton(
+                      onPressed: vm.clearAllNotifications,
+                      child: const Text('Clear All'),
+                    ),
+                ],
               ),
-              title: Text(n.title),
-              subtitle: Text(n.message),
-              onTap: () => vm.markNotificationRead(n.id),
-            ),
-        ],
+              if (items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    'No notifications.',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                ),
+              for (final n in items)
+                Dismissible(
+                  key: ValueKey('notification-${n.id}'),
+                  direction: DismissDirection.endToStart,
+                  onDismissed: (_) => vm.deleteNotification(n.id),
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    color: Colors.red.shade400,
+                    child: const Icon(Icons.delete_outline, color: Colors.white),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      n.isRead
+                          ? Icons.notifications_none
+                          : Icons.notifications_active,
+                      color: n.isRead ? AppColors.muted : AppColors.primary,
+                    ),
+                    title: Text(n.title),
+                    subtitle: Text(n.message),
+                    onTap: () => vm.markNotificationRead(n.id),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     ),
   );

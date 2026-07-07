@@ -176,3 +176,42 @@ class TestDashboardStats:
         resp = client.get("/admin/users", headers=admin_headers)
         assert resp.status_code == 200
         assert any(u["email"] == "student@test.local" for u in resp.json())
+
+
+class TestAdminNotifications:
+    def test_admin_can_delete_a_single_notification(self, client, admin_headers):
+        user_id = _register_pending(client)
+        client.patch(
+            f"/admin/users/{user_id}/assign-role", json={"role": "student"}, headers=admin_headers,
+        )
+        notification = client.get("/admin/notifications", headers=admin_headers).json()[0]
+
+        resp = client.delete(f"/admin/notifications/{notification['id']}", headers=admin_headers)
+        assert resp.status_code == 200
+
+        remaining_ids = [n["id"] for n in client.get("/admin/notifications", headers=admin_headers).json()]
+        assert notification["id"] not in remaining_ids
+
+    def test_admin_can_clear_all_notifications(self, client, admin_headers):
+        user_id = _register_pending(client)
+        client.patch(
+            f"/admin/users/{user_id}/assign-role", json={"role": "student"}, headers=admin_headers,
+        )
+        assert client.get("/admin/notifications", headers=admin_headers).json() != []
+
+        resp = client.delete("/admin/notifications", headers=admin_headers)
+        assert resp.status_code == 200
+        assert client.get("/admin/notifications", headers=admin_headers).json() == []
+
+    def test_student_cannot_delete_notifications(self, client, admin_headers, student_headers):
+        user_id = _register_pending(client)
+        client.patch(
+            f"/admin/users/{user_id}/assign-role", json={"role": "student"}, headers=admin_headers,
+        )
+        notification = client.get("/admin/notifications", headers=admin_headers).json()[0]
+
+        resp = client.delete(f"/admin/notifications/{notification['id']}", headers=student_headers)
+        assert resp.status_code == 403
+
+        resp_all = client.delete("/admin/notifications", headers=student_headers)
+        assert resp_all.status_code == 403
