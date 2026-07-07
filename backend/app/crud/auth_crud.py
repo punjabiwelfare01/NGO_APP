@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..models.auth import BlacklistedToken
 from ..models.notification import AdminNotification
-from ..models.user import User, UserRole
+from ..models.user import User, UserRole, UserRoleGrant
 from ..schemas.auth import RegisterRequest
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -27,13 +27,22 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # ── JWT helpers ───────────────────────────────────────────────────────────────
 
-def create_access_token(user: User) -> str:
+def create_access_token(user: User, active_role: UserRole | None = None) -> str:
+    """Issue a JWT for `user`.
+
+    `active_role` is the role this session is "acting as" — defaults to the
+    account's primary `role` (unchanged behavior for single-role accounts).
+    Pass a different granted role (see `User.granted_roles`) to issue a token
+    for a role switch without requiring the user to log in again.
+    """
+    resolved_role = active_role or user.role
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.access_token_expire_minutes
     )
     payload = {
         "sub": str(user.id),
         "role": user.role.value,
+        "active_role": resolved_role.value,
         "name": user.name,
         "jti": str(uuid.uuid4()),   # unique token ID — used for revocation
         "exp": expire,
@@ -138,6 +147,7 @@ def register_user(
     )
     db.add(user)
     db.flush()
+    db.add(UserRoleGrant(user_id=user.id, role=user.role.value, status="active"))
     if pending_access:
         db.add(AdminNotification(
             title="New access request",

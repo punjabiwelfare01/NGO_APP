@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../app_state.dart';
 import '../../models/counsellor_session_models.dart';
+import '../../models/ngo_profile.dart';
 import '../../models/school_partner_models.dart';
 import '../../repositories/auth_repository.dart';
+import '../../repositories/ngo_repository.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../internship/wall_of_impact_view.dart';
 import 'counsellor_directory_screen.dart';
@@ -35,6 +37,7 @@ class _SchoolPartnerPortalScreenState
     extends State<SchoolPartnerPortalScreen> {
   final _vm = CounsellorViewModel.shared;
   int _tab = 0;
+  NGOProfile _ngo = NGOProfile.fallback;
 
   @override
   void initState() {
@@ -43,6 +46,12 @@ class _SchoolPartnerPortalScreenState
     _vm.loadSchoolRequests();
     _vm.loadSchoolProfile();
     _vm.loadSchoolStats();
+    _loadNgo();
+  }
+
+  Future<void> _loadNgo() async {
+    final ngo = await NGORepository.getProfile();
+    if (mounted) setState(() => _ngo = ngo);
   }
 
   @override
@@ -54,7 +63,7 @@ class _SchoolPartnerPortalScreenState
         body: IndexedStack(
           index: _tab,
           children: [
-            _HomeTab(vm: _vm),
+            _HomeTab(vm: _vm, ngo: _ngo),
             _CounsellorsTab(vm: _vm),
             _RequestsTab(vm: _vm),
             _ImpactTab(vm: _vm),
@@ -153,13 +162,69 @@ class _NavItem extends StatelessWidget {
   }
 }
 
+// ─── NGO brand header (logo, name, registration) ───────────────────────────────
+
+class _SchoolBrandHeader extends StatelessWidget {
+  const _SchoolBrandHeader({required this.ngo});
+  final NGOProfile ngo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        ClipOval(
+          child: Image.asset(
+            'assests/ngo_logo.jpeg',
+            width: 48,
+            height: 48,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                ngo.name,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: _kInk,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Regd. No. ${ngo.registrationNumber ?? '736'}, Delhi Cantt',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: _kMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton.filledTonal(
+          onPressed: null,
+          icon: const Icon(Icons.notifications_none_rounded),
+          tooltip: 'Notifications',
+        ),
+      ],
+    );
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 0 — Home
 // ══════════════════════════════════════════════════════════════════════════════
 
 class _HomeTab extends StatelessWidget {
-  const _HomeTab({required this.vm});
+  const _HomeTab({required this.vm, required this.ngo});
   final CounsellorViewModel vm;
+  final NGOProfile ngo;
 
   @override
   Widget build(BuildContext context) {
@@ -170,11 +235,20 @@ class _HomeTab extends StatelessWidget {
 
     return CustomScrollView(
       slivers: [
+        // ── NGO brand header ─────────────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: Container(
+            color: _kCard,
+            padding: EdgeInsets.fromLTRB(
+                16, MediaQuery.of(context).padding.top + 12, 16, 12),
+            child: _SchoolBrandHeader(ngo: ngo),
+          ),
+        ),
         // ── Header ───────────────────────────────────────────────────────────
         SliverToBoxAdapter(
           child: Container(
             color: _kCard,
-            padding: const EdgeInsets.fromLTRB(20, 52, 20, 20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

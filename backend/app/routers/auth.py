@@ -35,6 +35,7 @@ from ..schemas.auth import (
     LoginRequest,
     RegisterRequest,
     ResetPasswordRequest,
+    SwitchRoleRequest,
     VerifyResetCodeRequest,
     TokenResponse,
 )
@@ -59,6 +60,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             "name": user.name,
             "email": user.email,
             "role": user.role.value,
+            "roles": sorted(r.value for r in user.granted_roles),
             "access_status": user.access_status,
             "requested_role": user.requested_role,
         },
@@ -135,13 +137,44 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is inactive")
     access_status = getattr(user, "access_status", "approved") or "approved"
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
     token = create_access_token(user)
     return TokenResponse(
         access_token=token,
         role=user.role.value,
+        roles=sorted(r.value for r in user.granted_roles),
         user_id=user.id,
         name=user.name,
         access_status=access_status,
+    )
+
+
+@router.post("/switch-role", response_model=TokenResponse,
+             summary="Switch the active role for a multi-role account, without logging out")
+def switch_role(
+    payload: SwitchRoleRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        requested_role = UserRole(payload.role)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"Invalid role: {payload.role}")
+
+    if requested_role not in current_user.granted_roles:
+        raise HTTPException(
+            status_code=403,
+            detail=f"This account does not have the '{requested_role.value}' role.",
+        )
+
+    token = create_access_token(current_user, active_role=requested_role)
+    return TokenResponse(
+        access_token=token,
+        role=requested_role.value,
+        roles=sorted(r.value for r in current_user.granted_roles),
+        user_id=current_user.id,
+        name=current_user.name,
+        access_status=getattr(current_user, "access_status", "approved") or "approved",
     )
 
 
@@ -313,10 +346,13 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is inactive")
 
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
     token = create_access_token(user)
     return TokenResponse(
         access_token=token,
         role=user.role.value,
+        roles=sorted(r.value for r in user.granted_roles),
         user_id=user.id,
         name=user.name,
     )
@@ -357,10 +393,13 @@ def auth0_login(payload: Auth0LoginRequest, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is inactive")
 
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
     token = create_access_token(user)
     return TokenResponse(
         access_token=token,
         role=user.role.value,
+        roles=sorted(r.value for r in user.granted_roles),
         user_id=user.id,
         name=user.name,
     )

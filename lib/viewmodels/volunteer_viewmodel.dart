@@ -153,6 +153,7 @@ class VolunteerViewModel extends ChangeNotifier {
     String? transactionId,
     String? remarks,
     String? proofFiles,
+    String? reviewTarget,
   }) async {
     try {
       final sub = await VolunteerRepository.submitWork(
@@ -166,6 +167,7 @@ class VolunteerViewModel extends ChangeNotifier {
         transactionId: transactionId,
         remarks: remarks,
         proofFiles: proofFiles,
+        reviewTarget: reviewTarget,
       );
       _submissions = [sub, ..._submissions];
       await _refreshStats();
@@ -238,6 +240,10 @@ class VolunteerViewModel extends ChangeNotifier {
 
   Future<List<WorkSubmission>> getPendingSubmissions() async {
     return VolunteerRepository.getPendingSubmissions();
+  }
+
+  Future<List<WorkSubmission>> getApprovedSubmissions() async {
+    return VolunteerRepository.getApprovedSubmissions();
   }
 
   Future<bool> reviewSubmission(

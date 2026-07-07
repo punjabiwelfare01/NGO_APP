@@ -44,6 +44,7 @@ class AuthViewModel extends ChangeNotifier {
         role,
         name: response.name,
         status: status,
+        roles: response.roles.map(UserRole.fromString).toList(),
       );
       _state = ViewState.idle;
       if (!_disposed) notifyListeners();
@@ -85,6 +86,7 @@ class AuthViewModel extends ChangeNotifier {
         role,
         name: response.name,
         status: status,
+        roles: response.roles.map(UserRole.fromString).toList(),
       );
       _state = ViewState.idle;
       if (!_disposed) notifyListeners();
@@ -148,6 +150,7 @@ class AuthViewModel extends ChangeNotifier {
         role,
         name: response.name,
         status: status,
+        roles: response.roles.map(UserRole.fromString).toList(),
       );
       _state = ViewState.idle;
       if (!_disposed) notifyListeners();
@@ -192,12 +195,16 @@ class AuthViewModel extends ChangeNotifier {
       final user = await AuthRepository.getCurrentUser();
       final role = UserRole.fromString(user.role ?? 'guest');
       final status = AccessStatus.fromString(user.accessStatus ?? 'pending');
+      final roles = user.roles.isNotEmpty
+          ? user.roles.map(UserRole.fromString).toList()
+          : [role];
       AppState.setFromLogin(
         user.id,
         token,
         role,
         name: user.name,
         status: status,
+        roles: roles,
       );
       _state = ViewState.idle;
       if (!_disposed) notifyListeners();
@@ -212,6 +219,41 @@ class AuthViewModel extends ChangeNotifier {
       _errorMessage = 'Could not connect to the backend.';
       if (!_disposed) notifyListeners();
       return null;
+    }
+  }
+
+  /// Switches the session's active role for a multi-role account, without
+  /// logging out. Returns true on success; false on failure (error message
+  /// available via [errorMessage]).
+  Future<bool> switchRole(UserRole role) async {
+    _state = ViewState.loading;
+    _errorMessage = null;
+    if (!_disposed) notifyListeners();
+    try {
+      final response = await AuthRepository.switchRole(role.apiValue);
+      AppState.setFromLogin(
+        response.userId,
+        response.accessToken,
+        UserRole.fromString(response.role),
+        name: response.name,
+        status: AppState.accessStatus,
+        roles: response.roles.map(UserRole.fromString).toList(),
+      );
+      _state = ViewState.idle;
+      if (!_disposed) notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _state = ViewState.error;
+      _errorMessage = e.statusCode == 403
+          ? 'This account does not have that role.'
+          : 'Server error (${e.statusCode}). Please try again.';
+      if (!_disposed) notifyListeners();
+      return false;
+    } catch (_) {
+      _state = ViewState.error;
+      _errorMessage = 'Connection failed. Is the backend running?';
+      if (!_disposed) notifyListeners();
+      return false;
     }
   }
 

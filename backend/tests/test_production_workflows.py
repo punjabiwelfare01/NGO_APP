@@ -30,7 +30,7 @@ def test_student_apply_and_submit_persists(client, admin_headers, student_header
     # Event manager/admin assigns the applicant before work can be submitted.
     updated = client.patch(f"/event-manager/assignments/{assignment['id']}", headers=admin_headers, json={"status": "assigned"})
     assert updated.status_code == 200
-    submitted = client.post(f"/student/assignments/{assignment['id']}/submit-work", headers=student_headers, json={
+    submitted = client.post("/volunteer/work-submissions", headers=student_headers, json={
         "activity_id": activity["id"],
         "assignment_id": assignment["id"],
         "title": "Completed support work",
@@ -120,7 +120,11 @@ def test_certificate_signed_pdf_download_and_public_verify(client, db, admin_use
     generated = client.post("/admin/certificates/generate", headers=admin_headers, json={"assignment_id": assignment.id})
     assert generated.status_code == 201, generated.text
     certificate = generated.json()
-    assert certificate["status"] == "pending_signature"
+    # /admin/certificates/generate creates the draft certificate already
+    # workflow-"approved" (the draft PDF text says "Pending authorized
+    # signature and stamp" — that's descriptive copy, not the DB status).
+    # The DB status only becomes "issued" once upload-signed runs below.
+    assert certificate["status"] == "approved"
     uploaded = client.post(f"/admin/certificates/{certificate['certificate_id']}/upload-signed", headers=admin_headers, files={"file": ("signed.pdf", b"%PDF-1.4\n% signed certificate", "application/pdf")})
     assert uploaded.status_code == 200, uploaded.text
     assert uploaded.json()["status"] == "issued"

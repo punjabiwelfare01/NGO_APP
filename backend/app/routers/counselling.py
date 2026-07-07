@@ -28,8 +28,17 @@ def _fmt_time(t: str) -> str:
         return t
 
 
-def _mentor_dict(m, db: Session) -> dict:
-    """Build the full public mentor dict including extended fields and weekly schedule."""
+def _mentor_dict(m, db: Session, current_user: User) -> dict:
+    """Build the mentor dict shown to other users. Contact details (phone,
+    location) and internal verification/admin fields are private — only
+    included for admins/super_admins or the counsellor viewing their own
+    record. Everyone else (school partners, students, etc.) gets the public
+    profile subset only.
+    """
+    is_privileged = (
+        current_user.active_role in (UserRole.admin, UserRole.super_admin)
+        or current_user.id == m.user_id
+    )
     photo = m.profile_image_url or (m.user.photo_url if m.user else None)
     weekly_slots = (
         db.query(CounsellorWeeklyAvailability)
@@ -48,7 +57,7 @@ def _mentor_dict(m, db: Session) -> dict:
         f" ({s.mode.capitalize()})"
         for s in weekly_slots
     ]
-    return {
+    result = {
         "id": m.id,
         "user_id": m.user_id,
         "display_name": m.display_name,
@@ -57,21 +66,35 @@ def _mentor_dict(m, db: Session) -> dict:
         "category": m.category,
         "profile_image_url": photo,
         "is_active": m.is_active,
+        "featured": m.featured,
         "rating": m.rating,
         "session_count": m.session_count,
         "created_at": m.created_at,
-        # Extended profile fields
+        # Public extended profile fields
         "qualification": m.qualification,
         "years_of_experience": m.years_of_experience,
         "counselling_mode": m.counselling_mode,
         "languages_known": m.languages_known,
         "organization": m.organization,
-        # User contact fields
-        "phone": m.user.phone if m.user else None,
-        "location": m.user.location if m.user else None,
         # Weekly availability as formatted strings
         "weekly_availability": availability,
     }
+    if is_privileged:
+        result.update({
+            "phone": m.user.phone if m.user else None,
+            "location": m.user.location if m.user else None,
+            "gender": m.gender,
+            "date_of_birth": m.date_of_birth,
+            "city": m.city,
+            "state": m.state,
+            "pin_code": m.pin_code,
+            "id_proof_type": m.id_proof_type,
+            "id_proof_doc_url": m.id_proof_doc_url,
+            "professional_cert_url": m.professional_cert_url,
+            "verification_status": m.verification_status,
+            "admin_remark": m.admin_remark,
+        })
+    return result
 
 router = APIRouter(prefix="/counselling", tags=["Counselling"])
 
@@ -84,7 +107,7 @@ def get_my_mentor_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != UserRole.mentor:
+    if current_user.active_role != UserRole.mentor:
         raise HTTPException(status_code=403, detail="Counsellor access required")
     profile = counselling_crud.get_mentor_by_user(db, current_user.id)
     if not profile:
@@ -99,7 +122,7 @@ def update_my_mentor_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != UserRole.mentor:
+    if current_user.active_role != UserRole.mentor:
         raise HTTPException(status_code=403, detail="Counsellor access required")
     profile = counselling_crud.get_mentor_by_user(db, current_user.id)
     if not profile:
@@ -123,7 +146,7 @@ def list_mentors(
     current_user: User = Depends(get_current_user),
 ):
     mentors = counselling_crud.list_mentors(db, category=category)
-    return [_mentor_dict(m, db) for m in mentors]
+    return [_mentor_dict(m, db, current_user) for m in mentors]
 
 
 @router.get("/mentors/{mentor_id}", summary="Get mentor profile detail [authenticated]")
@@ -135,7 +158,7 @@ def get_mentor(
     profile = counselling_crud.get_mentor(db, mentor_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Mentor profile not found")
-    return _mentor_dict(profile, db)
+    return _mentor_dict(profile, db, current_user)
 
 
 @router.post("/mentors", response_model=MentorProfileResponse, status_code=201,
@@ -180,15 +203,57 @@ def update_mentor_profile(
     # Only admin/super_admin or the owning mentor may update a mentor profile.
     # content_creator is intentionally excluded — creating/editing mentors is
     # an administrative operation, not a content-management task.
-    is_admin = current_user.role in (UserRole.admin, UserRole.super_admin)
-    is_owner = (current_user.role == UserRole.mentor and profile.user_id == current_user.id)
+    is_admin = current_user.active_role in (UserRole.admin, UserRole.super_admin)
+    is_owner = (current_user.active_role == UserRole.mentor and profile.user_id == current_user.id)
     if not is_admin and not is_owner:
         raise HTTPException(status_code=403, detail="Access denied")
     updated = counselling_crud.update_mentor_profile(db, mentor_id, payload)
     return updated
 
 
-# ── Extended profile (qualification, experience, languages, mode) ─────────────
+@router.patch("/mentors/by-user/{user_id}", response_model=MentorProfileResponse,
+              summary="Update a mentor profile by user id [admin only]")
+def update_mentor_profile_by_user(
+    user_id: int,
+    payload: MentorProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(admin_only),
+):
+    # Screens like the school-facing counsellor directory identify a
+    # counsellor by user_id (CounsellorProfile.id), not the mentor_profiles
+    # primary key used by /mentors/{mentor_id} — this endpoint bridges that.
+    profile = counselling_crud.get_mentor_by_user(db, user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Mentor profile not found")
+    return counselling_crud.update_mentor_profile(db, profile.id, payload)
+
+
+# ── Extended profile (qualification, experience, languages, mode, verification) ─
+
+def _extended_profile_dict(profile) -> dict:
+    return {
+        "qualification":         profile.qualification,
+        "years_of_experience":   profile.years_of_experience,
+        "counselling_mode":      profile.counselling_mode,
+        "languages_known":       profile.languages_known,
+        "organization":          profile.organization,
+        "gender":                profile.gender,
+        "date_of_birth":         profile.date_of_birth,
+        "city":                  profile.city,
+        "state":                 profile.state,
+        "pin_code":              profile.pin_code,
+        # Verification / documents — read-only here, written by the
+        # dedicated upload endpoint (docs) or by admin action (status/remark).
+        "id_proof_type":         profile.id_proof_type,
+        "id_proof_number":       profile.id_proof_number,
+        "id_proof_doc_url":      profile.id_proof_doc_url,
+        "professional_cert_url": profile.professional_cert_url,
+        "verification_status":   profile.verification_status,
+        "verified_by":           profile.verified_by,
+        "verified_at":           profile.verified_at,
+        "admin_remark":          profile.admin_remark,
+    }
+
 
 @router.get("/mentors/me/extended",
             summary="Get current counsellor's extended profile fields")
@@ -196,23 +261,12 @@ def get_extended_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != UserRole.mentor:
+    if current_user.active_role != UserRole.mentor:
         raise HTTPException(status_code=403, detail="Counsellor access required")
     profile = counselling_crud.get_mentor_by_user(db, current_user.id)
     if not profile:
         return {}
-    return {
-        "qualification":       profile.qualification,
-        "years_of_experience": profile.years_of_experience,
-        "counselling_mode":    profile.counselling_mode,
-        "languages_known":     profile.languages_known,
-        "organization":        profile.organization,
-        "gender":              profile.gender,
-        "date_of_birth":       profile.date_of_birth,
-        "city":                profile.city,
-        "state":               profile.state,
-        "pin_code":            profile.pin_code,
-    }
+    return _extended_profile_dict(profile)
 
 
 @router.patch("/mentors/me/extended",
@@ -222,7 +276,7 @@ def update_extended_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != UserRole.mentor:
+    if current_user.active_role != UserRole.mentor:
         raise HTTPException(status_code=403, detail="Counsellor access required")
     profile = counselling_crud.get_mentor_by_user(db, current_user.id)
     if not profile:
@@ -235,25 +289,14 @@ def update_extended_profile(
     allowed = {
         "qualification", "years_of_experience", "counselling_mode",
         "languages_known", "organization", "gender", "date_of_birth",
-        "city", "state", "pin_code",
+        "city", "state", "pin_code", "id_proof_type", "id_proof_number",
     }
     for key, value in payload.items():
         if key in allowed:
             setattr(profile, key, value)
     db.commit()
     db.refresh(profile)
-    return {
-        "qualification":       profile.qualification,
-        "years_of_experience": profile.years_of_experience,
-        "counselling_mode":    profile.counselling_mode,
-        "languages_known":     profile.languages_known,
-        "organization":        profile.organization,
-        "gender":              profile.gender,
-        "date_of_birth":       profile.date_of_birth,
-        "city":                profile.city,
-        "state":               profile.state,
-        "pin_code":            profile.pin_code,
-    }
+    return _extended_profile_dict(profile)
 
 
 # ── Slots ──────────────────────────────────────────────────────────────────────

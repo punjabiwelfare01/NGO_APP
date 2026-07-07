@@ -30,10 +30,15 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    role: str
+    role: str                       # the session's active role
+    roles: List[str] = []           # all roles granted to this account
     user_id: int
     name: str
     access_status: Optional[str] = None
+
+
+class SwitchRoleRequest(BaseModel):
+    role: str
 
 
 class TokenData(BaseModel):

@@ -133,6 +133,19 @@ class TestLogin:
         assert data["role"] == "admin"
         assert data["name"] == "Admin User"
 
+    def test_login_records_last_login_at(self, client, db, student_user, admin_headers):
+        assert student_user.last_login_at is None
+        resp = client.post("/auth/login", json={
+            "email": "student@test.local", "password": "testpass123",
+        })
+        assert resp.status_code == 200
+        db.refresh(student_user)
+        assert student_user.last_login_at is not None
+
+        detail = client.get(f"/admin/users/{student_user.id}", headers=admin_headers)
+        assert detail.status_code == 200
+        assert detail.json()["last_login_at"] is not None
+
     def test_login_wrong_password(self, client, student_user):
         resp = client.post("/auth/login", json={
             "email": "student@test.local",
@@ -317,6 +330,113 @@ class TestGovIdUpload:
         body = detail.json()
         assert body["gov_id_doc_url"] is not None
         assert body["gov_id_type"] == "Aadhaar Card"
+
+
+# ── multi-role accounts (student/"volunteer" + event_manager) ──────────────────
+
+class TestMultiRole:
+    def test_single_role_login_unchanged(self, client, student_user):
+        resp = client.post("/auth/login", json={
+            "email": "student@test.local", "password": "testpass123",
+        })
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["role"] == "student"
+        assert body["roles"] == ["student"]
+
+    def test_admin_grants_a_role(self, client, db, student_user, admin_headers):
+        resp = client.post(
+            f"/admin/users/{student_user.id}/roles",
+            json={"role": "event_manager"},
+            headers=admin_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert set(resp.json()["roles"]) == {"student", "event_manager"}
+
+        db.refresh(student_user)
+        assert {r.value for r in student_user.granted_roles} == {"student", "event_manager"}
+
+        login = client.post("/auth/login", json={
+            "email": "student@test.local", "password": "testpass123",
+        })
+        assert login.status_code == 200, login.text
+        body = login.json()
+        assert body["role"] == "student"  # primary role stays the default active role
+        assert sorted(body["roles"]) == ["event_manager", "student"]
+
+    def test_only_super_admin_can_grant_super_admin_role(self, client, student_user, admin_headers):
+        resp = client.post(
+            f"/admin/users/{student_user.id}/roles",
+            json={"role": "super_admin"},
+            headers=admin_headers,
+        )
+        assert resp.status_code == 403
+
+    def test_granted_role_can_be_revoked(self, client, db, student_user, admin_headers):
+        client.post(
+            f"/admin/users/{student_user.id}/roles",
+            json={"role": "event_manager"},
+            headers=admin_headers,
+        )
+        resp = client.delete(f"/admin/users/{student_user.id}/roles/event_manager", headers=admin_headers)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["roles"] == ["student"]
+        db.refresh(student_user)
+        assert {r.value for r in student_user.granted_roles} == {"student"}
+
+    def test_switch_role_succeeds_for_granted_role(self, client, student_user, student_headers, admin_headers):
+        client.post(
+            f"/admin/users/{student_user.id}/roles",
+            json={"role": "event_manager"},
+            headers=admin_headers,
+        )
+        resp = client.post(
+            "/auth/switch-role", json={"role": "event_manager"}, headers=student_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["role"] == "event_manager"
+        assert sorted(body["roles"]) == ["event_manager", "student"]
+
+    def test_switch_role_rejects_ungranted_role(self, client, student_headers):
+        # student_user has no secondary role granted
+        resp = client.post(
+            "/auth/switch-role", json={"role": "event_manager"}, headers=student_headers,
+        )
+        assert resp.status_code == 403
+
+    def test_switch_role_rejects_invalid_role_name(self, client, student_headers):
+        resp = client.post(
+            "/auth/switch-role", json={"role": "not_a_role"}, headers=student_headers,
+        )
+        assert resp.status_code == 422
+
+    def test_active_role_gates_endpoints_after_switching(self, client, student_user, student_headers, admin_headers):
+        # Before switching: student endpoints work, event_manager endpoints don't.
+        assert client.get("/student/activities", headers=student_headers).status_code == 200
+        assert client.get("/event-manager/dashboard", headers=student_headers).status_code == 403
+
+        client.post(
+            f"/admin/users/{student_user.id}/roles",
+            json={"role": "event_manager"},
+            headers=admin_headers,
+        )
+        switched = client.post(
+            "/auth/switch-role", json={"role": "event_manager"}, headers=student_headers,
+        )
+        em_headers = {"Authorization": f"Bearer {switched.json()['access_token']}"}
+
+        # After switching to event_manager: EM endpoints work, student endpoints don't.
+        assert client.get("/event-manager/dashboard", headers=em_headers).status_code == 200
+        assert client.get("/student/activities", headers=em_headers).status_code == 403
+
+        # Switching back restores student access.
+        back = client.post(
+            "/auth/switch-role", json={"role": "student"}, headers=em_headers,
+        )
+        student_again_headers = {"Authorization": f"Bearer {back.json()['access_token']}"}
+        assert client.get("/student/activities", headers=student_again_headers).status_code == 200
+        assert client.get("/event-manager/dashboard", headers=student_again_headers).status_code == 403
 
 
 # ── role-based access ──────────────────────────────────────────────────────────

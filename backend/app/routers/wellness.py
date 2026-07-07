@@ -23,14 +23,14 @@ router = APIRouter(prefix="/users/{user_id}/wellness", tags=["Wellness"])
 
 def _assert_wellness_access(current_user: User, user_id: int) -> None:
     """Self, mentor, or admin may access wellness data."""
-    if current_user.id != user_id and current_user.role not in (
+    if current_user.id != user_id and current_user.active_role not in (
         UserRole.mentor, UserRole.admin, UserRole.super_admin
     ):
         raise HTTPException(status_code=403, detail="Access denied")
 
 
 def _assert_mentor_manager(current_user: User) -> None:
-    if current_user.role not in (
+    if current_user.active_role not in (
         UserRole.mentor, UserRole.admin, UserRole.super_admin
     ):
         raise HTTPException(status_code=403, detail="Only mentors and admins may manage counselling slots")
@@ -68,7 +68,7 @@ def list_my_slots(
     current_user: User = Depends(get_current_user),
 ):
     _assert_mentor_manager(current_user)
-    mentor_id = user_id if current_user.role in (UserRole.admin, UserRole.super_admin) else current_user.id
+    mentor_id = user_id if current_user.active_role in (UserRole.admin, UserRole.super_admin) else current_user.id
     return wellness_crud.list_mentor_slots(db, mentor_id)
 
 
@@ -80,7 +80,7 @@ def list_mentor_sessions(
     current_user: User = Depends(get_current_user),
 ):
     _assert_mentor_manager(current_user)
-    mentor_id = user_id if current_user.role in (UserRole.admin, UserRole.super_admin) else current_user.id
+    mentor_id = user_id if current_user.active_role in (UserRole.admin, UserRole.super_admin) else current_user.id
     return wellness_crud.get_mentor_sessions(db, mentor_id)
 
 
@@ -95,7 +95,7 @@ def create_slot(
     _assert_mentor_manager(current_user)
     if payload.ends_at <= payload.starts_at:
         raise HTTPException(status_code=422, detail="ends_at must be after starts_at")
-    mentor_id = user_id if current_user.role in (UserRole.admin, UserRole.super_admin) else current_user.id
+    mentor_id = user_id if current_user.active_role in (UserRole.admin, UserRole.super_admin) else current_user.id
     mentor_name = current_user.name
     if mentor_id != current_user.id:
         mentor = db.query(User).filter(User.id == mentor_id).first()
@@ -129,7 +129,7 @@ def update_slot(
     _assert_mentor_manager(current_user)
     if payload.starts_at and payload.ends_at and payload.ends_at <= payload.starts_at:
         raise HTTPException(status_code=422, detail="ends_at must be after starts_at")
-    if current_user.role == UserRole.mentor:
+    if current_user.active_role == UserRole.mentor:
         existing = wellness_crud.get_availability_slot(db, slot_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Slot not found")
@@ -153,7 +153,7 @@ def delete_slot(
     slot = wellness_crud.get_availability_slot(db, slot_id)
     if not slot:
         raise HTTPException(status_code=404, detail="Slot not found")
-    if current_user.role == UserRole.mentor and slot.mentor_id != current_user.id:
+    if current_user.active_role == UserRole.mentor and slot.mentor_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     delete_availability_slot(db, slot_id)
 
@@ -195,7 +195,7 @@ def update_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role not in (
+    if current_user.active_role not in (
         UserRole.mentor, UserRole.admin, UserRole.super_admin
     ):
         raise HTTPException(status_code=403, detail="Only mentors and admins may update sessions")

@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import '../../app_state.dart';
 import '../../core/colors.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
+import '../../viewmodels/events_viewmodel.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
+import '../events/events_dashboard_screen.dart';
 import '../profile/profile_view.dart';
 import 'em_activities_view.dart';
 import 'em_home_view.dart';
-import 'em_events_view.dart';
 import 'em_students_view.dart';
 import 'em_impact_view.dart';
 
@@ -21,12 +22,14 @@ class EventManagerShell extends StatefulWidget {
 class _EventManagerShellState extends State<EventManagerShell> {
   int _selectedIndex = 0;
   late final EventManagerViewModel _vm;
+  late final EventsViewModel _eventsVm;
   final _studentsTabNotifier = ValueNotifier<int>(0);
 
   @override
   void initState() {
     super.initState();
     _vm = EventManagerViewModel()..load();
+    _eventsVm = EventsViewModel(isAdmin: false)..load();
     CounsellorViewModel.shared.load();
   }
 
@@ -34,6 +37,7 @@ class _EventManagerShellState extends State<EventManagerShell> {
   void dispose() {
     _studentsTabNotifier.dispose();
     _vm.dispose();
+    _eventsVm.dispose();
     super.dispose();
   }
 
@@ -48,7 +52,7 @@ class _EventManagerShellState extends State<EventManagerShell> {
 
     final pages = [
       EMHomeView(vm: _vm, managerName: name, onNavigateToStudents: _navigateToStudents),
-      EMEventsView(vm: _vm),
+      EventsDashboardScreen(vm: _eventsVm),
       EMActivitiesView(vm: _vm),
       EMStudentsView(vm: _vm, tabNotifier: _studentsTabNotifier),
       EMImpactView(vm: _vm),
@@ -56,7 +60,7 @@ class _EventManagerShellState extends State<EventManagerShell> {
     ];
 
     return ListenableBuilder(
-      listenable: _vm,
+      listenable: Listenable.merge([_vm, _eventsVm]),
       builder: (context, _) {
         final pendingCount =
             _vm.stats.pendingSubmissions +
@@ -83,9 +87,14 @@ class _EventManagerShellState extends State<EventManagerShell> {
                 selectedIcon: const Icon(Icons.home_rounded),
                 label: 'Home',
               ),
-              const NavigationDestination(
-                icon: Icon(Icons.event_outlined),
-                selectedIcon: Icon(Icons.event_rounded),
+              NavigationDestination(
+                icon: Badge(
+                  isLabelVisible:
+                      _eventsVm.needsAttentionCount > 0 && _selectedIndex != 1,
+                  label: Text('${_eventsVm.needsAttentionCount}'),
+                  child: const Icon(Icons.event_outlined),
+                ),
+                selectedIcon: const Icon(Icons.event_rounded),
                 label: 'Events',
               ),
               NavigationDestination(

@@ -251,12 +251,23 @@ class CounsellorViewModel extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  void toggleFeatured(int counsellorId) {
+  Future<void> toggleFeatured(int counsellorId) async {
     final idx = _counsellors.indexWhere((c) => c.id == counsellorId);
     if (idx < 0) return;
     final c = _counsellors[idx];
-    _counsellors[idx] = c.copyWith(isFeatured: !c.isFeatured);
+    final next = !c.isFeatured;
+    // Optimistic update, rolled back if the persist call fails.
+    _counsellors[idx] = c.copyWith(isFeatured: next);
     if (!_disposed) notifyListeners();
+    try {
+      await CounsellingRepository.updateCounsellorByUserId(
+        counsellorId,
+        {'featured': next},
+      );
+    } catch (_) {
+      _counsellors[idx] = c;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   void updateCounsellor(CounsellorProfile profile) {

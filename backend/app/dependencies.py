@@ -38,6 +38,27 @@ from .permissions import ROLE_HIERARCHY, ROLE_PERMISSIONS, Permission
 _bearer = HTTPBearer(auto_error=False)
 
 
+# ── active-role resolution ───────────────────────────────────────────────────
+
+def _attach_active_role(user: User, payload: dict) -> User:
+    """Resolve which role this token's session is "acting as" and stash it on
+    the (otherwise unmodified) User instance as a plain, non-persisted
+    attribute. Falls back to the account's primary role for tokens issued
+    before the active_role claim existed, and for any active_role value that
+    isn't (or is no longer) one of the account's granted roles — so a granted
+    role that's later revoked can't be smuggled in via a stale token.
+    """
+    claimed = payload.get("active_role")
+    try:
+        role = UserRole(claimed) if claimed else user.role
+    except ValueError:
+        role = user.role
+    if role not in user.granted_roles:
+        role = user.role
+    user.active_role = role
+    return user
+
+
 # ── authentication ─────────────────────────────────────────────────────────────
 
 def get_current_user(
@@ -60,7 +81,7 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found or account inactive")
-    return user
+    return _attach_active_role(user, payload)
 
 
 def get_optional_user(
@@ -78,7 +99,8 @@ def get_optional_user(
         return None
     if is_token_revoked(db, jti):
         return None
-    return db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+    user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+    return _attach_active_role(user, payload) if user else None
 
 
 def get_download_user(
@@ -101,7 +123,7 @@ def get_download_user(
     user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
     if not user:
         raise HTTPException(401, "User not found or inactive")
-    return user
+    return _attach_active_role(user, payload)
 
 
 # ── role helpers ───────────────────────────────────────────────────────────────
@@ -132,7 +154,7 @@ def require_role(*allowed: UserRole):
     min_level = min(_role_level(r) for r in allowed)
 
     def _guard(current_user: User = Depends(get_current_user)) -> User:
-        if _role_level(current_user.role) >= min_level:
+        if _role_level(current_user.active_role) >= min_level:
             return current_user
         raise HTTPException(
             status_code=403,
@@ -145,12 +167,12 @@ def require_permission(permission: Permission):
     """
     Dependency factory that enforces a named permission.
 
-    Checks ROLE_PERMISSIONS for the caller's role. Use this for fine-grained
-    checks that go beyond simple hierarchy (e.g., VIEW_ANALYTICS which is
-    granted to mentor+ but not to content_creator even though cc < mentor).
+    Checks ROLE_PERMISSIONS for the caller's active role. Use this for
+    fine-grained checks that go beyond simple hierarchy (e.g., VIEW_ANALYTICS
+    which is granted to mentor+ but not to content_creator even though cc < mentor).
     """
     def _guard(current_user: User = Depends(get_current_user)) -> User:
-        if permission in ROLE_PERMISSIONS.get(current_user.role, frozenset()):
+        if permission in ROLE_PERMISSIONS.get(current_user.active_role, frozenset()):
             return current_user
         raise HTTPException(
             status_code=403,
@@ -164,6 +186,15 @@ def require_permission(permission: Permission):
 def admin_only(
     current_user: User = Depends(require_role(UserRole.admin, UserRole.super_admin)),
 ) -> User:
+    return current_user
+
+
+def student_only(current_user: User = Depends(get_current_user)) -> User:
+    """Exact match on the active role — no hierarchy inheritance, since a
+    higher-privileged user (e.g. admin) acting as a student is a distinct
+    active session, not an escalation."""
+    if current_user.active_role != UserRole.student:
+        raise HTTPException(status_code=403, detail="Student access required")
     return current_user
 
 

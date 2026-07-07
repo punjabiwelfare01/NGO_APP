@@ -37,6 +37,9 @@ class _WorkSubmissionScreenState extends State<WorkSubmissionScreen> {
   final _remarksCtrl = TextEditingController();
 
   VolunteerActivity? _selectedActivity;
+  // null = auto-route (event manager if the activity is EM-owned, else
+  // admin); explicit value overrides that default.
+  String? _reviewTarget;
   bool _submitting = false;
   bool _submitted = false;
 
@@ -87,7 +90,15 @@ class _WorkSubmissionScreenState extends State<WorkSubmissionScreen> {
         .map((a) => a.activity)
         .whereType<VolunteerActivity>()
         .toList();
-    return assigned.isNotEmpty ? assigned : widget.vm.activities;
+    final list = assigned.isNotEmpty ? assigned : widget.vm.activities;
+    // Guarantee the pre-selected activity (from an assignment/activity card)
+    // is always a valid dropdown option, even if it's missing from the
+    // viewmodel's current lists (e.g. not loaded yet).
+    final selected = _selectedActivity;
+    if (selected != null && !list.any((a) => a.id == selected.id)) {
+      return [selected, ...list];
+    }
+    return list;
   }
 
   @override
@@ -160,9 +171,15 @@ class _WorkSubmissionScreenState extends State<WorkSubmissionScreen> {
     final proofFilesJson = _proofFiles.isEmpty
         ? null
         : jsonEncode(_proofFiles.map((f) => f.url).toList());
+    // Only forward the pre-existing assignment id when it still matches the
+    // selected activity — if the user changed the activity, the backend
+    // resolves (or creates) the right assignment for the new one.
+    final assignmentId = widget.assignment?.activityId == _selectedActivity!.id
+        ? widget.assignment?.id
+        : null;
     final result = await widget.vm.submitWork(
       activityId: _selectedActivity!.id,
-      assignmentId: widget.assignment?.id,
+      assignmentId: assignmentId,
       title: _titleCtrl.text.trim(),
       description: _descCtrl.text.trim(),
       hoursWorked: double.tryParse(_hoursCtrl.text) ?? 0,
@@ -171,6 +188,7 @@ class _WorkSubmissionScreenState extends State<WorkSubmissionScreen> {
       transactionId: _txnCtrl.text.trim().isEmpty ? null : _txnCtrl.text.trim(),
       remarks: _remarksCtrl.text.trim().isEmpty ? null : _remarksCtrl.text.trim(),
       proofFiles: proofFilesJson,
+      reviewTarget: _reviewTarget,
     );
     setState(() {
       _submitting = false;
@@ -206,16 +224,15 @@ class _WorkSubmissionScreenState extends State<WorkSubmissionScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Activity selector — locked when coming from an assignment card
+          // Activity selector — pre-selected when opened from an activity
+          // card, but always editable so the flow is identical regardless
+          // of entry point.
           _SectionLabel(label: 'Activity *'),
-          if (widget.assignment != null && _selectedActivity != null)
-            _ActivityLockedTile(activity: _selectedActivity!)
-          else
-            _ActivityDropdown(
-              activities: _assignedActivities,
-              selected: _selectedActivity,
-              onChanged: (a) => setState(() => _selectedActivity = a),
-            ),
+          _ActivityDropdown(
+            activities: _assignedActivities,
+            selected: _selectedActivity,
+            onChanged: (a) => setState(() => _selectedActivity = a),
+          ),
           const SizedBox(height: 14),
 
           _SectionLabel(label: 'Work Title *'),
@@ -298,6 +315,41 @@ class _WorkSubmissionScreenState extends State<WorkSubmissionScreen> {
             disabled: _submitting,
             onPickFiles: _pickAndUploadProof,
             onRemove: (i) => setState(() => _proofFiles.removeAt(i)),
+          ),
+          const SizedBox(height: 14),
+
+          _SectionLabel(label: 'Reviewer'),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              _isEditing
+                  ? 'Leave on Auto to keep the current reviewer.'
+                  : "Who should review this? Auto picks the activity's event manager, or NGO Admin if it has none.",
+              style: TextStyle(
+                color: AppColors.muted.withValues(alpha: 0.8),
+                fontSize: 11,
+              ),
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('Auto'),
+                selected: _reviewTarget == null,
+                onSelected: (_) => setState(() => _reviewTarget = null),
+              ),
+              ChoiceChip(
+                label: const Text('Event Manager'),
+                selected: _reviewTarget == 'event_manager',
+                onSelected: (_) => setState(() => _reviewTarget = 'event_manager'),
+              ),
+              ChoiceChip(
+                label: const Text('NGO Admin'),
+                selected: _reviewTarget == 'admin',
+                onSelected: (_) => setState(() => _reviewTarget = 'admin'),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
 
@@ -520,40 +572,6 @@ class _ProofUploadSection extends StatelessWidget {
 }
 
 // ── Supporting widgets ────────────────────────────────────────────────────────
-
-class _ActivityLockedTile extends StatelessWidget {
-  const _ActivityLockedTile({required this.activity});
-  final VolunteerActivity activity;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(
-        color: AppColors.muted.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.muted.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              activity.title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.ink,
-              ),
-            ),
-          ),
-          Icon(Icons.lock_outline_rounded,
-              size: 15, color: AppColors.muted.withValues(alpha: 0.5)),
-        ],
-      ),
-    );
-  }
-}
 
 class _ActivityDropdown extends StatelessWidget {
   const _ActivityDropdown({

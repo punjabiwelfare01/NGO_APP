@@ -186,7 +186,9 @@ class WorkSubmission {
   final String? remarks;
   final String? reviewerNotes;
   final DateTime? createdAt;
+  final DateTime? reviewedAt;
   final VolunteerActivity? activity;
+  final String reviewTarget;
 
   const WorkSubmission({
     required this.id,
@@ -204,7 +206,9 @@ class WorkSubmission {
     this.remarks,
     this.reviewerNotes,
     this.createdAt,
+    this.reviewedAt,
     this.activity,
+    this.reviewTarget = 'admin',
   });
 
   factory WorkSubmission.fromJson(Map<String, dynamic> j) => WorkSubmission(
@@ -225,10 +229,22 @@ class WorkSubmission {
     createdAt: j['created_at'] == null
         ? null
         : DateTime.tryParse(j['created_at'] as String),
+    reviewedAt: _parseUtc(j['reviewed_at'] as String?),
     activity: j['activity'] == null
         ? null
         : VolunteerActivity.fromJson(j['activity'] as Map<String, dynamic>),
+    reviewTarget: j['review_target'] as String? ?? 'admin',
   );
+
+  // Backend sends naive UTC timestamps (Python's datetime.utcnow()) with no
+  // 'Z'/offset suffix, which DateTime.parse would otherwise misinterpret as
+  // local time. Force UTC so IST conversion downstream is accurate on any
+  // device regardless of its own timezone setting.
+  static DateTime? _parseUtc(String? raw) {
+    if (raw == null) return null;
+    final hasOffset = raw.endsWith('Z') || RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(raw);
+    return DateTime.tryParse(hasOffset ? raw : '${raw}Z');
+  }
 }
 
 class DailyLog {

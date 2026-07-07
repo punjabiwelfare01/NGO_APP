@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from ..crud import volunteer_crud
 from ..database import get_db
-from ..dependencies import get_current_user
+from ..dependencies import get_current_user, student_only
 from ..models.event import Event, EventStatus
-from ..models.user import User, UserRole
+from ..models.user import User
 from ..models.volunteer import VolunteerActivity
 from ..schemas.volunteer import (
     ActivityApplicationCreate,
@@ -19,8 +19,6 @@ from ..schemas.volunteer import (
     ActivityAssignmentOut,
     StudentActivityOut,
     StudentWorkSummary,
-    WorkSubmissionCreate,
-    WorkSubmissionOut,
 )
 
 router = APIRouter(prefix="/student", tags=["Student Work"])
@@ -28,12 +26,6 @@ router = APIRouter(prefix="/student", tags=["Student Work"])
 _UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
 _PROOF_ALLOWED = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov"}
 _PROOF_MAX_BYTES = 50 * 1024 * 1024  # 50 MB
-
-
-def _student(user: User = Depends(get_current_user)) -> User:
-    if user.role != UserRole.student:
-        raise HTTPException(403, "Student access required")
-    return user
 
 
 def _activity_payload(activity, application=None, assignment=None):
@@ -75,7 +67,7 @@ _VISIBLE_EVENT_STATUSES = [
 
 
 @router.get("/activities", response_model=List[StudentActivityOut])
-def activities(db: Session = Depends(get_db), user: User = Depends(_student)):
+def activities(db: Session = Depends(get_db), user: User = Depends(student_only)):
     applications = {
         item.activity_id: item
         for item in volunteer_crud.get_applications_for_student(db, user.id)
@@ -105,7 +97,7 @@ def activities(db: Session = Depends(get_db), user: User = Depends(_student)):
 
 
 @router.get("/activities/{activity_id}", response_model=StudentActivityOut)
-def activity(activity_id: int, db: Session = Depends(get_db), user: User = Depends(_student)):
+def activity(activity_id: int, db: Session = Depends(get_db), user: User = Depends(student_only)):
     item = volunteer_crud.get_activity(db, activity_id)
     if not item:
         raise HTTPException(404, "Activity not found")
@@ -129,7 +121,7 @@ def apply(
     activity_id: int,
     data: ActivityApplicationCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(_student),
+    user: User = Depends(student_only),
 ):
     item = volunteer_crud.get_activity(db, activity_id)
     if not item:
@@ -147,81 +139,18 @@ def apply(
 
 
 @router.get("/assignments", response_model=List[ActivityAssignmentOut])
-def assignments(db: Session = Depends(get_db), user: User = Depends(_student)):
+def assignments(db: Session = Depends(get_db), user: User = Depends(student_only)):
     return volunteer_crud.get_assignments_for_student(db, user.id)
 
 
 @router.get("/assignments/{assignment_id}", response_model=ActivityAssignmentOut)
-def assignment(assignment_id: int, db: Session = Depends(get_db), user: User = Depends(_student)):
+def assignment(assignment_id: int, db: Session = Depends(get_db), user: User = Depends(student_only)):
     item = volunteer_crud.get_assignment(db, assignment_id)
     if not item or item.student_id != user.id:
         raise HTTPException(404, "Assignment not found")
     return item
 
 
-@router.post("/assignments/{assignment_id}/submit-work", response_model=WorkSubmissionOut, status_code=201)
-def submit_assignment_work(
-    assignment_id: int,
-    data: WorkSubmissionCreate,
-    db: Session = Depends(get_db),
-    user: User = Depends(_student),
-):
-    assignment = volunteer_crud.get_assignment(db, assignment_id)
-    if not assignment or assignment.student_id != user.id:
-        raise HTTPException(404, "Assignment not found")
-
-    # If a previous submission exists for this assignment, update it (resubmit)
-    # rather than blocking with 409. This supports the "Edit & Resubmit" flow.
-    from ..models.volunteer import WorkSubmission as WS
-    from sqlalchemy import or_, and_
-    existing_sub = (
-        db.query(WS)
-        .filter(
-            or_(
-                WS.assignment_id == assignment_id,
-                and_(
-                    WS.assignment_id.is_(None),
-                    WS.student_id == user.id,
-                    WS.activity_id == assignment.activity_id,
-                ),
-            )
-        )
-        .order_by(WS.created_at.desc())
-        .first()
-    )
-
-    if existing_sub and assignment.status in (
-        "submitted", "resubmission_requested", "event_manager_verified",
-    ):
-        # Update the most-recent submission in-place
-        existing_sub.title = data.title
-        existing_sub.description = data.description
-        existing_sub.hours_worked = data.hours_worked
-        existing_sub.people_reached = data.people_reached
-        existing_sub.donation_collected = data.donation_collected
-        existing_sub.transaction_id = data.transaction_id
-        existing_sub.remarks = data.remarks
-        if data.proof_files is not None:
-            existing_sub.proof_files = data.proof_files
-        existing_sub.status = "submitted"
-        # Link the orphaned submission to this assignment
-        if existing_sub.assignment_id is None:
-            existing_sub.assignment_id = assignment_id
-        assignment.status = "submitted"
-        db.commit()
-        db.refresh(existing_sub)
-        return existing_sub
-
-    if assignment.status in ("admin_approved", "certificate_generated", "completed"):
-        raise HTTPException(409, "Work is already approved — it cannot be resubmitted")
-
-    payload = data.model_copy(update={
-        "assignment_id": assignment.id,
-        "activity_id": assignment.activity_id,
-    })
-    return volunteer_crud.create_submission(db, payload, user.id)
-
-
 @router.get("/work-summary", response_model=StudentWorkSummary)
-def work_summary(db: Session = Depends(get_db), user: User = Depends(_student)):
+def work_summary(db: Session = Depends(get_db), user: User = Depends(student_only)):
     return volunteer_crud.get_student_work_summary(db, user.id)

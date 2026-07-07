@@ -117,7 +117,9 @@ class AdminViewModel extends ChangeNotifier {
         verificationNote: verificationNote,
       );
       _pendingUsers.removeWhere((u) => u.id == userId);
-      _updateAllUser(userId, role: role, accessStatus: 'approved');
+      final idx = _allUsers.indexWhere((u) => u.id == userId);
+      final roles = idx != -1 ? {..._allUsers[idx].roles, role}.toList() : [role];
+      _updateAllUser(userId, role: role, accessStatus: 'approved', roles: roles);
       if (!_disposed) notifyListeners();
       return true;
     } on ApiException catch (e) {
@@ -230,14 +232,68 @@ class AdminViewModel extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Grants `role` to a user in addition to any roles it already holds.
+  Future<bool> grantRole({required int userId, required String role}) async {
+    try {
+      await AdminRepository.grantRole(userId: userId, role: role);
+      final idx = _allUsers.indexWhere((u) => u.id == userId);
+      if (idx != -1) {
+        final roles = {..._allUsers[idx].roles, role}.toList();
+        _updateAllUser(userId, roles: roles);
+      }
+      if (!_disposed) notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = 'Role update failed (${e.statusCode}).';
+      if (!_disposed) notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Connection failed.';
+      if (!_disposed) notifyListeners();
+      return false;
+    }
+  }
+
+  /// Revokes a previously granted role (cannot revoke the primary role).
+  Future<bool> revokeRole({required int userId, required String role}) async {
+    try {
+      await AdminRepository.revokeRole(userId: userId, role: role);
+      final idx = _allUsers.indexWhere((u) => u.id == userId);
+      if (idx != -1) {
+        final roles = _allUsers[idx].roles.where((r) => r != role).toList();
+        _updateAllUser(userId, roles: roles);
+      }
+      if (!_disposed) notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = 'Role update failed (${e.statusCode}).';
+      if (!_disposed) notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Connection failed.';
+      if (!_disposed) notifyListeners();
+      return false;
+    }
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  void _updateAllUser(int userId, {String? role, String? accessStatus}) {
+  void _updateAllUser(
+    int userId, {
+    String? role,
+    String? accessStatus,
+    String? secondaryRole,
+    bool clearSecondaryRole = false,
+    List<String>? roles,
+  }) {
     final idx = _allUsers.indexWhere((u) => u.id == userId);
     if (idx != -1) {
       _allUsers[idx] = _allUsers[idx].copyWith(
         role: role,
         accessStatus: accessStatus,
+        secondaryRole: secondaryRole,
+        clearSecondaryRole: clearSecondaryRole,
+        roles: roles,
       );
     }
   }

@@ -16,13 +16,14 @@ class _VolunteerAdminScreenState extends State<VolunteerAdminScreen>
   late final VolunteerViewModel _vm;
   late final TabController _tabs;
   List<WorkSubmission> _pending = [];
+  List<WorkSubmission> _approved = [];
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
     _vm = VolunteerViewModel();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     _load();
   }
 
@@ -37,6 +38,7 @@ class _VolunteerAdminScreenState extends State<VolunteerAdminScreen>
     setState(() => _loading = true);
     await _vm.load();
     _pending = await _vm.getPendingSubmissions();
+    _approved = await _vm.getApprovedSubmissions();
     if (mounted) setState(() => _loading = false);
   }
 
@@ -52,6 +54,8 @@ class _VolunteerAdminScreenState extends State<VolunteerAdminScreen>
         elevation: 0,
         bottom: TabBar(
           controller: _tabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.muted,
           indicatorColor: AppColors.primary,
@@ -61,6 +65,10 @@ class _VolunteerAdminScreenState extends State<VolunteerAdminScreen>
             Tab(
               text:
                   'Pending (${_pending.length})',
+            ),
+            Tab(
+              text:
+                  'Approved (${_approved.length})',
             ),
             const Tab(text: 'Activities'),
             const Tab(text: 'Impact Stories'),
@@ -76,6 +84,7 @@ class _VolunteerAdminScreenState extends State<VolunteerAdminScreen>
                   submissions: _pending,
                   onReview: _onReview,
                 ),
+                _ApprovedTab(submissions: _approved),
                 _ActivitiesTab(vm: _vm),
                 _ImpactTab(vm: _vm),
               ],
@@ -91,6 +100,12 @@ class _VolunteerAdminScreenState extends State<VolunteerAdminScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Submission ${status == "approved" ? "approved" : "rejected"}')),
         );
+      }
+      // Refresh the Approved list so a just-approved submission (with its
+      // real reviewed_at timestamp) shows up immediately.
+      if (status == 'approved') {
+        _approved = await _vm.getApprovedSubmissions();
+        if (mounted) setState(() {});
       }
     }
   }
@@ -262,6 +277,131 @@ class _PendingCardState extends State<_PendingCard> {
     );
     if (mounted) setState(() => _busy = false);
   }
+}
+
+// ── Approved Submissions Tab ──────────────────────────────────────────────────
+
+class _ApprovedTab extends StatelessWidget {
+  const _ApprovedTab({required this.submissions});
+  final List<WorkSubmission> submissions;
+
+  @override
+  Widget build(BuildContext context) {
+    if (submissions.isEmpty) {
+      return const Center(
+        child: Text('No approved work yet',
+            style: TextStyle(color: AppColors.muted)),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: submissions.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (_, i) => _ApprovedCard(submission: submissions[i]),
+    );
+  }
+}
+
+class _ApprovedCard extends StatelessWidget {
+  const _ApprovedCard({required this.submission});
+  final WorkSubmission submission;
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = submission;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  sub.title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.ink,
+                      fontSize: 15),
+                ),
+              ),
+              const Icon(Icons.check_circle_rounded,
+                  color: AppColors.secondary, size: 18),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(sub.description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            children: [
+              _InfoChip(
+                  icon: Icons.schedule_rounded,
+                  label: '${sub.hoursWorked}h',
+                  color: AppColors.primary),
+              _InfoChip(
+                  icon: Icons.people_rounded,
+                  label: '${sub.peopleReached} reached',
+                  color: AppColors.secondary),
+              if (sub.donationCollected > 0)
+                _InfoChip(
+                    icon: Icons.currency_rupee_rounded,
+                    label: '₹${sub.donationCollected.toStringAsFixed(0)}',
+                    color: AppColors.accent),
+            ],
+          ),
+          if (sub.reviewerNotes != null && sub.reviewerNotes!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Note: ${sub.reviewerNotes}',
+                style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+          ],
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.event_available_rounded,
+                  size: 14, color: AppColors.secondary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  sub.reviewedAt == null
+                      ? 'Approved'
+                      : 'Approved on ${formatIst(sub.reviewedAt!)}',
+                  style: const TextStyle(
+                      color: AppColors.secondary,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Formats a UTC [dateTime] as Indian Standard Time (UTC+5:30), independent
+/// of the device's own timezone setting — e.g. "6 Jul 2026, 4:55 PM IST".
+String formatIst(DateTime dateTime) {
+  final utc = dateTime.isUtc ? dateTime : dateTime.toUtc();
+  final ist = utc.add(const Duration(hours: 5, minutes: 30));
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  final hour12 = ist.hour % 12 == 0 ? 12 : ist.hour % 12;
+  final ampm = ist.hour < 12 ? 'AM' : 'PM';
+  final minute = ist.minute.toString().padLeft(2, '0');
+  return '${ist.day} ${months[ist.month - 1]} ${ist.year}, $hour12:$minute $ampm IST';
 }
 
 // ── Activities Tab ────────────────────────────────────────────────────────────

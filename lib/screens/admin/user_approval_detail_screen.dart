@@ -25,10 +25,21 @@ class UserApprovalDetailScreen extends StatefulWidget {
       _UserApprovalDetailScreenState();
 }
 
+const _kAssignableRoles = {
+  'student',
+  'mentor',
+  'content_creator',
+  'event_manager',
+  'support_staff',
+  'school_partner',
+};
+
 class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
   final _noteCtrl = TextEditingController();
-  String? _selectedRole;
+  Set<String> _selectedRoles = {};
+  String? _primaryRole;
   bool _loading = false;
+  bool _savingRoles = false;
   bool _changed = false;
   AppUser? _user;
   String? _loadError;
@@ -54,19 +65,15 @@ class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
         final requestedRole = user.requestedRole == 'counsellor'
             ? 'mentor'
             : user.requestedRole;
-        const assignableRoles = {
-          'student',
-          'mentor',
-          'content_creator',
-          'event_manager',
-          'support_staff',
-          'school_partner',
-        };
+        final primary = _kAssignableRoles.contains(requestedRole)
+            ? requestedRole!
+            : (user.role ?? 'student');
         setState(() {
           _user = user;
-          _selectedRole = assignableRoles.contains(requestedRole)
-              ? requestedRole
-              : null;
+          _primaryRole = primary;
+          _selectedRoles = user.roles.isNotEmpty
+              ? {...user.roles, primary}
+              : {primary};
           _loading = false;
         });
       }
@@ -176,12 +183,58 @@ class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
           ],
 
           // ── Role assignment ──────────────────────────────────────────
-          _SectionLabel('Assign Role'),
-          const SizedBox(height: 8),
-          _RoleSelector(
-            selected: _selectedRole,
-            onChanged: (v) => setState(() => _selectedRole = v),
+          _SectionLabel('Assign Roles'),
+          const SizedBox(height: 4),
+          const Text(
+            'Select every dashboard this account should have access to. '
+            'Tap the star to choose which one is the primary/default role.',
+            style: TextStyle(color: AppColors.muted, fontSize: 12),
           ),
+          const SizedBox(height: 8),
+          _MultiRoleSelector(
+            selectedRoles: _selectedRoles,
+            primaryRole: _primaryRole,
+            onToggle: (role) => setState(() {
+              if (_selectedRoles.contains(role)) {
+                if (_selectedRoles.length == 1) return; // must keep >= 1
+                _selectedRoles.remove(role);
+                if (_primaryRole == role) {
+                  _primaryRole = _selectedRoles.first;
+                }
+              } else {
+                _selectedRoles.add(role);
+              }
+            }),
+            onSetPrimary: (role) => setState(() => _primaryRole = role),
+          ),
+          const SizedBox(height: 12),
+          if (_user!.accessStatus == 'approved')
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: _savingRoles ? null : _saveRoles,
+                icon: _savingRoles
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.save_outlined, size: 18),
+                label: const Text('Save Roles'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 20),
 
           // ── Verification note ────────────────────────────────────────
@@ -238,9 +291,7 @@ class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: _loading || _selectedRole == null
-                      ? null
-                      : _approve,
+                  onPressed: _loading || _primaryRole == null ? null : _approve,
                   icon: _loading
                       ? const SizedBox(
                           width: 16,
@@ -272,33 +323,40 @@ class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
   }
 
   Future<void> _approve() async {
-    if (_selectedRole == null) return;
+    if (_primaryRole == null) return;
+    final extra = _selectedRoles.where((r) => r != _primaryRole).toList();
+    final label = extra.isEmpty
+        ? _roleLabel(_primaryRole!)
+        : '${_roleLabel(_primaryRole!)} + ${extra.length} more';
     final confirmed = await _confirm(
-      title: 'Approve as ${_roleLabel(_selectedRole!)}?',
+      title: 'Approve as $label?',
       body:
-          '${_user!.name} will be granted access to the ${_roleLabel(_selectedRole!)} dashboard.',
+          '${_user!.name} will be granted access to: '
+          '${_selectedRoles.map(_roleLabel).join(', ')}.',
       confirmLabel: 'Approve',
       confirmColor: AppColors.accent,
     );
     if (!confirmed || !mounted) return;
 
     setState(() => _loading = true);
-    final ok = await widget.vm.assignRole(
+    var ok = await widget.vm.assignRole(
       userId: widget.userId,
-      role: _selectedRole!,
+      role: _primaryRole!,
       verificationNote: _noteCtrl.text.trim().isEmpty
           ? null
           : _noteCtrl.text.trim(),
     );
+    for (final role in extra) {
+      if (!ok) break;
+      ok = await widget.vm.grantRole(userId: widget.userId, role: role);
+    }
     if (!mounted) return;
     setState(() => _loading = false);
     if (ok) {
       _changed = true;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '${_user!.name} approved as ${_roleLabel(_selectedRole!)}.',
-          ),
+          content: Text('${_user!.name} approved as $label.'),
           backgroundColor: AppColors.accent,
         ),
       );
@@ -307,6 +365,52 @@ class _UserApprovalDetailScreenState extends State<UserApprovalDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(widget.vm.errorMessage ?? 'Failed to assign role.'),
+          backgroundColor: AppColors.softRed,
+        ),
+      );
+    }
+  }
+
+  /// For an already-approved user: reconciles the checklist against the
+  /// account's current roles by granting newly-checked roles, revoking
+  /// unchecked ones, and re-assigning the primary role if it changed.
+  Future<void> _saveRoles() async {
+    if (_primaryRole == null) return;
+    setState(() => _savingRoles = true);
+
+    final existing = _user!.roles.toSet();
+    var ok = true;
+    if (_primaryRole != _user!.role) {
+      ok = await widget.vm.assignRole(userId: widget.userId, role: _primaryRole!);
+    }
+    for (final role in _selectedRoles.difference(existing)) {
+      if (!ok) break;
+      if (role == _primaryRole) continue; // already granted by assignRole
+      ok = await widget.vm.grantRole(userId: widget.userId, role: role);
+    }
+    for (final role in existing.difference(_selectedRoles)) {
+      if (!ok) break;
+      ok = await widget.vm.revokeRole(userId: widget.userId, role: role);
+    }
+
+    if (!mounted) return;
+    setState(() => _savingRoles = false);
+    if (ok) {
+      _changed = true;
+      _user = _user!.copyWith(
+        role: _primaryRole,
+        roles: _selectedRoles.toList(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_user!.name}\'s roles were updated.'),
+          backgroundColor: AppColors.accent,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.vm.errorMessage ?? 'Failed to update roles.'),
           backgroundColor: AppColors.softRed,
         ),
       );
@@ -559,10 +663,21 @@ class _RequestedRoleBanner extends StatelessWidget {
   }
 }
 
-class _RoleSelector extends StatelessWidget {
-  const _RoleSelector({required this.selected, required this.onChanged});
-  final String? selected;
-  final ValueChanged<String?> onChanged;
+/// Multi-select checklist: an admin can check any number of roles to grant
+/// them all to the account, and mark one of the checked roles as primary
+/// (the account's default/login role) by tapping its star.
+class _MultiRoleSelector extends StatelessWidget {
+  const _MultiRoleSelector({
+    required this.selectedRoles,
+    required this.primaryRole,
+    required this.onToggle,
+    required this.onSetPrimary,
+  });
+
+  final Set<String> selectedRoles;
+  final String? primaryRole;
+  final ValueChanged<String> onToggle;
+  final ValueChanged<String> onSetPrimary;
 
   static const _roles = [
     ('student', 'Student', Icons.school_outlined, AppColors.primary),
@@ -598,12 +713,13 @@ class _RoleSelector extends StatelessWidget {
     return Column(
       children: _roles.map((r) {
         final (value, label, icon, color) = r;
-        final isSelected = selected == value;
+        final isSelected = selectedRoles.contains(value);
+        final isPrimary = primaryRole == value;
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => onChanged(value),
+            onTap: () => onToggle(value),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -622,10 +738,14 @@ class _RoleSelector extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    icon,
+                    isSelected
+                        ? Icons.check_box_rounded
+                        : Icons.check_box_outline_blank_rounded,
                     size: 20,
                     color: isSelected ? color : AppColors.muted,
                   ),
+                  const SizedBox(width: 10),
+                  Icon(icon, size: 20, color: isSelected ? color : AppColors.muted),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -638,7 +758,15 @@ class _RoleSelector extends StatelessWidget {
                     ),
                   ),
                   if (isSelected)
-                    Icon(Icons.check_circle_rounded, size: 18, color: color),
+                    IconButton(
+                      onPressed: () => onSetPrimary(value),
+                      tooltip: isPrimary ? 'Primary role' : 'Set as primary',
+                      icon: Icon(
+                        isPrimary ? Icons.star_rounded : Icons.star_outline_rounded,
+                        size: 20,
+                        color: isPrimary ? color : AppColors.muted,
+                      ),
+                    ),
                 ],
               ),
             ),

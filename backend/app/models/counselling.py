@@ -15,6 +15,7 @@ class MentorProfile(Base):
     category          = Column(String, nullable=True)
     profile_image_url = Column(String, nullable=True)
     is_active         = Column(Boolean, default=True, nullable=False)
+    featured          = Column(Boolean, default=False, nullable=False)
     rating            = Column(Float, default=0.0, nullable=False)
     session_count     = Column(Integer, default=0, nullable=False)
     google_calendar_id = Column(String, nullable=True)

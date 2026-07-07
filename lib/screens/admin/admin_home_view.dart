@@ -14,9 +14,11 @@ import '../../repositories/donation_repository.dart';
 import '../../viewmodels/admin_viewmodel.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
+import '../../viewmodels/events_viewmodel.dart';
 import '../event_manager/counsellor_requests_screen.dart';
-import '../events/admin/event_manager_screen.dart';
+import '../events/events_dashboard_screen.dart';
 import '../learn/admin/create_free_course_screen.dart';
+import 'admin_design_system.dart';
 import 'admin_manage_view.dart';
 import 'admin_org_report_screen.dart';
 import 'counsellor_admin_screen.dart';
@@ -87,34 +89,34 @@ class _AdminHomeViewState extends State<AdminHomeView> {
           ]);
         },
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
             _header(admin),
-            const SizedBox(height: 16),
+            const SizedBox(height: AdminSpacing.xl),
             _criticalAlerts(admin, events),
-            const SizedBox(height: 18),
+            const SizedBox(height: AdminSpacing.xl),
             _overview(admin),
-            const SizedBox(height: 20),
+            const SizedBox(height: AdminSpacing.xl),
             _quickActions(),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _pendingApprovals(admin),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _volunteerReview(events),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _eventsOverview(events),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _schoolRequests(),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _donationSummary(),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _certificateCenter(),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _impactApproval(events),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _courseReview(),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _reportsAnalytics(admin, events),
-            const SizedBox(height: 22),
+            const SizedBox(height: AdminSpacing.xl),
             _recentActivity(admin, events),
           ],
         ),
@@ -128,94 +130,115 @@ class _AdminHomeViewState extends State<AdminHomeView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               child: Image.asset(
                 'assests/ngo_logo.jpeg',
-                width: 46,
-                height: 46,
+                width: 52,
+                height: 52,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => const Icon(
                   Icons.volunteer_activism_rounded,
                   color: AppColors.primary,
-                  size: 40,
+                  size: 44,
                 ),
               ),
             ),
-            const SizedBox(width: 11),
+            const SizedBox(width: AdminSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Good Morning, $name 👋',
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AdminText.pageTitle,
                   ),
+                  const SizedBox(height: 4),
                   Text(
                     AppState.role.displayName == 'Super Admin'
                         ? 'Super Admin Dashboard'
                         : 'Admin Dashboard',
                     style: const TextStyle(
                       color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   const Text(
                     'Manage the complete NGO platform',
-                    style: TextStyle(color: AppColors.muted, fontSize: 11),
+                    style: AdminText.secondary,
                   ),
                 ],
               ),
             ),
-            Badge(
-              isLabelVisible: vm.unreadCount > 0,
-              label: Text('${vm.unreadCount}'),
-              child: IconButton.filledTonal(
-                onPressed: () => _showNotifications(vm),
-                icon: const Icon(Icons.notifications_outlined),
+          ],
+        ),
+        const SizedBox(height: AdminSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(AdminSpacing.chipRadius),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified_rounded, color: Color(0xFF2E7D32), size: 18),
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Full Platform Access • Verified NGO Admin',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFF1B5E20),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 6),
-            CircleAvatar(
-              backgroundColor: const Color(0xFFE8E1FF),
-              child: Text(
-                name[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Color(0xFF6A1B9A),
-                  fontWeight: FontWeight.w900,
+            const SizedBox(width: AdminSpacing.sm),
+            SizedBox(
+              width: AdminSpacing.minTouch,
+              height: AdminSpacing.minTouch,
+              child: Badge(
+                isLabelVisible: vm.unreadCount > 0,
+                label: Text('${vm.unreadCount}'),
+                child: IconButton.filledTonal(
+                  onPressed: () => _showNotifications(vm),
+                  icon: const Icon(Icons.notifications_outlined, size: 24),
+                ),
+              ),
+            ),
+            const SizedBox(width: AdminSpacing.xs),
+            SizedBox(
+              width: AdminSpacing.minTouch,
+              height: AdminSpacing.minTouch,
+              child: CircleAvatar(
+                backgroundColor: const Color(0xFFE8E1FF),
+                child: Text(
+                  name[0].toUpperCase(),
+                  style: const TextStyle(
+                    color: Color(0xFF6A1B9A),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8F5E9),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.verified_rounded, color: Color(0xFF2E7D32), size: 16),
-              SizedBox(width: 5),
-              Text(
-                'Full Platform Access • Verified NGO Admin',
-                style: TextStyle(
-                  color: Color(0xFF1B5E20),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -232,34 +255,36 @@ class _AdminHomeViewState extends State<AdminHomeView> {
         .where((r) => r.status == SchoolRequestStatus.newRequest)
         .length;
     return Container(
-      padding: const EdgeInsets.all(17),
+      padding: const EdgeInsets.all(AdminSpacing.lg),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF7F1D1D), Color(0xFFB91C1C)],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AdminSpacing.cardRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Color(0xFFFFD54F)),
-              SizedBox(width: 7),
-              Text(
-                'Critical Alerts / Pending Actions',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFFFD54F), size: 24),
+              SizedBox(width: AdminSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Critical Alerts / Pending Actions',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 11),
+          const SizedBox(height: AdminSpacing.md),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: AdminSpacing.xs,
+            runSpacing: AdminSpacing.xs,
             children: [
               _alert('${admin.pendingCount} users'),
               _alert('${events.pendingSubmissions.length} work reviews'),
@@ -269,15 +294,13 @@ class _AdminHomeViewState extends State<AdminHomeView> {
               _alert('$school school requests'),
             ],
           ),
-          const SizedBox(height: 13),
-          FilledButton.icon(
+          const SizedBox(height: AdminSpacing.md),
+          AdminPrimaryButton(
+            label: 'Review Pending Tasks',
+            icon: Icons.fact_check_rounded,
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF991B1B),
             onPressed: () => _push(PendingApprovalsScreen(vm: widget.adminVm)),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFF991B1B),
-            ),
-            icon: const Icon(Icons.fact_check_rounded),
-            label: const Text('Review Pending Tasks'),
           ),
         ],
       ),
@@ -300,7 +323,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Platform Overview', Icons.analytics_rounded),
-        const SizedBox(height: 10),
+        const SizedBox(height: AdminSpacing.sm),
         Row(
           children: [
             Expanded(
@@ -311,7 +334,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
                 AppColors.primary,
               ),
             ),
-            const SizedBox(width: 9),
+            const SizedBox(width: AdminSpacing.sm),
             Expanded(
               child: _stat(
                 'Pending Tasks',
@@ -322,7 +345,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
             ),
           ],
         ),
-        const SizedBox(height: 9),
+        const SizedBox(height: AdminSpacing.sm),
         Row(
           children: [
             Expanded(
@@ -333,7 +356,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
                 AppColors.secondary,
               ),
             ),
-            const SizedBox(width: 9),
+            const SizedBox(width: AdminSpacing.sm),
             Expanded(
               child: _stat(
                 'Certificates',
@@ -366,7 +389,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
         Icons.event_rounded,
         'Create Event',
         const Color(0xFF1565C0),
-        () => _push(const EventManagerScreen()),
+        () => _push(EventsDashboardScreen(vm: EventsViewModel(isAdmin: true)..load())),
       ),
       _Action(
         Icons.rate_review_rounded,
@@ -403,14 +426,14 @@ class _AdminHomeViewState extends State<AdminHomeView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Admin Quick Actions', Icons.bolt_rounded),
-        const SizedBox(height: 10),
+        const SizedBox(height: AdminSpacing.sm),
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 9,
-          mainAxisSpacing: 9,
-          childAspectRatio: 2.25,
+          crossAxisSpacing: AdminSpacing.sm,
+          mainAxisSpacing: AdminSpacing.sm,
+          childAspectRatio: 1.55,
           children: actions.map((a) => _actionCard(a)).toList(),
         ),
       ],
@@ -438,72 +461,85 @@ class _AdminHomeViewState extends State<AdminHomeView> {
   }
 
   Widget _pendingUser(PendingUserItem user) => Container(
-    margin: const EdgeInsets.only(bottom: 9),
-    padding: const EdgeInsets.all(13),
+    margin: const EdgeInsets.only(bottom: AdminSpacing.sm),
+    padding: const EdgeInsets.all(AdminSpacing.md),
     decoration: _cardDecoration(),
     child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
-              child: Text(user.name.isEmpty ? '?' : user.name[0].toUpperCase()),
+              radius: 22,
+              child: Text(
+                user.name.isEmpty ? '?' : user.name[0].toUpperCase(),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AdminSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     user.name,
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AdminText.cardTitle,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _roleLabel(user.requestedRole ?? user.currentRole),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AdminText.secondary,
                   ),
                   Text(
-                    '${_roleLabel(user.requestedRole ?? user.currentRole)} • ${user.location ?? 'Location not set'}',
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 10,
-                    ),
+                    user.location ?? 'Location not set',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AdminText.secondary,
                   ),
                   Text(
                     user.email,
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 10,
-                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AdminText.secondary,
                   ),
                 ],
               ),
             ),
-            TextButton(
-              onPressed: () => _push(
-                UserApprovalDetailScreen(userId: user.id, vm: widget.adminVm),
-              ),
-              child: const Text('View'),
-            ),
           ],
         ),
+        const SizedBox(height: AdminSpacing.sm),
         Row(
           children: [
             Expanded(
-              child: OutlinedButton(
-                onPressed: () => widget.adminVm.rejectUser(user.id),
-                child: const Text('Reject'),
+              child: AdminSecondaryButton(
+                label: 'View',
+                onPressed: () => _push(
+                  UserApprovalDetailScreen(userId: user.id, vm: widget.adminVm),
+                ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AdminSpacing.xs),
             Expanded(
-              child: FilledButton(
-                onPressed: () => widget.adminVm.assignRole(
-                  userId: user.id,
-                  role: user.requestedRole ?? user.currentRole,
-                ),
-                child: const Text('Approve'),
+              child: AdminSecondaryButton(
+                label: 'Reject',
+                foregroundColor: AppColors.softRed,
+                onPressed: () => widget.adminVm.rejectUser(user.id),
               ),
             ),
           ],
+        ),
+        const SizedBox(height: AdminSpacing.xs),
+        AdminPrimaryButton(
+          label: 'Approve',
+          onPressed: () => widget.adminVm.assignRole(
+            userId: user.id,
+            role: user.requestedRole ?? user.currentRole,
+          ),
         ),
       ],
     ),
@@ -551,23 +587,22 @@ class _AdminHomeViewState extends State<AdminHomeView> {
           'Events & Activities Overview',
           Icons.event_note_rounded,
           action: 'Manage',
-          onAction: () => _push(const EventManagerScreen()),
+          onAction: () => _push(EventsDashboardScreen(vm: EventsViewModel(isAdmin: true)..load())),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AdminSpacing.sm),
         Row(
           children: [
-            for (final item in [
-              ('Active', active),
-              ('Upcoming', upcoming),
-              ('Draft', draft),
-              ('Completed', complete),
-            ])
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: _smallMetric(item.$1, '${item.$2}'),
-                ),
-              ),
+            Expanded(child: _metricTile('Active', '$active')),
+            const SizedBox(width: AdminSpacing.sm),
+            Expanded(child: _metricTile('Upcoming', '$upcoming')),
+          ],
+        ),
+        const SizedBox(height: AdminSpacing.sm),
+        Row(
+          children: [
+            Expanded(child: _metricTile('Draft', '$draft')),
+            const SizedBox(width: AdminSpacing.sm),
+            Expanded(child: _metricTile('Completed', '$complete')),
           ],
         ),
       ],
@@ -589,6 +624,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
                     'Review Request',
                     () => _push(const CounsellorRequestsScreen()),
                     badge: r.status.label,
+                    badgeColor: r.status.color,
                   ),
                 )
                 .toList(),
@@ -675,9 +711,9 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _sectionTitle('Reports & Analytics', Icons.analytics_rounded),
-      const SizedBox(height: 10),
+      const SizedBox(height: AdminSpacing.sm),
       Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: AdminSpacing.md, vertical: 4),
         decoration: _cardDecoration(),
         child: Column(
           children: [
@@ -731,43 +767,36 @@ class _AdminHomeViewState extends State<AdminHomeView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('Recent Admin Activity', Icons.history_rounded),
-        const SizedBox(height: 10),
+        const SizedBox(height: AdminSpacing.sm),
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(AdminSpacing.md),
           decoration: _cardDecoration(),
           child: Column(
             children: [
               if (items.isEmpty)
-                const Text(
-                  'No recent activity.',
-                  style: TextStyle(color: AppColors.muted),
-                )
+                const Text('No recent activity.', style: AdminText.secondary)
               else
                 for (var i = 0; i < items.length; i++) ...[
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(
                         Icons.check_circle_outline_rounded,
                         color: AppColors.secondary,
-                        size: 18,
+                        size: 22,
                       ),
-                      const SizedBox(width: 9),
+                      const SizedBox(width: AdminSpacing.xs),
                       Expanded(
                         child: Text(
                           items[i],
-                          style: const TextStyle(
-                            color: AppColors.ink,
-                            fontSize: 11,
-                          ),
+                          style: AdminText.body,
                         ),
                       ),
-                      const Text(
-                        'Now',
-                        style: TextStyle(color: AppColors.muted, fontSize: 9),
-                      ),
+                      const SizedBox(width: AdminSpacing.xs),
+                      const Text('Now', style: AdminText.secondary),
                     ],
                   ),
-                  if (i != items.length - 1) const Divider(height: 18),
+                  if (i != items.length - 1) const Divider(height: AdminSpacing.lg),
                 ],
             ],
           ),
@@ -787,79 +816,82 @@ class _AdminHomeViewState extends State<AdminHomeView> {
           .length;
 
   Widget _alert(String text) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: .13),
-      borderRadius: BorderRadius.circular(11),
+      color: Colors.white.withValues(alpha: .16),
+      borderRadius: BorderRadius.circular(AdminSpacing.chipRadius),
     ),
     child: Text(
       text,
       style: const TextStyle(
         color: Colors.white,
-        fontSize: 10,
+        fontSize: 13,
         fontWeight: FontWeight.w700,
       ),
     ),
   );
   Widget _stat(String label, String value, IconData icon, Color color) =>
       Container(
-        padding: const EdgeInsets.all(13),
+        padding: const EdgeInsets.all(AdminSpacing.md),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: color.withValues(alpha: .16)),
+          borderRadius: BorderRadius.circular(AdminSpacing.cardRadius),
+          border: Border.all(color: color.withValues(alpha: .18)),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  label,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 10),
-                ),
-              ],
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: AdminSpacing.sm),
+            Expanded(
+              child: AdminStatBlock(label: label, value: value, valueColor: color),
             ),
           ],
         ),
       );
   Widget _actionCard(_Action a) => Material(
     color: Colors.white,
-    borderRadius: BorderRadius.circular(14),
+    borderRadius: BorderRadius.circular(AdminSpacing.cardRadius),
     child: InkWell(
       onTap: a.onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.all(11),
+      borderRadius: BorderRadius.circular(AdminSpacing.cardRadius),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: AdminSpacing.minTouch),
+        padding: const EdgeInsets.all(AdminSpacing.sm),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AdminSpacing.cardRadius),
+          border: Border.all(color: AppColors.muted.withValues(alpha: .12)),
+        ),
         child: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: a.color.withValues(alpha: .1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(a.icon, color: a.color, size: 20),
+              child: Icon(a.icon, color: a.color, size: 24),
             ),
-            const SizedBox(width: 9),
+            const SizedBox(width: AdminSpacing.sm),
             Expanded(
               child: Text(
                 a.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: AppColors.ink,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
                 ),
               ),
             ),
@@ -875,19 +907,32 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     VoidCallback? onAction,
   }) => Row(
     children: [
-      Icon(icon, color: AppColors.primary, size: 20),
-      const SizedBox(width: 7),
+      Icon(icon, color: AppColors.primary, size: 24),
+      const SizedBox(width: AdminSpacing.xs),
       Expanded(
         child: Text(
           title,
-          style: const TextStyle(
-            color: AppColors.ink,
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: AdminText.sectionTitle,
         ),
       ),
-      if (action != null) TextButton(onPressed: onAction, child: Text(action)),
+      if (action != null)
+        TextButton(
+          onPressed: onAction,
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, AdminSpacing.minTouch),
+            padding: const EdgeInsets.symmetric(horizontal: AdminSpacing.xs),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(action, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 2),
+              const Icon(Icons.arrow_forward_rounded, size: 16),
+            ],
+          ),
+        ),
     ],
   );
   Widget _previewSection(
@@ -899,7 +944,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _sectionTitle(title, icon, action: 'View all', onAction: action),
-      const SizedBox(height: 10),
+      const SizedBox(height: AdminSpacing.sm),
       ...children,
     ],
   );
@@ -909,44 +954,33 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     String action,
     VoidCallback onTap, {
     String? badge,
+    Color? badgeColor,
   }) => Container(
-    margin: const EdgeInsets.only(bottom: 9),
-    padding: const EdgeInsets.all(13),
+    margin: const EdgeInsets.only(bottom: AdminSpacing.sm),
+    padding: const EdgeInsets.all(AdminSpacing.md),
     decoration: _cardDecoration(),
-    child: Row(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: AppColors.ink,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: const TextStyle(color: AppColors.muted, fontSize: 10),
-              ),
-              if (badge != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 5),
-                  child: Text(
-                    badge,
-                    style: const TextStyle(
-                      color: AppColors.secondary,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+        Text(
+          title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: AdminText.cardTitle,
         ),
-        TextButton(onPressed: onTap, child: Text(action)),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: AdminText.secondary,
+        ),
+        if (badge != null) ...[
+          const SizedBox(height: AdminSpacing.xs),
+          AdminStatusBadge(label: badge, color: badgeColor),
+        ],
+        const SizedBox(height: AdminSpacing.sm),
+        AdminSecondaryButton(label: action, onPressed: onTap),
       ],
     ),
   );
@@ -961,9 +995,9 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _sectionTitle(title, icon),
-      const SizedBox(height: 10),
+      const SizedBox(height: AdminSpacing.sm),
       Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(AdminSpacing.md),
         decoration: _cardDecoration(),
         child: Column(
           children: [
@@ -975,98 +1009,142 @@ class _AdminHomeViewState extends State<AdminHomeView> {
             ),
             if (trust != null)
               Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  trust,
-                  style: const TextStyle(
-                    color: Color(0xFF2E7D32),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                  ),
+                padding: const EdgeInsets.only(top: AdminSpacing.sm),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shield_rounded, color: Color(0xFF2E7D32), size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        trust,
+                        style: const TextStyle(
+                          color: Color(0xFF2E7D32),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(onPressed: onTap, child: Text(action)),
-            ),
+            const SizedBox(height: AdminSpacing.md),
+            AdminSecondaryButton(label: action, onPressed: onTap),
           ],
         ),
       ),
     ],
   );
+  /// Compact centered stat used inside a 3-across row (e.g. center-summary
+  /// cards). The value auto-shrinks via FittedBox so it can never overflow
+  /// its column regardless of digit count, and the label wraps to 2 lines
+  /// rather than clipping.
   Widget _smallMetric(String label, String value) => Container(
-    margin: const EdgeInsets.symmetric(horizontal: 3),
-    padding: const EdgeInsets.all(8),
+    margin: const EdgeInsets.symmetric(horizontal: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
     decoration: BoxDecoration(
       color: AppColors.background,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(14),
     ),
     child: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.primary,
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
+        const SizedBox(height: 4),
         Text(
           label,
-          maxLines: 1,
+          textAlign: TextAlign.center,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppColors.muted, fontSize: 8),
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            height: 1.2,
+          ),
         ),
       ],
     ),
   );
-  Widget _reportRow(String title, String subtitle, {VoidCallback? onTap}) => Row(
-    children: [
-      const Icon(Icons.description_outlined, color: AppColors.primary),
-      const SizedBox(width: 9),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: AppColors.ink,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: const TextStyle(color: AppColors.muted, fontSize: 9),
-            ),
-          ],
+
+  /// Bordered metric card used for the 2x2 events-overview grid — same
+  /// visual weight as [_stat] but without a leading icon.
+  Widget _metricTile(String label, String value) => Container(
+    padding: const EdgeInsets.all(AdminSpacing.md),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(AdminSpacing.cardRadius),
+      border: Border.all(color: AppColors.muted.withValues(alpha: .14)),
+    ),
+    child: AdminStatBlock(label: label, value: value),
+  );
+  Widget _reportRow(String title, String subtitle, {VoidCallback? onTap}) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: AdminSpacing.sm),
+    child: Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: .1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(Icons.description_outlined, color: AppColors.primary, size: 22),
         ),
-      ),
-      TextButton(
-        onPressed: onTap,
-        child: const Text('Generate'),
-      ),
-    ],
+        const SizedBox(width: AdminSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AdminText.bodyStrong.copyWith(fontSize: 15),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AdminText.secondary,
+              ),
+            ],
+          ),
+        ),
+        TextButton(
+          onPressed: onTap,
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, AdminSpacing.minTouch),
+          ),
+          child: const Text('Generate', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        ),
+      ],
+    ),
   );
   Widget _empty(String text, IconData icon) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.all(17),
+    padding: const EdgeInsets.all(AdminSpacing.md),
     decoration: _cardDecoration(),
     child: Row(
       children: [
-        Icon(icon, color: AppColors.secondary),
-        const SizedBox(width: 9),
-        Text(text, style: const TextStyle(color: AppColors.muted)),
+        Icon(icon, color: AppColors.secondary, size: 24),
+        const SizedBox(width: AdminSpacing.sm),
+        Expanded(child: Text(text, style: AdminText.body)),
       ],
     ),
   );
-  BoxDecoration _cardDecoration() => BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(15),
-    border: Border.all(color: AppColors.muted.withValues(alpha: .12)),
-  );
+  BoxDecoration _cardDecoration() => adminCardDecoration();
   String _money(double value) => value >= 100000
       ? '₹${(value / 100000).toStringAsFixed(1)}L'
       : value >= 1000

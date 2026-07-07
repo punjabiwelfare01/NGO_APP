@@ -27,6 +27,11 @@ class SubmissionStatus(str, enum.Enum):
     needs_correction = "needs_correction"
 
 
+class ReviewTarget(str, enum.Enum):
+    event_manager = "event_manager"
+    admin         = "admin"
+
+
 class VolunteerActivity(Base):
     __tablename__ = "volunteer_activities"
 
@@ -106,6 +111,7 @@ class WorkSubmission(Base):
     transaction_id      = Column(String, nullable=True)
     proof_files         = Column(String, nullable=True)  # JSON array of file paths
     status              = Column(SAEnum(SubmissionStatus), default=SubmissionStatus.submitted)
+    review_target       = Column(SAEnum(ReviewTarget), nullable=False, default=ReviewTarget.admin)
     remarks             = Column(String, nullable=True)
     reviewer_notes      = Column(String, nullable=True)
     reviewed_by         = Column(Integer, ForeignKey("users.id"), nullable=True)

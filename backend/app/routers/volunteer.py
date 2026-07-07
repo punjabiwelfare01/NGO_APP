@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 
 from ..crud import volunteer_crud
 from ..database import get_db
-from ..dependencies import get_current_user, require_role
+from ..dependencies import get_current_user, require_role, student_only
 from ..models.user import User, UserRole
-from ..models.volunteer import ActivityCategory
+from ..models.volunteer import ActivityCategory, ReviewTarget
 from ..schemas.volunteer import (
     ActivityAssignmentCreate, ActivityAssignmentOut,
     DailyLogCreate, DailyLogOut, DailyLogUpdate,
@@ -15,6 +15,7 @@ from ..schemas.volunteer import (
     VolunteerActivityCreate, VolunteerActivityOut, VolunteerActivityUpdate,
     VolunteerStats, WorkSubmissionCreate, WorkSubmissionOut, WorkSubmissionReview,
 )
+from ..services import submission_service
 
 router = APIRouter(prefix="/volunteer", tags=["Volunteer"])
 
@@ -70,7 +71,7 @@ def update_activity(
     obj = volunteer_crud.get_activity(db, activity_id)
     if not obj:
         raise HTTPException(404, "Activity not found")
-    if current_user.role == UserRole.event_manager and obj.created_by != current_user.id:
+    if current_user.active_role == UserRole.event_manager and obj.created_by != current_user.id:
         raise HTTPException(403, "You can only edit activities you created")
     updated = volunteer_crud.update_activity(db, activity_id, data)
     return updated
@@ -105,16 +106,15 @@ def all_assignments(
 
 # ── Work Submissions ──────────────────────────────────────────────────────────
 
-@router.post("/submissions", response_model=WorkSubmissionOut)
+@router.post("/work-submissions", response_model=WorkSubmissionOut, status_code=201,
+             summary="Submit (or resubmit) volunteer work — the single entry point for both "
+                     "the 'My Assignments' card and the 'Quick Actions' flow")
 def submit_work(
     data: WorkSubmissionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(student_only),
 ):
-    activity = volunteer_crud.get_activity(db, data.activity_id)
-    if not activity:
-        raise HTTPException(404, "Activity not found")
-    return volunteer_crud.create_submission(db, data, current_user.id)
+    return submission_service.submit_work(db, current_user.id, data)
 
 
 @router.get("/submissions/me", response_model=List[WorkSubmissionOut])
@@ -133,6 +133,14 @@ def pending_submissions(
     return volunteer_crud.get_pending_submissions(db)
 
 
+@router.get("/submissions/approved", response_model=List[WorkSubmissionOut])
+def approved_submissions(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role(UserRole.admin, UserRole.super_admin)),
+):
+    return volunteer_crud.get_approved_submissions(db)
+
+
 @router.patch("/submissions/{submission_id}/review", response_model=WorkSubmissionOut)
 def review_submission(
     submission_id: int,
@@ -140,10 +148,12 @@ def review_submission(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.admin, UserRole.super_admin)),
 ):
-    obj = volunteer_crud.review_submission(db, submission_id, data, current_user.id)
-    if not obj:
+    existing = volunteer_crud.get_submission(db, submission_id)
+    if not existing:
         raise HTTPException(404, "Submission not found")
-    return obj
+    if existing.review_target != ReviewTarget.admin:
+        raise HTTPException(403, "This submission is routed to the Event Manager queue, not admin review")
+    return volunteer_crud.review_submission(db, submission_id, data, current_user.id)
 
 
 # ── Daily Logs ────────────────────────────────────────────────────────────────

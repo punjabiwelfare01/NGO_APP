@@ -24,6 +24,17 @@ class AuthRepository {
     return AppUser.fromJson(json);
   }
 
+  /// Switches the session's active role for a multi-role account, without
+  /// requiring the user to log in again. `role` must be one of the account's
+  /// granted roles (e.g. TokenResponse.roles from login) — the API value,
+  /// e.g. UserRole.eventManager.apiValue.
+  static Future<TokenResponse> switchRole(String role) async {
+    final json =
+        await ApiClient.post('/auth/switch-role', {'role': role})
+            as Map<String, dynamic>;
+    return TokenResponse.fromJson(json);
+  }
+
   /// General public registration — creates a pending access request.
   /// requested_role is stored server-side for admin review; it does NOT grant access.
   static Future<TokenResponse> register({

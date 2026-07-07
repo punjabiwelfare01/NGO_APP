@@ -19,6 +19,7 @@ class MentorProfileUpdate(BaseModel):
     category: Optional[str] = None
     profile_image_url: Optional[str] = None
     is_active: Optional[bool] = None
+    featured: Optional[bool] = None
 
 
 class MentorProfileResponse(BaseModel):
@@ -30,6 +31,7 @@ class MentorProfileResponse(BaseModel):
     category: Optional[str] = None
     profile_image_url: Optional[str] = None
     is_active: bool
+    featured: bool = False
     rating: float
     session_count: int
     created_at: Optional[datetime] = None

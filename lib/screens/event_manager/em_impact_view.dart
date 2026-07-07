@@ -336,6 +336,7 @@ class _DraftPostCard extends StatefulWidget {
 
 class _DraftPostCardState extends State<_DraftPostCard> {
   bool _expanded = false;
+  bool _deleting = false;
 
   String get _dateLabel {
     final d = widget.post.date;
@@ -650,12 +651,115 @@ class _DraftPostCardState extends State<_DraftPostCard> {
                       ],
                     ),
                   ),
+                // Admin-only delete button
+                if (AppState.role.isAdmin) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _deleting
+                        ? const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Color(0xFFC62828),
+                              ),
+                            ),
+                          )
+                        : OutlinedButton.icon(
+                            onPressed: () => _confirmDelete(context),
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                size: 15),
+                            label: const Text('Delete Post',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFC62828),
+                              side: const BorderSide(
+                                  color: Color(0xFFC62828)),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 11),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                  ),
+                ],
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFC62828), size: 22),
+            SizedBox(width: 10),
+            Text('Delete Post?',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+          ],
+        ),
+        content: Text(
+          'This will permanently delete "${widget.post.title}" and all its media. This cannot be undone.',
+          style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.5),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.muted,
+              side: BorderSide(color: AppColors.muted.withValues(alpha: 0.3)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFC62828),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await widget.vm.deleteImpactPost(widget.post.id);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Row(children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+            SizedBox(width: 8),
+            Text('Impact post deleted.',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ]),
+          backgroundColor: Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _deleting = false);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Failed to delete. Please try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }
 
@@ -907,59 +1011,32 @@ class _PublishedPostCardState extends State<_PublishedPostCard> {
             ),
           const SizedBox(height: 12),
           const Divider(height: 1, indent: 14, endIndent: 14),
-          // ── Share + View Details + Admin Delete ────────────────────────
+          // ── View Details + Admin Delete ────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Sharing impact post…'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.share_rounded, size: 14),
-                        label: const Text('Share',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: _kPurple,
-                          side: const BorderSide(color: _kPurple),
-                          padding: const EdgeInsets.symmetric(vertical: 11),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => _PostDetailSheet(post: post),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () => showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => _PostDetailSheet(post: post),
-                        ),
-                        icon: const Icon(Icons.remove_red_eye_rounded,
-                            size: 14),
-                        label: const Text('View Details',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700)),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _kPurple,
-                          padding: const EdgeInsets.symmetric(vertical: 11),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
+                    icon: const Icon(Icons.remove_red_eye_rounded,
+                        size: 14),
+                    label: const Text('View Details',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _kPurple,
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                  ],
+                  ),
                 ),
                 // Admin-only delete button
                 if (AppState.role.isAdmin) ...[
@@ -2650,14 +2727,6 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
                       style: TextButton.styleFrom(
                           foregroundColor: AppColors.muted),
                     ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: null,
-                      icon: const Icon(Icons.share_rounded, size: 16),
-                      label: const Text('Share'),
-                      style: TextButton.styleFrom(
-                          foregroundColor: AppColors.muted),
-                    ),
                   ],
                 ),
               ),
@@ -2904,11 +2973,25 @@ class _ImageThumb extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               color: const Color(0xFFC62828).withValues(alpha: 0.7),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.error_rounded,
                       color: Colors.white, size: 22),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.errorMessage ?? 'Upload failed',
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   if (onRetry != null)
                     GestureDetector(

@@ -35,11 +35,11 @@ def posts(
     user: User | None = Depends(get_optional_user),
 ):
     if mine:
-        if not user or user.role not in _IMPACT_CREATOR_ROLES:
+        if not user or user.active_role not in _IMPACT_CREATOR_ROLES:
             raise HTTPException(403, "Not allowed")
         posts = impact_repository.list_posts(db, status=None, category=category, created_by=user.id)
         return [impact_service.serialize_post(db, item, user.id, _base(request)) for item in posts]
-    if status != "published" and (not user or user.role not in (UserRole.event_manager, UserRole.admin, UserRole.super_admin)):
+    if status != "published" and (not user or user.active_role not in (UserRole.event_manager, UserRole.admin, UserRole.super_admin)):
         raise HTTPException(403, "Published posts only")
     return [impact_service.serialize_post(db, post, user.id if user else None, _base(request)) for post in impact_repository.list_posts(db, status, category)]
 
@@ -96,7 +96,7 @@ async def add_media(
     item = impact_repository.get_post(db, post_id)
     if not item:
         raise HTTPException(404, "Impact post not found")
-    if user.role in (UserRole.event_manager, UserRole.mentor) and item.created_by != user.id:
+    if user.active_role in (UserRole.event_manager, UserRole.mentor) and item.created_by != user.id:
         raise HTTPException(403, "Access denied")
 
     _IMPACT_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,7 +126,7 @@ def update(post_id: int, data: ImpactPostUpdate, request: Request, db: Session =
     item = impact_repository.get_post(db, post_id)
     if not item:
         raise HTTPException(404, "Impact post not found")
-    if user.role in (UserRole.event_manager, UserRole.mentor) and item.created_by != user.id:
+    if user.active_role in (UserRole.event_manager, UserRole.mentor) and item.created_by != user.id:
         raise HTTPException(403, "Access denied")
     item = impact_repository.update_post(db, item, data)
     return impact_service.serialize_post(db, item, user.id, _base(request))

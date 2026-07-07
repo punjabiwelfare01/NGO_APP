@@ -93,6 +93,7 @@ class TokenResponse {
     required this.name,
     this.accessStatus,
     this.requestedRole,
+    this.roles = const [],
   });
 
   final String accessToken;
@@ -102,11 +103,16 @@ class TokenResponse {
   final String? accessStatus;
   final String? requestedRole;
 
+  /// All roles granted to this account (the "active" one is [role]). Falls
+  /// back to `[role]` when the backend response doesn't include it, so
+  /// older/partial responses still behave as single-role accounts.
+  final List<String> roles;
+
   factory TokenResponse.fromJson(Map<String, dynamic> j) {
     // Handles three response shapes:
-    //  1. Login:       flat  { access_token, role, user_id, name, ... }
-    //  2. Login+user:  nested { access_token, user: { id, role, name, ... } }
-    //  3. Register:    { message, user: { id, role, name, access_status, ... } }
+    //  1. Login:       flat  { access_token, role, roles, user_id, name, ... }
+    //  2. Login+user:  nested { access_token, user: { id, role, roles, name, ... } }
+    //  3. Register:    { message, user: { id, role, roles, name, access_status, ... } }
     //     (no access_token — registration keeps user in pending state)
     final user = j['user'] as Map<String, dynamic>?;
     final token = (j['access_token'] as String?) ?? '';
@@ -115,6 +121,8 @@ class TokenResponse {
     final name = ((user?['name'] ?? j['name']) as String?) ?? '';
     final status = (user?['access_status'] ?? j['access_status']) as String?;
     final reqRole = (user?['requested_role'] ?? j['requested_role']) as String?;
+    final rolesRaw = (user?['roles'] ?? j['roles']) as List<dynamic>?;
+    final roles = rolesRaw?.map((e) => e.toString()).toList() ?? [role];
     return TokenResponse(
       accessToken: token,
       role: role,
@@ -122,6 +130,7 @@ class TokenResponse {
       name: name,
       accessStatus: status,
       requestedRole: reqRole,
+      roles: roles,
     );
   }
 }

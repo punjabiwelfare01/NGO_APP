@@ -64,6 +64,15 @@ class CounsellingRepository {
     return MentorProfile.fromJson(json);
   }
 
+  /// Update by user id (what [CounsellorProfile.id] holds), not the
+  /// mentor_profiles primary key used by [updateMentorProfile] above.
+  static Future<void> updateCounsellorByUserId(
+    int userId,
+    Map<String, dynamic> payload,
+  ) async {
+    await ApiClient.patch('/counselling/mentors/by-user/$userId', payload);
+  }
+
   static Future<List<ApiCounsellingSlot>> getSlots({String? category}) async {
     final query = category != null
         ? '?category=${Uri.encodeComponent(category)}'

@@ -18,6 +18,8 @@ class AppUser {
     this.location,
     this.phone,
     this.role,
+    this.secondaryRole,
+    this.roles = const [],
     this.accessStatus,
     this.requestedRole,
     this.verificationNote,
@@ -42,6 +44,10 @@ class AppUser {
   final String? location;
   final String? phone;
   final String? role;
+  final String? secondaryRole;
+  /// Every role this account currently has access to (primary + any granted
+  /// extras). Falls back to just [role] when the backend hasn't populated it.
+  final List<String> roles;
   final String? accessStatus;
   final String? requestedRole;
   final String? verificationNote;
@@ -63,6 +69,8 @@ class AppUser {
     String? location,
     String? phone,
     String? role,
+    String? secondaryRole,
+    List<String>? roles,
     String? accessStatus,
     String? requestedRole,
     String? verificationNote,
@@ -86,6 +94,8 @@ class AppUser {
     location: location ?? this.location,
     phone: phone ?? this.phone,
     role: role ?? this.role,
+    secondaryRole: secondaryRole ?? this.secondaryRole,
+    roles: roles ?? this.roles,
     accessStatus: accessStatus ?? this.accessStatus,
     requestedRole: requestedRole ?? this.requestedRole,
     verificationNote: verificationNote ?? this.verificationNote,
@@ -115,6 +125,9 @@ class AppUser {
     location: j['location'] as String?,
     phone: j['phone'] as String?,
     role: j['role'] as String?,
+    secondaryRole: j['secondary_role'] as String?,
+    roles: (j['roles'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+        (j['role'] != null ? [j['role'] as String] : const []),
     accessStatus: j['access_status'] as String?,
     requestedRole: j['requested_role'] as String?,
     verificationNote: j['verification_note'] as String?,
@@ -186,6 +199,9 @@ class AdminUserItem {
     this.schoolName,
     this.location,
     this.verificationNote,
+    this.secondaryRole,
+    this.roles = const [],
+    this.lastLoginAt,
   });
 
   final int id;
@@ -200,6 +216,11 @@ class AdminUserItem {
   final String? schoolName;
   final String? location;
   final String? verificationNote;
+  final String? secondaryRole;
+  /// Every role this account currently has access to (primary + any granted
+  /// extras). Falls back to just [role] when the backend hasn't populated it.
+  final List<String> roles;
+  final DateTime? lastLoginAt;
 
   bool get isBlocked => accessStatus == 'deactivated';
   bool get isPending => const {
@@ -211,7 +232,13 @@ class AdminUserItem {
   bool get isApproved => accessStatus == 'approved';
   bool get isRejected => accessStatus == 'rejected';
 
-  AdminUserItem copyWith({String? role, String? accessStatus}) => AdminUserItem(
+  AdminUserItem copyWith({
+    String? role,
+    String? accessStatus,
+    String? secondaryRole,
+    bool clearSecondaryRole = false,
+    List<String>? roles,
+  }) => AdminUserItem(
     id: id,
     name: name,
     email: email,
@@ -224,6 +251,9 @@ class AdminUserItem {
     schoolName: schoolName,
     location: location,
     verificationNote: verificationNote,
+    secondaryRole: clearSecondaryRole ? null : (secondaryRole ?? this.secondaryRole),
+    roles: roles ?? this.roles,
+    lastLoginAt: lastLoginAt,
   );
 
   factory AdminUserItem.fromJson(Map<String, dynamic> j) => AdminUserItem(
@@ -239,6 +269,12 @@ class AdminUserItem {
     schoolName: j['school_name'] as String?,
     location: j['location'] as String?,
     verificationNote: j['verification_note'] as String?,
+    secondaryRole: j['secondary_role'] as String?,
+    roles: (j['roles'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+        [(j['role'] ?? 'student') as String],
+    lastLoginAt: j['last_login_at'] == null
+        ? null
+        : DateTime.parse(j['last_login_at'] as String),
   );
 }
 

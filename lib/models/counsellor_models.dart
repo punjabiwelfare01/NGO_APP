@@ -292,7 +292,7 @@ class CounsellorProfile {
           ? VerificationStatus.verified
           : VerificationStatus.pending,
       isActive: isActive,
-      isFeatured: false,
+      isFeatured: json['featured'] as bool? ?? false,
       isRetired: false,
       showRetiredStatus: false,
       availableThisWeek: weeklyAvailability.isNotEmpty,

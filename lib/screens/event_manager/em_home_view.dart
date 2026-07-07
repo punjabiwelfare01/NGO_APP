@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 
 import '../../app_state.dart';
 import '../../core/colors.dart';
+import '../../models/bank_info.dart';
 import '../../models/event_manager_models.dart';
 import '../../models/counsellor_models.dart';
+import '../../repositories/bank_repository.dart';
 import '../../repositories/event_manager_repository.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
@@ -1341,19 +1343,36 @@ class _SchoolRequestsSection extends StatelessWidget {
   ).push(MaterialPageRoute(builder: (_) => const CounsellorRequestsScreen()));
 }
 
-class _DonationCampaignSummary extends StatelessWidget {
+class _DonationCampaignSummary extends StatefulWidget {
   const _DonationCampaignSummary({required this.vm});
   final EventManagerViewModel vm;
 
-  static const _upi     = 'punjabiwelfaretrust@upi';
-  static const _account = '35270101011873';
-  static const _ifsc    = 'UBIN0535273';
-  static const _bank    = 'Union Bank of India';
-  static const _branch  = 'Delhi-Cantonment Branch, South West Delhi – 110010';
-  static const _holder  = 'Punjabi Welfare Trust';
+  @override
+  State<_DonationCampaignSummary> createState() =>
+      _DonationCampaignSummaryState();
+}
+
+class _DonationCampaignSummaryState extends State<_DonationCampaignSummary> {
+  // No backend field for branch yet, so it stays a static display string
+  // alongside the admin-editable bank/UPI details.
+  static const _branch = 'Delhi-Cantonment Branch, South West Delhi – 110010';
+
+  BankInfo _bank = BankInfo.fallback;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBank();
+  }
+
+  Future<void> _loadBank() async {
+    final bank = await BankRepository.getBank();
+    if (mounted) setState(() => _bank = bank);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final vm = widget.vm;
     final drives = vm.events.where((e) => e.donationEligible).length;
     final collected = vm.assignments.fold<double>(
       0,
@@ -1493,15 +1512,15 @@ class _DonationCampaignSummary extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _EMPayRow('Beneficiary', _holder),
-                          _EMPayRow('Bank', _bank),
+                          _EMPayRow('Beneficiary', _bank.accountHolder ?? ''),
+                          _EMPayRow('Bank', _bank.bankName ?? ''),
                           _EMPayRow('Branch', _branch),
-                          _EMPayRow('Account No.', _account,
-                              onCopy: () => _copy(context, _account,
-                                  'Account number')),
-                          _EMPayRow('IFSC', _ifsc,
-                              onCopy: () =>
-                                  _copy(context, _ifsc, 'IFSC code')),
+                          _EMPayRow('Account No.', _bank.accountNumber ?? '',
+                              onCopy: () => _copy(context,
+                                  _bank.accountNumber ?? '', 'Account number')),
+                          _EMPayRow('IFSC', _bank.ifscCode ?? '',
+                              onCopy: () => _copy(
+                                  context, _bank.ifscCode ?? '', 'IFSC code')),
                         ],
                       ),
                     ),
@@ -1530,14 +1549,15 @@ class _DonationCampaignSummary extends StatelessWidget {
                           style: TextStyle(
                               color: Colors.white70, fontSize: 11)),
                       Expanded(
-                        child: Text(_upi,
+                        child: Text(_bank.upiId ?? '',
                             style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 11)),
                       ),
                       GestureDetector(
-                        onTap: () => _copy(context, _upi, 'UPI ID'),
+                        onTap: () =>
+                            _copy(context, _bank.upiId ?? '', 'UPI ID'),
                         child: const Icon(Icons.copy_rounded,
                             size: 13, color: Colors.white70),
                       ),

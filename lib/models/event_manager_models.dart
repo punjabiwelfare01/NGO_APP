@@ -524,6 +524,7 @@ class EMImpactPost {
   final String title;
   final String? studentName;
   final String? teamName;
+  final int? eventId;
   final String eventName;
   final String location;
   final DateTime date;
@@ -543,6 +544,7 @@ class EMImpactPost {
     required this.title,
     this.studentName,
     this.teamName,
+    this.eventId,
     required this.eventName,
     required this.location,
     required this.date,
@@ -571,6 +573,7 @@ class EMImpactPost {
         title: title ?? this.title,
         studentName: studentName,
         teamName: teamName,
+        eventId: eventId,
         eventName: eventName,
         location: location,
         date: date,
@@ -588,6 +591,7 @@ class EMImpactPost {
   factory EMImpactPost.fromJson(Map<String, dynamic> j) => EMImpactPost(
         id: j['id'] as int,
         type: EMImpactPostType.fromString(j['type'] as String),
+        eventId: j['event_id'] as int?,
         title: j['title'] as String,
         studentName: j['student_name'] as String?,
         teamName: j['team_name'] as String?,
@@ -617,6 +621,7 @@ class EMImpactPost {
         title: post.title,
         studentName: post.studentNames,
         teamName: post.teamName,
+        eventId: post.eventId,
         eventName: post.eventId != null ? 'Linked Event' : 'Standalone Post',
         location: post.location ?? '',
         date: post.publishedAt ?? DateTime.now(),

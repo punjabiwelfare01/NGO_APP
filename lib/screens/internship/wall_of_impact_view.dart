@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../core/colors.dart';
 import '../../models/impact_post.dart';
@@ -83,7 +82,10 @@ class _WallOfImpactViewState extends State<WallOfImpactView> {
               surfaceTintColor: Colors.transparent,
             )
           : null,
-      body: _buildContent(),
+      // When pushed, the AppBar already sits below the status bar. When
+      // embedded as a bottom-nav tab (no AppBar), wrap in SafeArea so the
+      // header doesn't render underneath the status bar icons.
+      body: canPop ? _buildContent() : SafeArea(child: _buildContent()),
     );
   }
 
@@ -303,7 +305,6 @@ class _WallOfImpactViewState extends State<WallOfImpactView> {
                     child: _PostCard(
                       post: _posts[i],
                       onAppreciate: () => _appreciate(_posts[i]),
-                      onShare: () => _share(_posts[i]),
                     ),
                   ),
                   childCount: _posts.length,
@@ -333,33 +334,6 @@ class _WallOfImpactViewState extends State<WallOfImpactView> {
     }
   }
 
-  Future<void> _share(ImpactPost post) async {
-    try {
-      final url = await ImpactRepository.share(post.id);
-      await Clipboard.setData(ClipboardData(text: url));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
-                SizedBox(width: 8),
-                Text('Share link copied to clipboard'),
-              ],
-            ),
-            backgroundColor: Color(0xFF2E7D32),
-          ),
-        );
-      }
-      await _load();
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not create share link')),
-        );
-      }
-    }
-  }
 }
 
 // ── Platform metrics bar ─────────────────────────────────────────────────────
@@ -469,11 +443,9 @@ class _PostCard extends StatefulWidget {
   const _PostCard({
     required this.post,
     required this.onAppreciate,
-    required this.onShare,
   });
   final ImpactPost post;
   final VoidCallback onAppreciate;
-  final VoidCallback onShare;
 
   @override
   State<_PostCard> createState() => _PostCardState();
@@ -787,16 +759,6 @@ class _PostCardState extends State<_PostCard> {
                       ? const Color(0xFFC62828)
                       : AppColors.muted,
                   onTap: widget.onAppreciate,
-                ),
-                const Spacer(),
-                // Share
-                _ActionButton(
-                  icon: Icons.share_rounded,
-                  label: post.shareCount > 0
-                      ? '${post.shareCount} Shares'
-                      : 'Share',
-                  color: AppColors.muted,
-                  onTap: widget.onShare,
                 ),
               ],
             ),

@@ -52,6 +52,8 @@ class UserResponse(BaseModel):
     level: int
     xp: int
     role: str = "student"
+    secondary_role: Optional[str] = None
+    roles: List[str] = []
     access_status: str = "pending"
     is_active: bool = True
     parent_email: Optional[str] = None
@@ -66,6 +68,7 @@ class UserResponse(BaseModel):
     gov_id_doc_url: Optional[str] = None
     photo_url: Optional[str] = None
     created_at: datetime
+    last_login_at: Optional[datetime] = None
     interests: Optional[List[str]] = None
 
     @field_validator("interests", mode="before")

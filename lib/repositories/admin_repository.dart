@@ -78,6 +78,25 @@ class AdminRepository {
         as Map<String, dynamic>;
   }
 
+  /// POST /admin/users/{id}/roles — grants `role` in addition to any roles
+  /// the account already holds (does not replace/clear other roles).
+  static Future<Map<String, dynamic>> grantRole({
+    required int userId,
+    required String role,
+  }) async {
+    return await ApiClient.post('/admin/users/$userId/roles', {'role': role})
+        as Map<String, dynamic>;
+  }
+
+  /// DELETE /admin/users/{id}/roles/{role} — revokes a previously granted
+  /// role. The account's primary role cannot be revoked this way.
+  static Future<void> revokeRole({
+    required int userId,
+    required String role,
+  }) async {
+    await ApiClient.delete('/admin/users/$userId/roles/$role');
+  }
+
   /// PATCH /admin/users/{id}/reject
   static Future<void> rejectUser(int userId, {String? reason}) async {
     await ApiClient.patch('/admin/users/$userId/reject', {

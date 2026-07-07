@@ -7,10 +7,9 @@ import '../../repositories/certificate_repository.dart';
 import '../../repositories/donation_repository.dart';
 import '../../viewmodels/admin_viewmodel.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
-import '../../viewmodels/event_pipeline_viewmodel.dart';
+import '../../viewmodels/events_viewmodel.dart';
 import '../event_manager/counsellor_requests_screen.dart';
-import '../events/admin/event_manager_screen.dart';
-import '../events/event_pipeline_screen.dart';
+import '../events/events_dashboard_screen.dart';
 import '../helping_support/admin/emergency_contacts_admin_screen.dart';
 import '../home/admin/safety_awareness_manager_screen.dart';
 import '../learn/management/learning_management_view.dart';
@@ -41,17 +40,10 @@ class AdminManageView extends StatelessWidget {
       ),
       _ManageTool(
         Icons.event_rounded,
-        'Events & Activities',
-        'Create, approve, publish and report',
+        'Events',
+        'Create, assign, review and publish — everything in one place',
         const Color(0xFF1565C0),
-        const EventManagerScreen(),
-      ),
-      _ManageTool(
-        Icons.account_tree_rounded,
-        'Event Pipeline',
-        'Full pipeline with stages, search and status',
-        const Color(0xFF0277BD),
-        const _EventPipelinePage(),
+        EventsDashboardScreen(vm: EventsViewModel(isAdmin: true)..load()),
       ),
       _ManageTool(
         Icons.menu_book_rounded,
@@ -464,27 +456,3 @@ class _CertificateAdminList extends StatelessWidget {
   );
 }
 
-class _EventPipelinePage extends StatefulWidget {
-  const _EventPipelinePage();
-  @override
-  State<_EventPipelinePage> createState() => _EventPipelinePageState();
-}
-
-class _EventPipelinePageState extends State<_EventPipelinePage> {
-  late final EventPipelineViewModel _vm;
-
-  @override
-  void initState() {
-    super.initState();
-    _vm = EventPipelineViewModel()..load();
-  }
-
-  @override
-  void dispose() {
-    _vm.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => EventPipelineScreen(vm: _vm);
-}

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../models/bank_info.dart';
 import '../../models/donation_models.dart';
+import '../../repositories/bank_repository.dart';
 import '../../viewmodels/volunteer_viewmodel.dart';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
@@ -18,13 +20,9 @@ const _kCardShadow = [
 ];
 
 // ── Bank / NGO constants ───────────────────────────────────────────────────────
-
-const _kUpi    = 'punjabiwelfaretrust@upi';
-const _kAcct   = '35270101011873';
-const _kIfsc   = 'UBIN0535273';
-const _kBank   = 'Union Bank of India';
+// Branch has no backend field yet (BankSetting only tracks the fields below),
+// so it stays a static display string alongside the admin-editable details.
 const _kBranch = 'Delhi-Cantonment Branch, South West Delhi – 110010';
-const _kHolder = 'Punjabi Welfare Trust';
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 
@@ -37,10 +35,18 @@ class DonationScreen extends StatefulWidget {
 }
 
 class _DonationScreenState extends State<DonationScreen> {
+  BankInfo _bank = BankInfo.fallback;
+
   @override
   void initState() {
     super.initState();
     widget.vm.loadDonations();
+    _loadBank();
+  }
+
+  Future<void> _loadBank() async {
+    final bank = await BankRepository.getBank();
+    if (mounted) setState(() => _bank = bank);
   }
 
   @override
@@ -94,11 +100,11 @@ class _DonationScreenState extends State<DonationScreen> {
                 const SizedBox(height: 22),
 
                 // 5. UPI ID card
-                const _UPICard(),
+                _UPICard(bank: _bank),
                 const SizedBox(height: 14),
 
                 // 6. Bank details accordion
-                const _BankAccordion(),
+                _BankAccordion(bank: _bank),
                 const SizedBox(height: 14),
 
                 // 7. Safety note
@@ -582,7 +588,8 @@ class _OrDivider extends StatelessWidget {
 // ── UPI ID Card ────────────────────────────────────────────────────────────────
 
 class _UPICard extends StatefulWidget {
-  const _UPICard();
+  const _UPICard({required this.bank});
+  final BankInfo bank;
 
   @override
   State<_UPICard> createState() => _UPICardState();
@@ -592,7 +599,7 @@ class _UPICardState extends State<_UPICard> {
   bool _copied = false;
 
   Future<void> _copy() async {
-    await Clipboard.setData(const ClipboardData(text: _kUpi));
+    await Clipboard.setData(ClipboardData(text: widget.bank.upiId ?? ''));
     setState(() => _copied = true);
     await Future.delayed(const Duration(seconds: 2));
     if (mounted) setState(() => _copied = false);
@@ -632,10 +639,10 @@ class _UPICardState extends State<_UPICard> {
                     color: _primary, size: 22),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  _kUpi,
-                  style: TextStyle(
+                  widget.bank.upiId ?? '',
+                  style: const TextStyle(
                     color: _ink,
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
@@ -711,7 +718,8 @@ class _UPICardState extends State<_UPICard> {
 // ── Bank Details Accordion ─────────────────────────────────────────────────────
 
 class _BankAccordion extends StatefulWidget {
-  const _BankAccordion();
+  const _BankAccordion({required this.bank});
+  final BankInfo bank;
 
   @override
   State<_BankAccordion> createState() => _BankAccordionState();
@@ -735,6 +743,11 @@ class _BankAccordionState extends State<_BankAccordion> {
         else { _ifscCopied = false; }
       });
     }
+  }
+
+  String _maskAccount(String? acct) {
+    if (acct == null || acct.length < 5) return acct ?? '';
+    return '••••••${acct.substring(acct.length - 5)}';
   }
 
   @override
@@ -807,22 +820,27 @@ class _BankAccordionState extends State<_BankAccordion> {
                         child: Column(
                           children: [
                             _BankRow(
-                                label: 'Beneficiary', value: _kHolder),
-                            _BankRow(label: 'Bank', value: _kBank),
+                                label: 'Beneficiary',
+                                value: widget.bank.accountHolder ?? ''),
+                            _BankRow(
+                                label: 'Bank',
+                                value: widget.bank.bankName ?? ''),
                             _BankRow(label: 'Branch', value: _kBranch),
                             _BankRowCopy(
                               label: 'Account Number',
-                              display: '••••••11873',
-                              copyVal: _kAcct,
+                              display: _maskAccount(widget.bank.accountNumber),
+                              copyVal: widget.bank.accountNumber ?? '',
                               copied: _acctCopied,
-                              onCopy: () => _copyField(_kAcct, true),
+                              onCopy: () => _copyField(
+                                  widget.bank.accountNumber ?? '', true),
                             ),
                             _BankRowCopy(
                               label: 'IFSC Code',
-                              display: _kIfsc,
-                              copyVal: _kIfsc,
+                              display: widget.bank.ifscCode ?? '',
+                              copyVal: widget.bank.ifscCode ?? '',
                               copied: _ifscCopied,
-                              onCopy: () => _copyField(_kIfsc, false),
+                              onCopy: () => _copyField(
+                                  widget.bank.ifscCode ?? '', false),
                             ),
                           ],
                         ),

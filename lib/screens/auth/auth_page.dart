@@ -1,12 +1,13 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../app_state.dart';
 import '../../core/colors.dart';
 import '../../models/auth_models.dart';
 import '../../repositories/api_client.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
+import 'role_selection_screen.dart';
 
 // ── Access type enum ──────────────────────────────────────────────────────────
 
@@ -95,7 +96,12 @@ class _AuthPageState extends State<AuthPage> {
   });
 
   void _navigateByStatus(BuildContext ctx, AccessStatus status) {
-    if (status == AccessStatus.approved && ctx.mounted) {
+    if (status != AccessStatus.approved || !ctx.mounted) return;
+    if (AppState.hasMultipleRoles) {
+      Navigator.of(ctx).pushReplacement(
+        MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+      );
+    } else {
       Navigator.of(ctx).pushReplacementNamed('/home');
     }
   }
@@ -263,7 +269,7 @@ class _NgoHeader extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         const Text(
-          'CareSkill — Verified NGO Volunteer & Social Impact Platform',
+          'Punjabiwelfareapp — Verified NGO Volunteer & Social Impact Platform',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppColors.primary,
@@ -481,12 +487,6 @@ class _SignInFormState extends State<_SignInForm> {
     if (status == AccessStatus.approved) widget.onSuccess(status);
   }
 
-  void _fillDemo(String email, String password) {
-    _emailCtrl.text = email;
-    _passwordCtrl.text = password;
-    setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -578,50 +578,6 @@ class _SignInFormState extends State<_SignInForm> {
               ),
             ),
             const SizedBox(height: 20),
-            // Demo chips — development mode only
-            if (kDebugMode) ...[
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text(
-                'Dev accounts',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.muted,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  _DemoChip(
-                    label: 'Student',
-                    color: AppColors.primary,
-                    onTap: () =>
-                        _fillDemo('aarav@careskill.demo', 'careskill123'),
-                  ),
-                  _DemoChip(
-                    label: 'Admin',
-                    color: AppColors.accent,
-                    onTap: () => _fillDemo('admin@careskill.demo', 'admin123'),
-                  ),
-                  _DemoChip(
-                    label: 'Counsellor',
-                    color: AppColors.secondary,
-                    onTap: () => _fillDemo('meera@careskill.demo', 'mentor123'),
-                  ),
-                  _DemoChip(
-                    label: 'Ev. Manager',
-                    color: const Color(0xFFBF360C),
-                    onTap: () => _fillDemo('em@careskill.demo', 'em123'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -911,7 +867,9 @@ class _StudentVolunteerFormState extends State<_StudentVolunteerForm> {
     if (_govIdFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please upload a government ID document for verification.'),
+          content: Text(
+            'Please upload a government ID document for verification.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -1524,8 +1482,8 @@ class _SchoolPartnerFormState extends State<_SchoolPartnerForm> {
                                 _preferredDate == null
                                     ? 'Preferred Date'
                                     : '${_preferredDate!.day.toString().padLeft(2, '0')}/'
-                                        '${_preferredDate!.month.toString().padLeft(2, '0')}/'
-                                        '${_preferredDate!.year}',
+                                          '${_preferredDate!.month.toString().padLeft(2, '0')}/'
+                                          '${_preferredDate!.year}',
                                 style: TextStyle(
                                   color: _preferredDate == null
                                       ? AppColors.muted.withValues(alpha: 0.6)
@@ -1737,7 +1695,9 @@ class _CounsellorFormState extends State<_CounsellorForm> {
     if (_govIdFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please upload a government ID document for verification.'),
+          content: Text(
+            'Please upload a government ID document for verification.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -2176,7 +2136,9 @@ class _NgoStaffFormState extends State<_NgoStaffForm> {
     if (_govIdFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please upload a government ID document for verification.'),
+          content: Text(
+            'Please upload a government ID document for verification.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -3375,8 +3337,9 @@ class _PasswordField extends StatelessWidget {
         obscureText: obscure,
         enabled: enabled,
         textInputAction: isLast ? null : TextInputAction.next,
-        onEditingComplete:
-            isLast ? null : () => FocusScope.of(context).nextFocus(),
+        onEditingComplete: isLast
+            ? null
+            : () => FocusScope.of(context).nextFocus(),
         decoration: dec,
         validator: validator,
       );
@@ -3558,31 +3521,6 @@ class _Auth0Badge extends StatelessWidget {
           fontWeight: FontWeight.w900,
         ),
       ),
-    );
-  }
-}
-
-class _DemoChip extends StatelessWidget {
-  const _DemoChip({
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(
-      label: Text(label),
-      avatar: CircleAvatar(backgroundColor: color, radius: 7),
-      onPressed: onTap,
-      labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-      backgroundColor: Colors.white,
-      side: BorderSide(color: color.withValues(alpha: 0.4)),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
     );
   }
 }

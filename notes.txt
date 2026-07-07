@@ -173,7 +173,20 @@ councellor fix this
 also add the ngo address ,registration number,logo and phone number 
 for legal authenticity for school
 
+----------------------------------------------
+currently in wall of  impact section  is stats data 0 reached,0 hours,
+0 Donated check whether is hardcoded
+also remove the heart icon and share icon and link for user
 
+currently their is no delete post  is present in admin role or event manager  create impact 
+post draft section pls add the delete post option
+
+in school volunteer login  using same email  login as volunteer or as a event
+manager i want that flow to give the same person volunteer two role acess
+make a perfect plan to implement this in current project
+
+currently their is no delete post  is present in admin role or event manager 
+ create impact post draft section pls add the delete post option
 
 
 

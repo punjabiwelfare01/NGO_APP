@@ -15,6 +15,7 @@ from ..models.user import User, UserRole
 from ..models.volunteer import (
     ActivityAssignment,
     DailyLog,
+    ReviewTarget,
     SubmissionStatus,
     VolunteerActivity,
     WorkSubmission,
@@ -52,7 +53,7 @@ def _event_json(event: Event, activities: list[VolunteerActivity]) -> dict:
 def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
     # ── Events ────────────────────────────────────────────────────────────────
     event_query = db.query(Event)
-    if user.role == UserRole.event_manager:
+    if user.active_role == UserRole.event_manager:
         event_query = event_query.filter(Event.created_by == user.id)
     events = event_query.order_by(Event.created_at.desc()).all()
     event_ids = [e.id for e in events]
@@ -75,7 +76,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
             VolunteerActivity.created_by == user.id,
         )
         .all()
-        if user.role == UserRole.event_manager
+        if user.active_role == UserRole.event_manager
         else db.query(VolunteerActivity).filter(VolunteerActivity.event_id.is_(None)).all()
     )
 
@@ -137,6 +138,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
         submission = (
             db.query(WorkSubmission)
             .filter(
+                WorkSubmission.review_target == ReviewTarget.event_manager,
                 or_(
                     WorkSubmission.assignment_id == assignment.id,
                     and_(
@@ -187,7 +189,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
         })
 
     # ── Impact posts ──────────────────────────────────────────────────────────
-    if user.role in (UserRole.admin, UserRole.super_admin):
+    if user.active_role in (UserRole.admin, UserRole.super_admin):
         impacts = db.query(ImpactPost).order_by(ImpactPost.created_at.desc()).all()
     else:
         # Include:
@@ -213,6 +215,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
             "title": item.title,
             "student_name": item.student_names,
             "team_name": item.team_name,
+            "event_id": item.event_id,
             "event_name": event_payload.get(item.event_id, {}).get("title", "NGO Event"),
             "location": item.location or "",
             "date": (item.published_at or item.created_at).isoformat(),
@@ -315,6 +318,7 @@ def get_activity_tracking(activity_id: int, db: Session = Depends(get_db), user:
         all_subs = (
             db.query(WorkSubmission)
             .filter(
+                WorkSubmission.review_target == ReviewTarget.event_manager,
                 or_(
                     WorkSubmission.assignment_id == assignment.id,
                     and_(
@@ -382,6 +386,8 @@ def review_submission(submission_id: int, payload: dict, db: Session = Depends(g
     sub = db.query(WorkSubmission).filter(WorkSubmission.id == submission_id).first()
     if not sub:
         raise HTTPException(404, "Submission not found")
+    if sub.review_target != ReviewTarget.event_manager:
+        raise HTTPException(403, "This submission is routed to the admin queue, not Event Manager review")
 
     valid_statuses = {"submitted", "under_review", "approved", "rejected", "needs_correction"}
     new_status_str = payload.get("status")
@@ -567,7 +573,7 @@ def list_my_activities(
 ):
     """Get activities created by the logged-in Event Manager (or all for admin)."""
     q = db.query(VolunteerActivity)
-    if user.role == UserRole.event_manager:
+    if user.active_role == UserRole.event_manager:
         q = q.filter(VolunteerActivity.created_by == user.id)
     if status:
         q = q.filter(VolunteerActivity.status == status)
@@ -586,7 +592,7 @@ def edit_activity(
     activity = db.query(VolunteerActivity).filter(VolunteerActivity.id == activity_id).first()
     if not activity:
         raise HTTPException(404, "Activity not found")
-    if user.role == UserRole.event_manager and activity.created_by != user.id:
+    if user.active_role == UserRole.event_manager and activity.created_by != user.id:
         raise HTTPException(403, "You can only edit activities you created")
 
     editable = {
@@ -613,7 +619,7 @@ def get_activity_students(
     activity = db.query(VolunteerActivity).filter(VolunteerActivity.id == activity_id).first()
     if not activity:
         raise HTTPException(404, "Activity not found")
-    if user.role == UserRole.event_manager and activity.created_by != user.id:
+    if user.active_role == UserRole.event_manager and activity.created_by != user.id:
         raise HTTPException(403, "Access denied")
 
     assignments = db.query(ActivityAssignment).filter(ActivityAssignment.activity_id == activity_id).all()
@@ -654,7 +660,7 @@ def assign_students_to_activity(
     activity = db.query(VolunteerActivity).filter(VolunteerActivity.id == activity_id).first()
     if not activity:
         raise HTTPException(404, "Activity not found")
-    if user.role == UserRole.event_manager and activity.created_by != user.id:
+    if user.active_role == UserRole.event_manager and activity.created_by != user.id:
         raise HTTPException(403, "Access denied")
 
     student_ids = payload.get("student_ids", [])
@@ -688,7 +694,7 @@ def get_activity_work_logs(
     activity = db.query(VolunteerActivity).filter(VolunteerActivity.id == activity_id).first()
     if not activity:
         raise HTTPException(404, "Activity not found")
-    if user.role == UserRole.event_manager and activity.created_by != user.id:
+    if user.active_role == UserRole.event_manager and activity.created_by != user.id:
         raise HTTPException(403, "Access denied")
 
     submissions = db.query(WorkSubmission).filter(WorkSubmission.activity_id == activity_id).all()

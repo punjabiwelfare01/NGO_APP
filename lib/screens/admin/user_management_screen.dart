@@ -15,11 +15,23 @@ class UserManagementScreen extends StatefulWidget {
   State<UserManagementScreen> createState() => _UserManagementScreenState();
 }
 
-class _UserManagementScreenState extends State<UserManagementScreen> {
+class _UserManagementScreenState extends State<UserManagementScreen>
+    with SingleTickerProviderStateMixin {
   final _searchCtrl = TextEditingController();
   String _filterRole = '';
   String _filterStatus = '';
   bool _loading = false;
+
+  // Drives the collapse/expand of the sticky User (avatar + name) column.
+  late final AnimationController _collapseCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 300),
+  );
+  late final Animation<double> _collapseAnim = CurvedAnimation(
+    parent: _collapseCtrl,
+    curve: Curves.easeInOut,
+  );
+  bool _userColCollapsed = false;
 
   @override
   void initState() {
@@ -30,7 +42,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _collapseCtrl.dispose();
     super.dispose();
+  }
+
+  void _toggleUserColumn() {
+    setState(() => _userColCollapsed = !_userColCollapsed);
+    if (_userColCollapsed) {
+      _collapseCtrl.forward();
+    } else {
+      _collapseCtrl.reverse();
+    }
   }
 
   Future<void> _fetch() async {
@@ -246,6 +268,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       }
                       return _UsersTable(
                         users: users,
+                        collapseAnim: _collapseAnim,
+                        collapsed: _userColCollapsed,
+                        onToggleUserColumn: _toggleUserColumn,
                         onView: (u) => _openDetail(u),
                         onBlock: (u) => _block(u),
                         onUnblock: (u) => _unblock(u),
@@ -359,10 +384,140 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 }
 
 // ── Table ─────────────────────────────────────────────────────────────────────
+//
+// Layout: a narrow sticky left region (row # + avatar/name) that only ever
+// scrolls vertically, beside a wide right region (email through actions)
+// that scrolls both ways. Two _ScrollSync pairs keep the two vertical lists
+// (left/right) and the two horizontal scrollables (header/body) mirrored, so
+// the header stays visually locked to its columns while the body scrolls
+// sideways, and the sticky column stays visually locked to its row while
+// the body scrolls down. Every row uses ListView.builder with a fixed
+// itemExtent, so thousands of users stay lazily-built and the two vertical
+// lists always report identical scroll extents (exact 1:1 offset mirroring).
 
-class _UsersTable extends StatelessWidget {
+const _kIndexColWidth = 40.0;
+const _kUserColWidth = 220.0;
+const _kStickyWidth = _kIndexColWidth + _kUserColWidth;
+const _kRowHeight = 78.0;
+const _kHeaderHeight = 44.0;
+
+// Width the sticky column animates down to when the User column is
+// collapsed. Kept wide enough (index column + the row's own horizontal
+// padding) so the "#" cell always has room, rather than collapsing all
+// the way to _kIndexColWidth which would clip it under the cell padding.
+const _kCollapsedStickyWidth = _kIndexColWidth + 24.0;
+
+// Fixed layout width given to the avatar+name content so it always renders
+// at the same size it did before the column became collapsible; the
+// surrounding OverflowBox/ClipRect handle animating how much of it is
+// visible, rather than reflowing the content itself.
+const _kUserNameContentWidth = _kUserColWidth - 24.0;
+
+double _stickyColumnWidth(double collapseProgress) =>
+    _kStickyWidth - (_kStickyWidth - _kCollapsedStickyWidth) * collapseProgress;
+
+// Fixed-width slot (never animates) that holds the collapse/expand chevron,
+// sitting right at the edge of the User column, always visible whether the
+// column is expanded or collapsed.
+const _kToggleColWidth = 28.0;
+
+class _ColSpec {
+  const _ColSpec(this.label, this.width);
+  final String label;
+  final double width;
+}
+
+const _kScrollColumns = [
+  _ColSpec('Email', 240),
+  _ColSpec('Phone', 150),
+  _ColSpec('Roles', 220),
+  _ColSpec('Location', 140),
+  _ColSpec('Status', 120),
+  _ColSpec('Registered', 160),
+  _ColSpec('Approval', 160),
+  _ColSpec('Last Login', 170),
+  _ColSpec('Actions', 240),
+];
+
+double get _kScrollWidth =>
+    _kScrollColumns.fold(0.0, (sum, c) => sum + c.width);
+
+/// Mirrors scroll offset between two controllers, in both directions, so
+/// dragging either one moves both (used for the sticky-column / fixed-header
+/// table below). Guarded against feedback loops.
+class _ScrollSync {
+  _ScrollSync() {
+    left.addListener(_onLeft);
+    right.addListener(_onRight);
+  }
+
+  final ScrollController left = ScrollController();
+  final ScrollController right = ScrollController();
+  bool _guard = false;
+
+  void _onLeft() => _mirror(from: left, to: right);
+  void _onRight() => _mirror(from: right, to: left);
+
+  void _mirror({required ScrollController from, required ScrollController to}) {
+    if (_guard || !from.hasClients || !to.hasClients) return;
+    final target = from.offset.clamp(0.0, to.position.maxScrollExtent);
+    if ((to.offset - target).abs() < 0.5) return;
+    _guard = true;
+    to.jumpTo(target);
+    _guard = false;
+  }
+
+  void dispose() {
+    left.dispose();
+    right.dispose();
+  }
+}
+
+// Small chevron handle anchored at the edge of the User column, used to
+// collapse/expand it. Lives in the fixed header (never scrolls away).
+class _UserColumnToggle extends StatelessWidget {
+  const _UserColumnToggle({required this.collapsed, required this.onTap});
+
+  final bool collapsed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _kToggleColWidth,
+      child: Center(
+        child: Tooltip(
+          message: collapsed ? 'Show User column' : 'Hide User column',
+          child: Material(
+            color: AppColors.primary.withValues(alpha: 0.10),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  collapsed
+                      ? Icons.chevron_right_rounded
+                      : Icons.chevron_left_rounded,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UsersTable extends StatefulWidget {
   const _UsersTable({
     required this.users,
+    required this.collapseAnim,
+    required this.collapsed,
+    required this.onToggleUserColumn,
     required this.onView,
     required this.onBlock,
     required this.onUnblock,
@@ -371,6 +526,9 @@ class _UsersTable extends StatelessWidget {
   });
 
   final List<AdminUserItem> users;
+  final Animation<double> collapseAnim;
+  final bool collapsed;
+  final VoidCallback onToggleUserColumn;
   final void Function(AdminUserItem) onView;
   final void Function(AdminUserItem) onBlock;
   final void Function(AdminUserItem) onUnblock;
@@ -378,79 +536,274 @@ class _UsersTable extends StatelessWidget {
   final void Function(AdminUserItem) onAssign;
 
   @override
+  State<_UsersTable> createState() => _UsersTableState();
+}
+
+class _UsersTableState extends State<_UsersTable> {
+  // .left = sticky user column, .right = scrollable body (vertical sync).
+  final _vSync = _ScrollSync();
+  // .left = header row, .right = scrollable body (horizontal sync).
+  final _hSync = _ScrollSync();
+
+  @override
+  void dispose() {
+    _vSync.dispose();
+    _hSync.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // ── Column headers ───────────────────────────────────────────
-          Container(
+    final divider = Container(width: 1, color: AppColors.muted.withValues(alpha: 0.15));
+    return Column(
+      children: [
+        // ── Fixed header (never scrolls vertically) ──────────────────────
+        SizedBox(
+          height: _kHeaderHeight,
+          child: Container(
             color: const Color(0xFFF0F4FF),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: const Row(
+            child: Row(
               children: [
-                _HeaderCell('#', width: 36),
-                _HeaderCell('User', flex: 3),
-                _HeaderCell('Role', flex: 2),
-                _HeaderCell('Location', flex: 2),
-                _HeaderCell('Status', flex: 2),
-                _HeaderCell('Registered', flex: 2),
-                _HeaderCell('Approval', flex: 2),
-                _HeaderCell('Actions', flex: 3),
+                AnimatedBuilder(
+                  animation: widget.collapseAnim,
+                  builder: (context, child) {
+                    final progress = widget.collapseAnim.value;
+                    return SizedBox(
+                      width: _stickyColumnWidth(progress),
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: _kIndexColWidth,
+                            child: _HeaderCell('#'),
+                          ),
+                          Expanded(
+                            child: Opacity(
+                              opacity: 1 - progress,
+                              child: const _HeaderCell('User'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                _UserColumnToggle(
+                  collapsed: widget.collapsed,
+                  onTap: widget.onToggleUserColumn,
+                ),
+                divider,
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _hSync.left,
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final col in _kScrollColumns)
+                          SizedBox(width: col.width, child: _HeaderCell(col.label)),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-          const Divider(height: 1),
+        ),
+        const Divider(height: 1),
 
-          // ── Rows ─────────────────────────────────────────────────────
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: users.length,
-            separatorBuilder: (_, _) =>
-                const Divider(height: 1, indent: 16, endIndent: 16),
-            itemBuilder: (_, i) => _UserRow(
-              index: i + 1,
-              user: users[i],
-              onView: () => onView(users[i]),
-              onBlock: () => onBlock(users[i]),
-              onUnblock: () => onUnblock(users[i]),
-              onDelete: () => onDelete(users[i]),
-              onAssign: () => onAssign(users[i]),
-            ),
+        // ── Body: sticky column (left) + scrollable columns (right) ─────
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AnimatedBuilder(
+                animation: widget.collapseAnim,
+                child: ListView.builder(
+                  controller: _vSync.left,
+                  itemExtent: _kRowHeight,
+                  itemCount: widget.users.length,
+                  itemBuilder: (_, i) => _StickyUserCell(
+                    index: i + 1,
+                    user: widget.users[i],
+                    onTap: () => widget.onView(widget.users[i]),
+                    collapseAnim: widget.collapseAnim,
+                  ),
+                ),
+                builder: (context, child) => SizedBox(
+                  width: _stickyColumnWidth(widget.collapseAnim.value),
+                  child: child,
+                ),
+              ),
+              // Empty spacer matching the header's toggle-button slot width,
+              // so the vertical divider stays aligned between header & body.
+              const SizedBox(width: _kToggleColWidth),
+              divider,
+              Expanded(
+                child: Scrollbar(
+                  controller: _hSync.right,
+                  child: SingleChildScrollView(
+                    controller: _hSync.right,
+                    scrollDirection: Axis.horizontal,
+                    child: SizedBox(
+                      width: _kScrollWidth,
+                      child: ListView.builder(
+                        controller: _vSync.right,
+                        itemExtent: _kRowHeight,
+                        itemCount: widget.users.length,
+                        itemBuilder: (_, i) => _ScrollableRowCells(
+                          user: widget.users[i],
+                          onView: () => widget.onView(widget.users[i]),
+                          onBlock: () => widget.onBlock(widget.users[i]),
+                          onUnblock: () => widget.onUnblock(widget.users[i]),
+                          onDelete: () => widget.onDelete(widget.users[i]),
+                          onAssign: () => widget.onAssign(widget.users[i]),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
 class _HeaderCell extends StatelessWidget {
-  const _HeaderCell(this.label, {this.width, this.flex});
+  const _HeaderCell(this.label);
   final String label;
-  final double? width;
-  final int? flex;
 
   @override
   Widget build(BuildContext context) {
-    final child = Text(
-      label.toUpperCase(),
-      style: const TextStyle(
-        color: AppColors.muted,
-        fontSize: 10,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.6,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          label.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+          ),
+        ),
       ),
     );
-    if (width != null) return SizedBox(width: width, child: child);
-    return Expanded(flex: flex ?? 1, child: child);
   }
 }
 
-// ── Single row ────────────────────────────────────────────────────────────────
+// ── Sticky left cell: row # + avatar + bold name ────────────────────────────
 
-class _UserRow extends StatelessWidget {
-  const _UserRow({
+class _StickyUserCell extends StatelessWidget {
+  const _StickyUserCell({
     required this.index,
+    required this.user,
+    required this.onTap,
+    required this.collapseAnim,
+  });
+
+  final int index;
+  final AdminUserItem user;
+  final VoidCallback onTap;
+  final Animation<double> collapseAnim;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarAndName = Row(
+      children: [
+        CircleAvatar(
+          radius: 18,
+          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+          child: Text(
+            user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Tooltip(
+            message: user.name,
+            child: Text(
+              user.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                color: AppColors.ink,
+                fontSize: 13.5,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: AnimatedBuilder(
+          animation: collapseAnim,
+          child: avatarAndName,
+          builder: (context, child) {
+            final progress = collapseAnim.value;
+            return Row(
+              children: [
+                SizedBox(
+                  width: _kIndexColWidth,
+                  child: Text(
+                    '$index',
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  // The avatar+name row always lays out at its natural width
+                  // (_kUserNameContentWidth) via OverflowBox, regardless of
+                  // how little space the shrinking Expanded actually grants
+                  // it; ClipRect then hides whatever doesn't fit, so the
+                  // collapse never trips a RenderFlex overflow.
+                  child: ClipRect(
+                    child: OverflowBox(
+                      minWidth: _kUserNameContentWidth,
+                      maxWidth: _kUserNameContentWidth,
+                      alignment: Alignment.centerLeft,
+                      child: Opacity(
+                        opacity: 1 - progress,
+                        child: Transform.translate(
+                          offset: Offset(-24 * progress, 0),
+                          child: child,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+// ── Scrollable right cells: Email · Phone · Roles · Location · Status ·
+//    Registered · Approval · Last Login · Actions ──────────────────────────
+
+class _ScrollableRowCells extends StatelessWidget {
+  const _ScrollableRowCells({
     required this.user,
     required this.onView,
     required this.onBlock,
@@ -459,7 +812,6 @@ class _UserRow extends StatelessWidget {
     required this.onAssign,
   });
 
-  final int index;
   final AdminUserItem user;
   final VoidCallback onView;
   final VoidCallback onBlock;
@@ -474,127 +826,85 @@ class _UserRow extends StatelessWidget {
     final approvalColor = _approvalColor(user.accessStatus);
     final approvalLabel = _approvalLabel(user.accessStatus);
 
-    return InkWell(
-      onTap: onView,
-      child: Container(
-        color: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // ── # ──────────────────────────────────────────────────────
-            SizedBox(
-              width: 36,
+    return Container(
+      color: Colors.white,
+      child: Row(
+        children: [
+          _cell(
+            _kScrollColumns[0].width,
+            Tooltip(
+              message: user.email,
               child: Text(
-                '$index',
-                style: const TextStyle(
-                  color: AppColors.muted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-
-            // ── User (avatar + name + email) ───────────────────────────
-            Expanded(
-              flex: 3,
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                    child: Text(
-                      user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
-                            fontSize: 13,
-                          ),
-                        ),
-                        Text(
-                          user.email,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Role ───────────────────────────────────────────────────
-            Expanded(flex: 2, child: _RoleBadge(role: user.role)),
-
-            // ── Location ───────────────────────────────────────────────
-            Expanded(
-              flex: 2,
-              child: Text(
-                user.location?.isNotEmpty == true ? user.location! : '—',
+                user.email,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                style: const TextStyle(color: AppColors.ink, fontSize: 12.5),
               ),
             ),
-
-            // ── Status (active/blocked) ────────────────────────────────
-            Expanded(
-              flex: 2,
-              child: _Badge(label: statusLabel, color: statusColor),
+          ),
+          _cell(
+            _kScrollColumns[1].width,
+            Text(
+              user.phone?.isNotEmpty == true ? user.phone! : '—',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
             ),
-
-            // ── Registered date ────────────────────────────────────────
-            Expanded(
-              flex: 2,
-              child: Text(
-                _fmt(user.createdAt),
-                style: const TextStyle(color: AppColors.muted, fontSize: 11),
-              ),
+          ),
+          _cell(
+            _kScrollColumns[2].width,
+            _RolesCell(role: user.role, roles: user.roles),
+          ),
+          _cell(
+            _kScrollColumns[3].width,
+            Text(
+              user.location?.isNotEmpty == true ? user.location! : '—',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
             ),
-
-            // ── Approval status ────────────────────────────────────────
-            Expanded(
-              flex: 2,
-              child: _Badge(label: approvalLabel, color: approvalColor),
+          ),
+          _cell(_kScrollColumns[4].width, _Badge(label: statusLabel, color: statusColor)),
+          _cell(
+            _kScrollColumns[5].width,
+            Text(
+              _fmtDate(user.createdAt),
+              style: const TextStyle(color: AppColors.muted, fontSize: 12),
             ),
-
-            // ── Actions ────────────────────────────────────────────────
-            Expanded(
-              flex: 3,
-              child: _ActionsCell(
-                user: user,
-                onView: onView,
-                onBlock: onBlock,
-                onUnblock: onUnblock,
-                onDelete: onDelete,
-                onAssign: onAssign,
-              ),
+          ),
+          _cell(_kScrollColumns[6].width, _Badge(label: approvalLabel, color: approvalColor)),
+          _cell(
+            _kScrollColumns[7].width,
+            Text(
+              user.lastLoginAt == null ? 'Never' : _fmtDateTime(user.lastLoginAt!),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.muted, fontSize: 12),
             ),
-          ],
-        ),
+          ),
+          _cell(
+            _kScrollColumns[8].width,
+            _ActionsCell(
+              user: user,
+              onView: onView,
+              onBlock: onBlock,
+              onUnblock: onUnblock,
+              onDelete: onDelete,
+              onAssign: onAssign,
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  static Widget _cell(double width, Widget child) => SizedBox(
+    width: width,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Align(alignment: Alignment.centerLeft, child: child),
+    ),
+  );
 
   static Color _statusColor(String s) => switch (s) {
     'approved' => AppColors.secondary,
@@ -627,8 +937,15 @@ class _UserRow extends StatelessWidget {
     _ => s,
   };
 
-  static String _fmt(DateTime d) =>
+  static String _fmtDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  static String _fmtDateTime(DateTime d) {
+    final local = d.toLocal();
+    final h = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final ampm = local.hour < 12 ? 'AM' : 'PM';
+    return '${_fmtDate(local)}, $h:${local.minute.toString().padLeft(2, '0')} $ampm';
+  }
 }
 
 // ── Actions cell ──────────────────────────────────────────────────────────────
@@ -766,9 +1083,12 @@ class _RoleBadge extends StatelessWidget {
   final String role;
 
   static final _config = {
-    'student': (AppColors.primary, 'Student'),
+    'student': (AppColors.primary, 'Volunteer'),
     'mentor': (AppColors.secondary, 'Counsellor'),
     'content_creator': (AppColors.accent, 'Creator'),
+    'event_manager': (const Color(0xFF7C4DFF), 'Event Manager'),
+    'support_staff': (const Color(0xFF11B8C9), 'Support Staff'),
+    'school_partner': (const Color(0xFF0D47A1), 'School Partner'),
     'admin': (const Color(0xFF6B48FF), 'Admin'),
     'super_admin': (const Color(0xFF6B48FF), 'Super Admin'),
     'guest': (AppColors.muted, 'Guest'),
@@ -778,6 +1098,27 @@ class _RoleBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cfg = _config[role] ?? (AppColors.muted, role);
     return _Badge(label: cfg.$2, color: cfg.$1);
+  }
+}
+
+/// The "Roles" column — shows every role this account is granted (see the
+/// multi-role feature) as small badges, primary role first.
+class _RolesCell extends StatelessWidget {
+  const _RolesCell({required this.role, required this.roles});
+  final String role;
+  final List<String> roles;
+
+  @override
+  Widget build(BuildContext context) {
+    final others = roles.where((r) => r != role);
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: [
+        _RoleBadge(role: role),
+        ...others.map((r) => _RoleBadge(role: r)),
+      ],
+    );
   }
 }
 

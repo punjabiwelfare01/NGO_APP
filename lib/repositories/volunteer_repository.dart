@@ -52,6 +52,9 @@ class VolunteerRepository {
     String? transactionId,
     String? proofFiles,
     String? remarks,
+    /// 'event_manager' or 'admin' to explicitly pick the reviewer; omit to
+    /// let the backend auto-route based on who created the activity.
+    String? reviewTarget,
   }) async {
     final body = <String, dynamic>{
       'activity_id': activityId,
@@ -65,11 +68,9 @@ class VolunteerRepository {
     if (transactionId != null) body['transaction_id'] = transactionId;
     if (proofFiles != null) body['proof_files'] = proofFiles;
     if (remarks != null) body['remarks'] = remarks;
+    if (reviewTarget != null) body['review_target'] = reviewTarget;
 
-    final path = assignmentId == null
-        ? '/volunteer/submissions'
-        : '/student/assignments/$assignmentId/submit-work';
-    final data = await ApiClient.post(path, body);
+    final data = await ApiClient.post('/volunteer/work-submissions', body);
     return WorkSubmission.fromJson(data as Map<String, dynamic>);
   }
 
@@ -97,6 +98,14 @@ class VolunteerRepository {
   static Future<List<WorkSubmission>> getPendingSubmissions() async {
     final data =
         await ApiClient.get('/volunteer/submissions/pending') as List<dynamic>;
+    return data
+        .map((e) => WorkSubmission.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<WorkSubmission>> getApprovedSubmissions() async {
+    final data = await ApiClient.get('/volunteer/submissions/approved')
+        as List<dynamic>;
     return data
         .map((e) => WorkSubmission.fromJson(e as Map<String, dynamic>))
         .toList();

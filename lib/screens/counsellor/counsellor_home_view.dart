@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../models/counsellor_models.dart';
 import '../../models/counsellor_session_models.dart';
+import '../../models/ngo_profile.dart';
 import '../../repositories/api_client.dart';
+import '../../repositories/ngo_repository.dart';
 import '../../viewmodels/counsellor_home_viewmodel.dart';
 import 'counsellor_meeting_detail_screen.dart';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
-const _kNavy   = Color(0xFF0A1F44);
 const _kBlue   = Color(0xFF1565C0);
 const _kGreen  = Color(0xFF2E7D32);
 const _kAmber  = Color(0xFFF57F17);
@@ -19,7 +20,7 @@ const _kCard   = Colors.white;
 
 // ─── Root View ────────────────────────────────────────────────────────────────
 
-class CounsellorHomeView extends StatelessWidget {
+class CounsellorHomeView extends StatefulWidget {
   const CounsellorHomeView({
     required this.vm,
     required this.counsellorName,
@@ -32,7 +33,26 @@ class CounsellorHomeView extends StatelessWidget {
   final ValueChanged<int> onNavigate;
 
   @override
+  State<CounsellorHomeView> createState() => _CounsellorHomeViewState();
+}
+
+class _CounsellorHomeViewState extends State<CounsellorHomeView> {
+  NGOProfile _ngo = NGOProfile.fallback;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNgo();
+  }
+
+  Future<void> _loadNgo() async {
+    final ngo = await NGORepository.getProfile();
+    if (mounted) setState(() => _ngo = ngo);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final vm = widget.vm;
     return ListenableBuilder(
       listenable: vm,
       builder: (context, _) {
@@ -43,31 +63,37 @@ class CounsellorHomeView extends StatelessWidget {
           onRefresh: vm.refreshRequests,
           child: CustomScrollView(
             slivers: [
-              _Header(name: counsellorName, profile: vm.profile),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: _CounsellorBrandHeader(ngo: _ngo),
+                ),
+              ),
+              _Header(name: widget.counsellorName, profile: vm.profile),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     _HeroBanner(
                       newCount: vm.newRequests.length,
-                      onViewRequests: () => onNavigate(1),
-                      onSchedule: () => onNavigate(2),
+                      onViewRequests: () => widget.onNavigate(1),
+                      onSchedule: () => widget.onNavigate(2),
                     ),
                     const SizedBox(height: 22),
-                    _QuickActionsSection(onNavigate: onNavigate),
+                    _QuickActionsSection(onNavigate: widget.onNavigate),
                     const SizedBox(height: 22),
                     _OverviewSection(stats: vm.stats),
                     const SizedBox(height: 22),
                     _MyImpactSection(
                       vm: vm,
-                      onViewAnalytics: () => onNavigate(4),
+                      onViewAnalytics: () => widget.onNavigate(4),
                     ),
                     if (vm.newRequests.isNotEmpty) ...[
                       const SizedBox(height: 22),
                       _NewRequestsSection(
                         requests: vm.newRequests,
                         vm: vm,
-                        onSeeAll: () => onNavigate(1),
+                        onSeeAll: () => widget.onNavigate(1),
                       ),
                     ],
                     if (vm.todayMeetings.isNotEmpty ||
@@ -88,6 +114,78 @@ class CounsellorHomeView extends StatelessWidget {
   }
 }
 
+// ─── NGO brand header (logo, name, registration, tagline) ─────────────────────
+
+class _CounsellorBrandHeader extends StatelessWidget {
+  const _CounsellorBrandHeader({required this.ngo});
+  final NGOProfile ngo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'assests/ngo_logo.jpeg',
+                width: 64,
+                height: 64,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    ngo.name,
+                    style: const TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                      color: _kInk,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Regd. No. ${ngo.registrationNumber ?? '736'}, Delhi Cantt',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: _kMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton.filledTonal(
+              onPressed: null,
+              icon: const Icon(Icons.notifications_none_rounded),
+              tooltip: 'Notifications',
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Divider(height: 1, color: _kMuted.withValues(alpha: 0.25)),
+        const SizedBox(height: 10),
+        const Text(
+          'Together we guide, together we empower.',
+          style: TextStyle(
+            fontSize: 13,
+            color: _kMuted,
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 class _Header extends StatelessWidget {
@@ -104,219 +202,234 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliverAppBar(
-      expandedHeight: 250,
-      pinned: true,
-      backgroundColor: _kNavy,
-      surfaceTintColor: _kNavy,
-      automaticallyImplyLeading: false,
-      flexibleSpace: FlexibleSpaceBar(
-        collapseMode: CollapseMode.pin,
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [_kNavy, Color(0xFF1565C0)],
-            ),
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 54, 20, 16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
             children: [
-              // ── Left: identity ────────────────────────────────────────
-              Expanded(
-                child: Column(
+              Positioned.fill(
+                child: Image.asset(
+                  'assests/background_card.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    Text(
-                      _greeting,
-                      style: const TextStyle(
-                        color: Color(0xFFB3C8E8),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    // Verified Counsellor chip
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _kGreen.withValues(alpha: .25),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: const Color(0xFF81C784)
-                                .withValues(alpha: .5)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
+                    // ── Left: identity ────────────────────────────────
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.start,
                         children: [
-                          Icon(Icons.verified_rounded,
-                              color: Color(0xFF81C784), size: 13),
-                          SizedBox(width: 5),
                           Text(
-                            'Verified Counsellor',
-                            style: TextStyle(
-                              color: Color(0xFFB9F6CA),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                            _greeting,
+                            style: const TextStyle(
+                              color: Color(0xFFDCE9FF),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Working with',
-                      style: TextStyle(
-                        color: Color(0xFFB3C8E8),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Punjabi Welfare Service Organisation',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    // Verification bar
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _kGreen.withValues(alpha: .2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.shield_rounded,
-                              color: Color(0xFF81C784), size: 13),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'NGO Verified Member',
-                            style: TextStyle(
-                              color: Color(0xFFB9F6CA),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
+                          const SizedBox(height: 4),
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              height: 1.1,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(height: 10),
+                          // Verified Counsellor chip
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .15),
-                              borderRadius: BorderRadius.circular(6),
+                              color: _kGreen,
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Text(
-                              profile.ngoVerificationId,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.verified_rounded,
+                                    color: Colors.white, size: 14),
+                                SizedBox(width: 5),
+                                Text(
+                                  'Verified Counsellor',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Serving at
+                          Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: .18),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.apartment_rounded,
+                                    color: Colors.white, size: 17),
                               ),
-                            ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Serving at',
+                                      style: TextStyle(
+                                        color: Color(0xFFDCE9FF),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Punjabi Welfare Service Organisation',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Verification pills
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: .16),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                      color: Colors.white
+                                          .withValues(alpha: .25)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.shield_rounded,
+                                        color: Color(0xFF81C784), size: 14),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'NGO Verified',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: .16),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                      color: Colors.white
+                                          .withValues(alpha: .25)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.badge_rounded,
+                                        color: Colors.white, size: 14),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'ID: ${profile.ngoVerificationId}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(width: 14),
+                    // ── Right: photo ───────────────────────────────────
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: .5),
+                                width: 2),
+                            color: Colors.white.withValues(alpha: .15),
+                          ),
+                          foregroundDecoration: profile.photoUrl != null
+                              ? BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  image: DecorationImage(
+                                    image: NetworkImage(
+                                      ApiClient.resolveUrl(profile.photoUrl!),
+                                    ),
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : null,
+                          child: profile.photoUrl == null
+                              ? const Icon(Icons.person_rounded,
+                                  color: Colors.white, size: 34)
+                              : null,
+                        ),
+                        // Online dot
+                        Positioned(
+                          right: 2,
+                          top: 2,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4CAF50),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 14),
-              // ── Right: photo + badges ─────────────────────────────────
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: .4),
-                              width: 2),
-                          color: Colors.white.withValues(alpha: .15),
-                        ),
-                        foregroundDecoration: profile.photoUrl != null
-                            ? BoxDecoration(
-                                shape: BoxShape.circle,
-                                image: DecorationImage(
-                                  image: NetworkImage(
-                                    ApiClient.resolveUrl(profile.photoUrl!),
-                                  ),
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : null,
-                        child: profile.photoUrl == null
-                            ? const Icon(Icons.person_rounded,
-                                color: Colors.white, size: 34)
-                            : null,
-                      ),
-                      // Online dot
-                      Positioned(
-                        right: 2,
-                        top: 2,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4CAF50),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: _kNavy, width: 2),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  // NGO logo
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      'assests/ngo_logo.jpeg',
-                      width: 36,
-                      height: 36,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: .15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.volunteer_activism_rounded,
-                            color: Colors.white, size: 18),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),

@@ -8,6 +8,7 @@ import '../../app_state.dart';
 import '../../core/colors.dart';
 import '../../core/config.dart';
 import '../../models/api_models.dart';
+import '../../models/auth_models.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import '../../viewmodels/profile_viewmodel.dart';
 import '../../viewmodels/view_state.dart';
@@ -70,7 +71,7 @@ class _ProfileViewState extends State<ProfileView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ChangePasswordSheet(
+      builder: (_) => ChangePasswordSheet(
         onSave: (currentPw, newPw) async {
           final error = await _authVm.changePassword(
             currentPassword: currentPw,
@@ -103,6 +104,28 @@ class _ProfileViewState extends State<ProfileView> {
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed('/login');
   }
+
+  Future<void> _switchRole() async {
+    final other = AppState.availableRoles.firstWhere((r) => r != AppState.role);
+    final ok = await _authVm.switchRole(other);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_authVm.errorMessage ?? 'Could not switch role. Please try again.'),
+          backgroundColor: AppColors.softRed,
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).pushReplacementNamed('/home');
+  }
+
+  // "Volunteer" is this app's product name for the student role in the
+  // multi-role context (see role_selection_screen.dart) — role.displayName
+  // says "Student" everywhere else.
+  String _switcherLabel(UserRole role) =>
+      role.isStudent ? 'Volunteer' : role.displayName;
 
   Future<void> _openEditProfile() async {
     final user = _vm.user;
@@ -389,6 +412,14 @@ class _ProfileViewState extends State<ProfileView> {
             const _SectionTitle('Preferences & Security'),
             _InfoCard(
               rows: [
+                if (AppState.hasMultipleRoles)
+                  _InfoRowData(
+                    icon: Icons.swap_horiz_rounded,
+                    tint: const Color(0xFF7C4DFF),
+                    label: 'Switch Role',
+                    value: 'Currently: ${_switcherLabel(AppState.role)}',
+                    onTap: _switchRole,
+                  ),
                 _InfoRowData(
                   icon: Icons.lock_outline_rounded,
                   tint: const Color(0xFF126BFF),
@@ -1688,7 +1719,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 // ── Personal Details ───────────────────────────────────────
                 _FormSectionLabel('Personal Details'),
                 const SizedBox(height: 10),
-                _SheetField(
+                SheetField(
                   controller: _nameCtrl,
                   label: 'Full Name',
                   icon: Icons.person_outline_rounded,
@@ -1698,7 +1729,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 const SizedBox(height: 12),
                 // Email is read-only — shown as disabled field
-                _SheetField(
+                SheetField(
                   controller:
                       TextEditingController(text: widget.user.email ?? ''),
                   label: 'Email Address (read-only)',
@@ -1706,7 +1737,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   enabled: false,
                 ),
                 const SizedBox(height: 12),
-                _SheetField(
+                SheetField(
                   controller: _phoneCtrl,
                   label: 'Phone Number',
                   icon: Icons.phone_outlined,
@@ -1719,7 +1750,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 if (isStudent) ...[
                   _FormSectionLabel('Education Details'),
                   const SizedBox(height: 10),
-                  _SheetField(
+                  SheetField(
                     controller: _ageCtrl,
                     label: 'Age',
                     icon: Icons.cake_outlined,
@@ -1754,21 +1785,21 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _SheetField(
+                  SheetField(
                     controller: _classCtrl,
                     label: 'Class / College / Year',
                     icon: Icons.school_outlined,
                     enabled: !_saving,
                   ),
                   const SizedBox(height: 12),
-                  _SheetField(
+                  SheetField(
                     controller: _schoolCtrl,
                     label: 'School / College / Institution',
                     icon: Icons.account_balance_outlined,
                     enabled: !_saving,
                   ),
                   const SizedBox(height: 12),
-                  _SheetField(
+                  SheetField(
                     controller: _locationCtrl,
                     label: 'City / Location',
                     icon: Icons.location_on_outlined,
@@ -1778,7 +1809,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   // Non-student: only Organization / Department
                   _FormSectionLabel('Organization Details'),
                   const SizedBox(height: 10),
-                  _SheetField(
+                  SheetField(
                     controller: _classCtrl,
                     label: 'Organization / Department',
                     icon: Icons.business_outlined,
@@ -1895,8 +1926,8 @@ class _FormSectionLabel extends StatelessWidget {
 
 // ── Shared form field ─────────────────────────────────────────────────────────
 
-class _SheetField extends StatelessWidget {
-  const _SheetField({
+class SheetField extends StatelessWidget {
+  const SheetField({
     required this.controller,
     required this.label,
     required this.icon,
@@ -1905,6 +1936,7 @@ class _SheetField extends StatelessWidget {
     this.validator,
     this.obscureText = false,
     this.suffixIcon,
+    super.key,
   });
 
   final TextEditingController controller;
@@ -1958,16 +1990,16 @@ class _SheetField extends StatelessWidget {
 
 // ── Change Password sheet ─────────────────────────────────────────────────────
 
-class _ChangePasswordSheet extends StatefulWidget {
-  const _ChangePasswordSheet({required this.onSave});
+class ChangePasswordSheet extends StatefulWidget {
+  const ChangePasswordSheet({required this.onSave, super.key});
 
   final Future<void> Function(String currentPw, String newPw) onSave;
 
   @override
-  State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
+  State<ChangePasswordSheet> createState() => ChangePasswordSheetState();
 }
 
-class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
+class ChangePasswordSheetState extends State<ChangePasswordSheet> {
   final _formKey = GlobalKey<FormState>();
   final _currentCtrl = TextEditingController();
   final _newCtrl = TextEditingController();
@@ -2040,7 +2072,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              _SheetField(
+              SheetField(
                 controller: _currentCtrl,
                 label: 'Current Password',
                 icon: Icons.lock_outline_rounded,
@@ -2061,7 +2093,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                     : null,
               ),
               const SizedBox(height: 12),
-              _SheetField(
+              SheetField(
                 controller: _newCtrl,
                 label: 'New Password',
                 icon: Icons.lock_reset_rounded,
@@ -2083,7 +2115,7 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 },
               ),
               const SizedBox(height: 12),
-              _SheetField(
+              SheetField(
                 controller: _confirmCtrl,
                 label: 'Confirm New Password',
                 icon: Icons.check_circle_outline_rounded,

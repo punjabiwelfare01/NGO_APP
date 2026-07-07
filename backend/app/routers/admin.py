@@ -8,7 +8,7 @@ from ..database import get_db
 from ..dependencies import admin_only
 from ..models.course import Course, UserCourseProgress
 from ..models.notification import AdminNotification
-from ..models.user import User, UserRole
+from ..models.user import User, UserRole, UserRoleGrant
 from ..schemas.user import UserResponse
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -21,6 +21,10 @@ class AssignRoleBody(BaseModel):
     role: str
     access_status: str = "approved"
     verification_note: Optional[str] = None
+
+
+class GrantRoleBody(BaseModel):
+    role: str
 
 
 class RejectBody(BaseModel):
@@ -195,9 +199,80 @@ def assign_role(
     if payload.verification_note:
         user.verification_note = payload.verification_note
 
+    # Ensure the new primary role also has an active user_roles grant, so
+    # granted_roles (and thus login/switch-role) reflects it immediately.
+    existing_grant = next((g for g in user.role_grants if g.role == new_role.value), None)
+    if existing_grant:
+        existing_grant.status = "active"
+    else:
+        user.role_grants.append(
+            UserRoleGrant(role=new_role.value, granted_by=current_user.id, status="active")
+        )
+
     _notify(db, user_id=user_id,
             title="Account Approved",
             message=f"{user.name} has been approved as {new_role.value}.",
+            ntype="approval")
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/users/{user_id}/roles", response_model=UserResponse, status_code=201,
+             summary="Grant a role to a user, in addition to any roles already held [admin only]")
+def grant_role(
+    user_id: int,
+    payload: GrantRoleBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(admin_only),
+):
+    try:
+        role = UserRole(payload.role)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"Invalid role: {payload.role}")
+    if role == UserRole.super_admin and current_user.role != UserRole.super_admin:
+        raise HTTPException(status_code=403, detail="Only super_admin can grant super_admin role")
+
+    user = _get_or_404(db, user_id)
+    existing_grant = next((g for g in user.role_grants if g.role == role.value), None)
+    if existing_grant:
+        existing_grant.status = "active"
+    else:
+        user.role_grants.append(
+            UserRoleGrant(role=role.value, granted_by=current_user.id, status="active")
+        )
+
+    _notify(db, user_id=user_id,
+            title="Account roles updated",
+            message=f"{user.name} was granted {role.value} access.",
+            ntype="approval")
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/users/{user_id}/roles/{role}", response_model=UserResponse,
+                summary="Revoke a previously-granted role from a user [admin only]")
+def revoke_role(
+    user_id: int,
+    role: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(admin_only),
+):
+    user = _get_or_404(db, user_id)
+    if role == user.role.value:
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot revoke the account's primary role — assign a different primary role instead",
+        )
+    grant = next((g for g in user.role_grants if g.role == role and g.status == "active"), None)
+    if not grant:
+        raise HTTPException(status_code=404, detail="Active role grant not found")
+    grant.status = "inactive"
+
+    _notify(db, user_id=user_id,
+            title="Account roles updated",
+            message=f"{user.name}'s {role} access was removed.",
             ntype="approval")
     db.commit()
     db.refresh(user)

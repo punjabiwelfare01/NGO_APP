@@ -46,6 +46,13 @@ def update_ngo_profile(data: NGOProfileData, request: Request, db: Session = Dep
     return item
 
 
+@router.get("/settings/bank/public", response_model=BankData)
+def get_bank_public(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Any authenticated user can fetch the official donation account details."""
+    item = db.query(BankSetting).first()
+    return item if item else BankData()
+
+
 @router.get("/settings/bank", response_model=BankData)
 def get_bank(db: Session = Depends(get_db), _: User = Depends(_admin)):
     item = db.query(BankSetting).first()

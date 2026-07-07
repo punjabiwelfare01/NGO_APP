@@ -29,7 +29,8 @@ import '../volunteer/my_certificates_screen.dart';
 import '../volunteer/activity_list_screen.dart';
 import '../admin/pending_approvals_screen.dart';
 import '../admin/user_management_screen.dart';
-import '../events/admin/event_manager_screen.dart';
+import '../../viewmodels/events_viewmodel.dart';
+import '../events/events_dashboard_screen.dart';
 import '../admin/volunteer_admin_screen.dart';
 import '../admin/counsellor_admin_screen.dart';
 import '../school_portal/school_partner_portal_screen.dart';
@@ -38,7 +39,10 @@ import '../helping_support/admin/emergency_contacts_admin_screen.dart';
 import '../events/event_detail_pipeline_screen.dart';
 import '../helping_support/student/all_slots_screen.dart';
 import '../home/admin/safety_awareness_manager_screen.dart';
+import '../profile/profile_notifications_screen.dart';
 import '../../models/event_pipeline_models.dart';
+import '../../models/ngo_profile.dart';
+import '../../repositories/ngo_repository.dart';
 import '../../viewmodels/event_pipeline_viewmodel.dart';
 import 'widgets/counselling_session_card.dart';
 import 'widgets/daily_challenge_card.dart';
@@ -67,6 +71,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   bool _eventBannerShown = false;
   OverlayEntry? _eventNotificationEntry;
   String _skillQuery = '';
+  NGOProfile _ngo = NGOProfile.fallback;
 
   @override
   void initState() {
@@ -92,7 +97,13 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
       _volunteerVm!.addListener(_onVolunteerVmChanged);
       _pipelineVm = EventPipelineViewModel.shared..load();
       _pipelineVm!.addListener(_onVolunteerVmChanged);
+      _loadNgo();
     }
+  }
+
+  Future<void> _loadNgo() async {
+    final ngo = await NGORepository.getProfile();
+    if (mounted) setState(() => _ngo = ngo);
   }
 
   void _onVolunteerVmChanged() => setState(() {});
@@ -242,6 +253,9 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                 .first;
         return AppScrollView(
           children: [
+            if (AppState.role.isStudent)
+              _NGOBrandHeader(ngo: _ngo)
+            else
             ListenableBuilder(
               listenable: _adminVm ?? _vm,
               builder: (_, _) {
@@ -283,7 +297,8 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                   ),
                   onOpenEvents: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const EventManagerScreen(),
+                      builder: (_) =>
+                          EventsDashboardScreen(vm: EventsViewModel(isAdmin: true)..load()),
                     ),
                   ),
                   onOpenCounselling: () => Navigator.of(context).push(
@@ -469,10 +484,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                 vm: _volunteerVm,
                 isLoading: _volunteerVm?.state == VolunteerLoadState.loading,
               ),
-              if (_pipelineVm != null) ...[
+              if (_pipelineVm != null &&
+                  _ActivePipelineEventCard.hasActive(_pipelineVm!)) ...[
                 const SectionHeader(title: 'Active Event'),
                 _ActivePipelineEventCard(vm: _pipelineVm!),
               ],
+              const _ServiceOfHumanityBanner(),
               const SectionHeader(title: 'Quick Actions'),
               const _NGOQuickActionsGrid(),
               const SectionHeader(title: 'Wall of Impact'),
@@ -557,6 +574,142 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     final day = value.day.toString().padLeft(2, '0');
     final month = value.month.toString().padLeft(2, '0');
     return '$day/$month/${value.year}';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NGO Student Home — Brand header (logo, name, registration, tagline)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NGOBrandHeader extends StatelessWidget {
+  const _NGOBrandHeader({required this.ngo});
+  final NGOProfile ngo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'assests/ngo_logo.jpeg',
+                width: 64,
+                height: 64,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    ngo.name,
+                    style: const TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.ink,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Regd. No. ${ngo.registrationNumber ?? '736'}, Delhi Cantt',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton.filledTonal(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ProfileNotificationsScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.notifications_none_rounded),
+              tooltip: 'Notifications',
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Divider(height: 1, color: AppColors.muted.withValues(alpha: 0.25)),
+        const SizedBox(height: 10),
+        const Text(
+          'Together we serve, together we grow. Building a better tomorrow.',
+          style: TextStyle(
+            fontSize: 13,
+            color: AppColors.muted,
+            fontWeight: FontWeight.w600,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NGO Student Home — "In Service of Humanity" banner
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ServiceOfHumanityBanner extends StatelessWidget {
+  const _ServiceOfHumanityBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFE0B2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.groups_rounded, color: Color(0xFFEF6C00)),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'In Service of Humanity',
+                  style: TextStyle(
+                    color: Color(0xFFEF6C00),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Your time. Their future. Our responsibility.',
+                  style: TextStyle(
+                    color: Color(0xFFBF6D00),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.favorite_border_rounded, color: Color(0xFFEF6C00), size: 20),
+        ],
+      ),
+    );
   }
 }
 
@@ -922,11 +1075,15 @@ class _NGOAssignmentsSection extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: const Color(0xFFCFDEFF)),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.assignment_outlined, color: Color(0xFF6B8FD6), size: 28),
-            SizedBox(width: 14),
-            Expanded(
+            Image.asset(
+              'assests/home_screenstudent2.png',
+              width: 56,
+              height: 56,
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2760,15 +2917,24 @@ class _ActivePipelineEventCard extends StatelessWidget {
   const _ActivePipelineEventCard({required this.vm});
   final EventPipelineViewModel vm;
 
+  static List<PipelineAssignment> _activeAssignments(EventPipelineViewModel vm) =>
+      vm.events
+          .expand((e) => e.allAssignments)
+          .where((a) =>
+              a.status == PipelineAssignmentStatus.assigned ||
+              a.status == PipelineAssignmentStatus.inProgress ||
+              a.status == PipelineAssignmentStatus.resubmissionRequested)
+          .toList();
+
+  /// Whether this card has anything to show beyond a "nothing here" message
+  /// — used by the caller to skip the whole "Active Event" section when
+  /// empty, since "My Assignments" above it already covers that case.
+  static bool hasActive(EventPipelineViewModel vm) =>
+      _activeAssignments(vm).isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
-    final allAssignments = vm.events
-        .expand((e) => e.allAssignments)
-        .where((a) =>
-            a.status == PipelineAssignmentStatus.assigned ||
-            a.status == PipelineAssignmentStatus.inProgress ||
-            a.status == PipelineAssignmentStatus.resubmissionRequested)
-        .toList();
+    final allAssignments = _activeAssignments(vm);
 
     if (allAssignments.isEmpty) {
       return Padding(

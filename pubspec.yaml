@@ -77,6 +77,10 @@ flutter:
     - assests/new_donation_qr.png
     - assests/home_screen_card_councellor.png
     - assests/donation_upi_qr_code.jpeg
+    - assests/student_home_screen1.png
+    - assests/home_screenstudent2.png
+    - assests/home_screen_Student3_icon.png
+    - assests/background_card.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

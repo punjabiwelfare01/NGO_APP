@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from ..models.volunteer import ActivityCategory, SubmissionStatus
+from ..models.volunteer import ActivityCategory, ReviewTarget, SubmissionStatus
 
 
 # ── VolunteerActivity ─────────────────────────────────────────────────────────
@@ -157,6 +157,9 @@ class WorkSubmissionCreate(BaseModel):
     transaction_id: Optional[str] = None
     proof_files: Optional[str] = None  # JSON array string
     remarks: Optional[str] = None
+    # None = auto-route based on the activity's creator (event manager vs
+    # admin-created activity); set explicitly to override that default.
+    review_target: Optional[ReviewTarget] = None
 
 
 class WorkSubmissionReview(BaseModel):
@@ -177,6 +180,7 @@ class WorkSubmissionOut(BaseModel):
     transaction_id: Optional[str]
     proof_files: Optional[str]
     status: SubmissionStatus
+    review_target: ReviewTarget
     remarks: Optional[str]
     reviewer_notes: Optional[str]
     reviewed_by: Optional[int]

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/colors.dart';
 import '../../../../models/certificate_models.dart';
+import '../../../../repositories/api_client.dart';
 import '../../../../repositories/certificate_repository.dart';
 
 /// Form for Admin / Event Manager to fill or edit certificate details
@@ -390,7 +391,9 @@ class _CertificateDetailFormScreenState
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.network(
-                        _signatureUrlCtrl.text,
+                        _signatureUrlCtrl.text.startsWith('http')
+                            ? _signatureUrlCtrl.text
+                            : '${ApiClient.baseUrl}${_signatureUrlCtrl.text}',
                         height: 60,
                         fit: BoxFit.contain,
                         errorBuilder: (_, _, _) => const Text(

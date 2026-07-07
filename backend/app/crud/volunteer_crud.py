@@ -8,12 +8,12 @@ from sqlalchemy.orm import Session
 
 from ..models.volunteer import (
     ActivityApplication, ActivityAssignment, ActivityCategory, DailyLog,
-    ImpactStory, SubmissionStatus, VolunteerActivity, WorkSubmission,
+    ImpactStory, ReviewTarget, SubmissionStatus, VolunteerActivity, WorkSubmission,
 )
 from ..schemas.volunteer import (
     ActivityAssignmentCreate, DailyLogCreate, DailyLogUpdate,
     ImpactStoryCreate, VolunteerActivityCreate, VolunteerActivityUpdate,
-    WorkSubmissionCreate, WorkSubmissionReview,
+    WorkSubmissionReview,
 )
 
 
@@ -133,47 +133,6 @@ def get_applications_for_student(db: Session, student_id: int) -> List[ActivityA
 
 # ── WorkSubmission ────────────────────────────────────────────────────────────
 
-def create_submission(db: Session, data: WorkSubmissionCreate, student_id: int) -> WorkSubmission:
-    assignment_id = data.assignment_id
-
-    if assignment_id is None:
-        # No assignment ID given — find an existing assignment for this student+activity
-        # or auto-create one so the submission is always visible to the event manager.
-        existing = (
-            db.query(ActivityAssignment)
-            .filter(
-                ActivityAssignment.student_id == student_id,
-                ActivityAssignment.activity_id == data.activity_id,
-            )
-            .first()
-        )
-        if existing:
-            assignment_id = existing.id
-        else:
-            auto = ActivityAssignment(
-                student_id=student_id,
-                activity_id=data.activity_id,
-                status="assigned",
-            )
-            db.add(auto)
-            db.flush()
-            assignment_id = auto.id
-
-    # Build submission with the resolved assignment_id
-    dump = data.model_dump()
-    dump['assignment_id'] = assignment_id
-    obj = WorkSubmission(**dump, student_id=student_id)
-    db.add(obj)
-
-    assignment = get_assignment(db, assignment_id)
-    if assignment and assignment.student_id == student_id:
-        assignment.status = "submitted"
-
-    db.commit()
-    db.refresh(obj)
-    return obj
-
-
 def get_submissions_for_student(db: Session, student_id: int) -> List[WorkSubmission]:
     return (
         db.query(WorkSubmission)
@@ -186,10 +145,25 @@ def get_submissions_for_student(db: Session, student_id: int) -> List[WorkSubmis
 def get_pending_submissions(db: Session) -> List[WorkSubmission]:
     return (
         db.query(WorkSubmission)
-        .filter(WorkSubmission.status.in_([
-            SubmissionStatus.submitted, SubmissionStatus.under_review,
-        ]))
+        .filter(
+            WorkSubmission.review_target == ReviewTarget.admin,
+            WorkSubmission.status.in_([
+                SubmissionStatus.submitted, SubmissionStatus.under_review,
+            ]),
+        )
         .order_by(WorkSubmission.created_at.desc())
+        .all()
+    )
+
+
+def get_approved_submissions(db: Session) -> List[WorkSubmission]:
+    return (
+        db.query(WorkSubmission)
+        .filter(
+            WorkSubmission.review_target == ReviewTarget.admin,
+            WorkSubmission.status == SubmissionStatus.approved,
+        )
+        .order_by(WorkSubmission.reviewed_at.desc())
         .all()
     )
 

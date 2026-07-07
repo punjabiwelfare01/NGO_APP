@@ -102,6 +102,11 @@ def school_partner_user(db):
     return _create_user(db, "school@test.local", UserRole.school_partner, "School Partner", age=40)
 
 
+@pytest.fixture()
+def event_manager_user(db):
+    return _create_user(db, "em@test.local", UserRole.event_manager, "Event Manager", age=32)
+
+
 # ── auth header fixtures ───────────────────────────────────────────────────────
 
 def _get_token(client, email: str) -> str:
@@ -138,6 +143,11 @@ def cc_headers(client, content_creator_user):
 @pytest.fixture()
 def school_partner_headers(client, school_partner_user):
     return {"Authorization": f"Bearer {_get_token(client, 'school@test.local')}"}
+
+
+@pytest.fixture()
+def event_manager_headers(client, event_manager_user):
+    return {"Authorization": f"Bearer {_get_token(client, 'em@test.local')}"}
 
 
 # ── shared payloads ────────────────────────────────────────────────────────────

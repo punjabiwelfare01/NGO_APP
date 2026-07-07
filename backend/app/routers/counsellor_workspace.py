@@ -21,7 +21,7 @@ router = APIRouter(tags=["Counsellor Workspace"])
 
 
 def _counsellor(user: User = Depends(get_current_user)) -> User:
-    if user.role not in (UserRole.mentor, UserRole.admin, UserRole.super_admin): raise HTTPException(403, "Counsellor access required")
+    if user.active_role not in (UserRole.mentor, UserRole.admin, UserRole.super_admin): raise HTTPException(403, "Counsellor access required")
     return user
 
 
@@ -37,13 +37,13 @@ def _request_json(item: SchoolCounsellorRequest, db: Session, reveal: bool) -> d
 @router.get("/counsellor/requests")
 def requests(db: Session = Depends(get_db), user: User = Depends(_counsellor)):
     query = db.query(SchoolCounsellorRequest)
-    if user.role == UserRole.mentor: query = query.filter(SchoolCounsellorRequest.counsellor_id == user.id)
+    if user.active_role == UserRole.mentor: query = query.filter(SchoolCounsellorRequest.counsellor_id == user.id)
     return [_request_json(item, db, item.status not in ("new_request", "declined")) for item in query.order_by(SchoolCounsellorRequest.created_at.desc()).all()]
 
 
 def _owned(db: Session, request_id: int, user: User):
     item = db.query(SchoolCounsellorRequest).filter(SchoolCounsellorRequest.id == request_id).first()
-    if not item or (user.role == UserRole.mentor and item.counsellor_id != user.id): raise HTTPException(404, "Counselling request not found")
+    if not item or (user.active_role == UserRole.mentor and item.counsellor_id != user.id): raise HTTPException(404, "Counselling request not found")
     return item
 
 
@@ -68,7 +68,7 @@ def reschedule(request_id: int, payload: dict, db: Session = Depends(get_db), us
 @router.get("/counsellor/sessions")
 def sessions(db: Session = Depends(get_db), user: User = Depends(_counsellor)):
     query = db.query(SchoolCounsellorRequest).filter(SchoolCounsellorRequest.status.in_(["accepted", "confirmed", "scheduled", "completed"]))
-    if user.role == UserRole.mentor: query = query.filter(SchoolCounsellorRequest.counsellor_id == user.id)
+    if user.active_role == UserRole.mentor: query = query.filter(SchoolCounsellorRequest.counsellor_id == user.id)
     return [_request_json(item, db, True) for item in query.order_by(SchoolCounsellorRequest.preferred_at).all()]
 
 
@@ -116,82 +116,6 @@ def delete_availability(slot_id: int, db: Session = Depends(get_db), user: User 
     item = db.query(CounsellingAvailability).filter(CounsellingAvailability.id == slot_id, CounsellingAvailability.mentor_id == user.id).first()
     if not item: raise HTTPException(404, "Availability not found")
     db.delete(item); db.commit()
-
-
-# ── Extended Profile ──────────────────────────────────────────────────────────
-
-@router.get("/counsellor/profile/extended")
-def get_extended_profile(db: Session = Depends(get_db), user: User = Depends(_counsellor)):
-    mentor = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
-    return {
-        "id": user.id,
-        "name": user.name,
-        "email": user.email,
-        "phone": user.phone,
-        "location": user.location,
-        "photo_url": user.photo_url,
-        "gender": mentor.gender if mentor else None,
-        "date_of_birth": mentor.date_of_birth if mentor else None,
-        "address": mentor.address if mentor else None,
-        "city": mentor.city if mentor else None,
-        "state": mentor.state if mentor else None,
-        "pin_code": mentor.pin_code if mentor else None,
-        "qualification": mentor.qualification if mentor else None,
-        "years_of_experience": mentor.years_of_experience if mentor else None,
-        "organization": mentor.organization if mentor else None,
-        "counselling_mode": mentor.counselling_mode if mentor else "both",
-        "languages_known": mentor.languages_known if mentor else None,
-        "bio": mentor.bio if mentor else None,
-        "expertise": mentor.expertise if mentor else None,
-        "category": mentor.category if mentor else None,
-        "profile_image_url": mentor.profile_image_url if mentor else None,
-        "id_proof_type": mentor.id_proof_type if mentor else None,
-        "id_proof_number": mentor.id_proof_number if mentor else None,
-        "id_proof_doc_url": mentor.id_proof_doc_url if mentor else None,
-        "professional_cert_url": mentor.professional_cert_url if mentor else None,
-        "verification_status": mentor.verification_status if mentor else "pending",
-        "verified_by": mentor.verified_by if mentor else None,
-        "verified_at": mentor.verified_at if mentor else None,
-        "admin_remark": mentor.admin_remark if mentor else None,
-    }
-
-
-@router.patch("/counsellor/profile/extended")
-def update_extended_profile(payload: dict, db: Session = Depends(get_db), user: User = Depends(_counsellor)):
-    # Update user-level fields
-    if "name" in payload:
-        user.name = payload["name"]
-    if "phone" in payload:
-        user.phone = payload["phone"]
-    if "location" in payload:
-        user.location = payload["location"]
-
-    # Find or create MentorProfile
-    mentor = db.query(MentorProfile).filter(MentorProfile.user_id == user.id).first()
-    if not mentor:
-        mentor = MentorProfile(
-            user_id=user.id,
-            display_name=user.name or "",
-        )
-        db.add(mentor)
-
-    mentor_fields = [
-        "gender", "date_of_birth", "address", "city", "state", "pin_code",
-        "qualification", "years_of_experience", "organization", "counselling_mode",
-        "languages_known", "bio", "expertise", "category", "profile_image_url",
-        "id_proof_type", "id_proof_number", "id_proof_doc_url", "professional_cert_url",
-    ]
-    for field in mentor_fields:
-        if field in payload:
-            setattr(mentor, field, payload[field])
-
-    # Keep display_name in sync with name
-    if "name" in payload:
-        mentor.display_name = payload["name"]
-
-    db.commit()
-    db.refresh(mentor)
-    return get_extended_profile(db=db, user=user)
 
 
 # ── Weekly Availability ───────────────────────────────────────────────────────
