@@ -18,6 +18,7 @@ import '../../models/volunteer_models.dart';
 import '../../viewmodels/volunteer_viewmodel.dart';
 import '../../repositories/impact_repository.dart';
 import '../../utils/navigation_helper.dart';
+import '../../widgets/achievement_certificates_section.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_scroll_view.dart';
 import '../../widgets/section_header.dart';
@@ -494,6 +495,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
               const _NGOQuickActionsGrid(),
               const SectionHeader(title: 'Wall of Impact'),
               const _WallOfImpactPreviewCard(),
+              const AchievementCertificatesSection(),
             ],
 
             // ── Emergency Help shortcut ────────────────────────────
@@ -2231,10 +2233,9 @@ class _EmergencyHelpCard extends StatelessWidget {
                   icon: Icons.location_on_rounded,
                   color: const Color(0xFF1565C0),
                   label: 'Office Address',
-                  value:
-                      'Punjabi Welfare Trust, Near Bus Stand, Fatehgarh Sahib, Punjab – 140406',
+                  value: 'Punjabi Welfare Trust, Sadar Bazar, Delhi Cantt, New Delhi',
                   onTap: () => _launch(
-                    'https://maps.google.com/?q=Fatehgarh+Sahib+Punjab',
+                    'https://maps.google.com/?q=Sadar+Bazar+Delhi+Cantt+New+Delhi',
                   ),
                   actionLabel: 'Get Directions',
                 ),

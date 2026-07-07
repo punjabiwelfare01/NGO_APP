@@ -709,7 +709,7 @@ class _NgoOverview extends StatelessWidget {
       ('Report Reference', reportNo),
       ('Email', ngo.email ?? 'Punjabiwelfaretrust99@gmail.com'),
       ('Contact', ngo.phone ?? '9211772333, 7834992799'),
-      ('Website', ngo.website ?? 'www.punjabihelp.org'),
+      ('Website', ngo.website ?? 'https://punjabiwelfaretrust.org'),
       ('Tagline', ngo.tagline ?? 'Empowering Communities Through Service'),
       ('Report Type', 'Organisation-wide Impact Report'),
       ('Access Level', 'Admin / Management'),

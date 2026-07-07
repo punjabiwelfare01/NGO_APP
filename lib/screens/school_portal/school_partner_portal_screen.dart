@@ -7,6 +7,7 @@ import '../../models/school_partner_models.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/ngo_repository.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
+import '../../widgets/achievement_certificates_section.dart';
 import '../internship/wall_of_impact_view.dart';
 import 'counsellor_directory_screen.dart';
 import 'school_partner_profile_screen.dart';
@@ -331,6 +332,9 @@ class _HomeTab extends StatelessWidget {
               // ── Hero Banner ───────────────────────────────────────────────
               _HeroBanner(vm: vm),
               const SizedBox(height: 22),
+
+              // ── NGO Achievements (builds trust for school partners) ───────
+              const AchievementCertificatesSection(),
 
               // ── School Services ───────────────────────────────────────────
               const _SectionTitle('School Services'),

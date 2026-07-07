@@ -10,6 +10,7 @@ import '../../repositories/bank_repository.dart';
 import '../../repositories/event_manager_repository.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
+import '../../widgets/achievement_certificates_section.dart';
 import '../../widgets/app_card.dart';
 import 'counsellor_requests_screen.dart';
 import '../events/official_event_report_screen.dart';
@@ -91,6 +92,8 @@ class EMHomeView extends StatelessWidget {
             _ReportsPendingSection(vm: vm),
             const SizedBox(height: 22),
             _RecentActivitySection(vm: vm),
+            const SizedBox(height: 22),
+            const AchievementCertificatesSection(),
           ],
         );
       },

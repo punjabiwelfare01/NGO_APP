@@ -25,8 +25,8 @@ class NGOProfile {
     registrationNumber: '736',
     email: 'Punjabiwelfaretrust99@gmail.com',
     phone: '9211772333, 7834992799',
-    address: 'Near Bus Stand, Fatehgarh Sahib, Punjab - 140406',
-    website: 'www.punjabihelp.org',
+    address: 'Sadar Bazar, Delhi Cantt, New Delhi',
+    website: 'https://punjabiwelfaretrust.org',
   );
 
   factory NGOProfile.fromJson(Map<String, dynamic> j) => NGOProfile(

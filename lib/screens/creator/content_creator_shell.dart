@@ -5,6 +5,7 @@ import '../../core/colors.dart';
 import '../../models/creator_content.dart';
 import '../../repositories/api_client.dart';
 import '../../repositories/creator_repository.dart';
+import '../../widgets/achievement_certificates_section.dart';
 import '../../widgets/app_card.dart';
 import '../events/admin/create_event/create_event_view.dart';
 import '../events/admin/create_event/quiz/create_quiz_screen.dart';
@@ -153,6 +154,8 @@ class _CreatorHomeViewState extends State<_CreatorHomeView> {
           _RecentContentSection(items: _stats!.recentContent),
           const SizedBox(height: 20),
           _TopPerformingSection(items: _stats!.topPerforming),
+          const SizedBox(height: 20),
+          const AchievementCertificatesSection(),
         ],
       ],
     );

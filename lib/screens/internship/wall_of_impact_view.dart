@@ -12,7 +12,11 @@ const _kPurple = Color(0xFF6A1B9A);
 // ── Root view ────────────────────────────────────────────────────────────────
 
 class WallOfImpactView extends StatefulWidget {
-  const WallOfImpactView({super.key});
+  const WallOfImpactView({super.key, this.initialCategory});
+
+  /// Pre-selects a category filter chip (e.g. 'certificate') when deep-linked
+  /// from a "View All" entry point elsewhere in the app.
+  final String? initialCategory;
 
   @override
   State<WallOfImpactView> createState() => _WallOfImpactViewState();
@@ -37,6 +41,7 @@ class _WallOfImpactViewState extends State<WallOfImpactView> {
   @override
   void initState() {
     super.initState();
+    _category = widget.initialCategory;
     _load();
   }
 

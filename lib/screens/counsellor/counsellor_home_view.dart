@@ -6,6 +6,7 @@ import '../../models/ngo_profile.dart';
 import '../../repositories/api_client.dart';
 import '../../repositories/ngo_repository.dart';
 import '../../viewmodels/counsellor_home_viewmodel.dart';
+import '../../widgets/achievement_certificates_section.dart';
 import 'counsellor_meeting_detail_screen.dart';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -101,6 +102,8 @@ class _CounsellorHomeViewState extends State<CounsellorHomeView> {
                       const SizedBox(height: 22),
                       _ScheduleRemindersRow(vm: vm),
                     ],
+                    const SizedBox(height: 22),
+                    const AchievementCertificatesSection(),
                     const SizedBox(height: 22),
                     _NgoFooter(),
                   ]),

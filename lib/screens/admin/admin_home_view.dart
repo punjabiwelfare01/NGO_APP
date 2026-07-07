@@ -15,6 +15,7 @@ import '../../viewmodels/admin_viewmodel.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../viewmodels/events_viewmodel.dart';
+import '../../widgets/achievement_certificates_section.dart';
 import '../event_manager/counsellor_requests_screen.dart';
 import '../events/events_dashboard_screen.dart';
 import '../learn/admin/create_free_course_screen.dart';
@@ -110,6 +111,8 @@ class _AdminHomeViewState extends State<AdminHomeView> {
             _donationSummary(),
             const SizedBox(height: AdminSpacing.xl),
             _certificateCenter(),
+            const SizedBox(height: AdminSpacing.xl),
+            const AchievementCertificatesSection(),
             const SizedBox(height: AdminSpacing.xl),
             _impactApproval(events),
             const SizedBox(height: AdminSpacing.xl),
