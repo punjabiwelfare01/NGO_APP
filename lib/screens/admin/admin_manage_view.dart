@@ -43,7 +43,7 @@ class AdminManageView extends StatelessWidget {
         'Events',
         'Create, assign, review and publish — everything in one place',
         const Color(0xFF1565C0),
-        EventsDashboardScreen(vm: EventsViewModel(isAdmin: true)..load()),
+        EventsDashboardScreen(vm: EventsViewModel.shared(isAdmin: true)..load()),
       ),
       _ManageTool(
         Icons.menu_book_rounded,

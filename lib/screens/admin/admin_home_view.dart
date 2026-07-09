@@ -38,10 +38,10 @@ class AdminHomeView extends StatefulWidget {
   final EventManagerViewModel eventVm;
   final ValueChanged<int> onOpenTab;
   @override
-  State<AdminHomeView> createState() => _AdminHomeViewState();
+  State<AdminHomeView> createState() => AdminHomeViewState();
 }
 
-class _AdminHomeViewState extends State<AdminHomeView> {
+class AdminHomeViewState extends State<AdminHomeView> {
   List<Donation> _donations = [];
   List<Certificate> _certificates = [];
   List<Course> _courses = [];
@@ -51,6 +51,13 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     super.initState();
     _loadModuleData();
   }
+
+  /// Re-fetches donations/certificates/courses (and school counsellor
+  /// requests) from the server. Called externally via a GlobalKey whenever
+  /// the Home tab is (re)selected, since this data otherwise only loads once
+  /// on first mount — the tab's State is kept alive by AdminShell's
+  /// IndexedStack, so `initState()` never re-runs on its own.
+  Future<void> refresh() => _loadModuleData();
 
   Future<void> _loadModuleData() async {
     // Load school counsellor requests for admin in parallel (non-fatal).
@@ -83,8 +90,8 @@ class _AdminHomeViewState extends State<AdminHomeView> {
       return RefreshIndicator(
         onRefresh: () async {
           await Future.wait([
-            admin.load(),
-            events.load(),
+            admin.load(force: true),
+            events.load(force: true),
             _loadModuleData(),
             CounsellorViewModel.shared.loadAllAdminRequests(),
           ]);
@@ -392,7 +399,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
         Icons.event_rounded,
         'Create Event',
         const Color(0xFF1565C0),
-        () => _push(EventsDashboardScreen(vm: EventsViewModel(isAdmin: true)..load())),
+        () => _push(EventsDashboardScreen(vm: EventsViewModel.shared(isAdmin: true)..load())),
       ),
       _Action(
         Icons.rate_review_rounded,
@@ -590,7 +597,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
           'Events & Activities Overview',
           Icons.event_note_rounded,
           action: 'Manage',
-          onAction: () => _push(EventsDashboardScreen(vm: EventsViewModel(isAdmin: true)..load())),
+          onAction: () => _push(EventsDashboardScreen(vm: EventsViewModel.shared(isAdmin: true)..load())),
         ),
         const SizedBox(height: AdminSpacing.sm),
         Row(
@@ -1166,7 +1173,7 @@ class _AdminHomeViewState extends State<AdminHomeView> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => screen));
-    await widget.adminVm.load();
+    await widget.adminVm.load(force: true);
   }
 
   void _showNotifications(AdminViewModel vm) => showModalBottomSheet<void>(

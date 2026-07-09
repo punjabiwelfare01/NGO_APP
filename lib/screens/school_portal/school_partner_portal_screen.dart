@@ -9,6 +9,7 @@ import '../../repositories/ngo_repository.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../../widgets/achievement_certificates_section.dart';
 import '../internship/wall_of_impact_view.dart';
+import '../profile/profile_notifications_screen.dart';
 import 'counsellor_directory_screen.dart';
 import 'school_partner_profile_screen.dart';
 import 'school_request_detail_screen.dart';
@@ -73,7 +74,13 @@ class _SchoolPartnerPortalScreenState
         ),
         bottomNavigationBar: _BottomNav(
           current: _tab,
-          onTap: (i) => setState(() => _tab = i),
+          onTap: (i) {
+            setState(() => _tab = i);
+            if (i == 0 || i == 2) {
+              _vm.loadSchoolRequests(force: true);
+              _vm.loadSchoolStats(force: true);
+            }
+          },
         ),
       ),
     );
@@ -209,7 +216,12 @@ class _SchoolBrandHeader extends StatelessWidget {
           ),
         ),
         IconButton.filledTonal(
-          onPressed: null,
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => const ProfileNotificationsScreen(),
+            ),
+          ),
           icon: const Icon(Icons.notifications_none_rounded),
           tooltip: 'Notifications',
         ),
@@ -1363,15 +1375,24 @@ class _RequestsTab extends StatelessWidget {
         surfaceTintColor: _kCard,
         automaticallyImplyLeading: false,
       ),
-      body: requests.isEmpty
-          ? _EmptyRequests(vm: vm)
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: requests.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (_, i) =>
-                  _RequestCard(request: requests[i], vm: vm),
-            ),
+      body: RefreshIndicator(
+        onRefresh: () => Future.wait([
+          vm.loadSchoolRequests(force: true),
+          vm.loadSchoolStats(force: true),
+        ]),
+        child: requests.isEmpty
+            ? ListView(
+                padding: const EdgeInsets.all(16),
+                children: [_EmptyRequests(vm: vm)],
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: requests.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (_, i) =>
+                    _RequestCard(request: requests[i], vm: vm),
+              ),
+      ),
     );
   }
 }

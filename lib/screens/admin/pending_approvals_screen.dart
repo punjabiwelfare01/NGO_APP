@@ -17,20 +17,12 @@ class PendingApprovalsScreen extends StatefulWidget {
 
 class _PendingApprovalsScreenState extends State<PendingApprovalsScreen> {
   late final AdminViewModel _vm;
-  late final bool _ownsVm;
 
   @override
   void initState() {
     super.initState();
-    _ownsVm = widget.vm == null;
-    _vm = widget.vm ?? AdminViewModel();
+    _vm = widget.vm ?? AdminViewModel.shared;
     _vm.loadPendingUsers();
-  }
-
-  @override
-  void dispose() {
-    if (_ownsVm) _vm.dispose();
-    super.dispose();
   }
 
   @override
@@ -53,7 +45,7 @@ class _PendingApprovalsScreenState extends State<PendingApprovalsScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppColors.ink),
             tooltip: 'Refresh',
-            onPressed: _vm.loadPendingUsers,
+            onPressed: () => _vm.loadPendingUsers(force: true),
           ),
         ],
       ),
@@ -66,12 +58,12 @@ class _PendingApprovalsScreenState extends State<PendingApprovalsScreen> {
           if (_vm.state == ViewState.error) {
             return _ErrorPanel(
               message: _vm.errorMessage ?? 'Failed to load pending users.',
-              onRetry: _vm.loadPendingUsers,
+              onRetry: () => _vm.loadPendingUsers(force: true),
             );
           }
           if (_vm.pendingUsers.isEmpty) {
             return RefreshIndicator(
-              onRefresh: _vm.loadPendingUsers,
+              onRefresh: () => _vm.loadPendingUsers(force: true),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: const [
@@ -81,7 +73,7 @@ class _PendingApprovalsScreenState extends State<PendingApprovalsScreen> {
             );
           }
           return RefreshIndicator(
-            onRefresh: _vm.loadPendingUsers,
+            onRefresh: () => _vm.loadPendingUsers(force: true),
             child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),

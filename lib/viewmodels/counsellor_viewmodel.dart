@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../app_state.dart';
 import '../models/counsellor_models.dart';
 import '../models/counsellor_session_models.dart';
 import '../models/school_partner_models.dart';
@@ -9,7 +10,27 @@ import '../repositories/school_partner_repository.dart';
 enum CounsellorLoadState { idle, loading, error }
 
 class CounsellorViewModel extends ChangeNotifier {
-  static final CounsellorViewModel shared = CounsellorViewModel();
+  static final CounsellorViewModel shared = CounsellorViewModel()
+    .._registerCacheReset();
+
+  /// Only the [shared] singleton should self-clear on logout — a
+  /// screen-local instance (e.g. CounsellorDirectoryScreen's fallback) must
+  /// not register a permanent AppState callback that outlives its widget.
+  void _registerCacheReset() =>
+      AppState.registerCacheReset(_resetCache);
+
+  void _resetCache() {
+    _loaded = false;
+    _schoolRequestsLoaded = false;
+    _schoolStatsLoaded = false;
+    _schoolProfile = null;
+    _counsellors = [];
+    _requests.clear();
+    _schoolRequests = [];
+    _schoolStats = SchoolStats.empty;
+    _allAdminRequests = [];
+    if (!_disposed) notifyListeners();
+  }
 
   CounsellorLoadState _state = CounsellorLoadState.idle;
   List<CounsellorProfile> _counsellors = [];
@@ -222,6 +243,8 @@ class CounsellorViewModel extends ChangeNotifier {
       'mode': req.sessionMode.name,
       'expected_students': req.studentCount,
       'class_group': req.gradeLevel,
+      if (req.principalPhone.isNotEmpty) 'coordinator_phone': req.principalPhone,
+      if (req.schoolAddress.isNotEmpty) 'school_address': req.schoolAddress,
       if (req.specialRequirements.isNotEmpty)
         'special_requirements': req.specialRequirements,
     });

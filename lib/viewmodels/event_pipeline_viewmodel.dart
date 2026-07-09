@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import '../models/event_manager_models.dart' hide EventReport;
 import '../models/event_pipeline_models.dart';
 import '../repositories/api_client.dart';
@@ -574,7 +575,17 @@ class EventPipelineViewModel extends ChangeNotifier {
 
   static EventPipelineViewModel? _shared;
   static EventPipelineViewModel get shared {
-    _shared ??= EventPipelineViewModel();
+    if (_shared == null) {
+      _shared = EventPipelineViewModel();
+      AppState.registerCacheReset(_shared!._resetCache);
+    }
     return _shared!;
+  }
+
+  void _resetCache() {
+    _loaded = false;
+    _events = [];
+    _stats = PipelineStats.empty;
+    if (!_disposed) notifyListeners();
   }
 }

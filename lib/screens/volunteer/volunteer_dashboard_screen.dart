@@ -27,14 +27,8 @@ class _VolunteerDashboardScreenState extends State<VolunteerDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _vm = VolunteerViewModel();
+    _vm = VolunteerViewModel.shared;
     _vm.load();
-  }
-
-  @override
-  void dispose() {
-    _vm.dispose();
-    super.dispose();
   }
 
   @override

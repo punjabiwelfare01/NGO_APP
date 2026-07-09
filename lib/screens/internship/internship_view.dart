@@ -25,13 +25,12 @@ class _InternshipViewState extends State<InternshipView>
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
-    _vm = VolunteerViewModel()..load();
+    _vm = VolunteerViewModel.shared..load();
   }
 
   @override
   void dispose() {
     _tabs.dispose();
-    _vm.dispose();
     super.dispose();
   }
 
@@ -148,7 +147,7 @@ class _InternshipViewState extends State<InternshipView>
         builder: (_) => WorkSubmissionScreen(vm: _vm, assignment: assignment),
       ),
     );
-    await _vm.load();
+    await _vm.load(force: true);
   }
 
   Future<void> _openUpdate(
@@ -162,7 +161,7 @@ class _InternshipViewState extends State<InternshipView>
         ),
       ),
     );
-    await _vm.load();
+    await _vm.load(force: true);
   }
 }
 

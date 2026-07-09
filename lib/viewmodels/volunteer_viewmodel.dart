@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../app_state.dart';
 import '../models/certificate_models.dart';
 import '../models/donation_models.dart';
 import '../models/volunteer_models.dart';
@@ -10,6 +11,31 @@ import '../repositories/volunteer_repository.dart';
 enum VolunteerLoadState { idle, loading, error }
 
 class VolunteerViewModel extends ChangeNotifier {
+  static VolunteerViewModel? _shared;
+  static VolunteerViewModel get shared {
+    if (_shared == null) {
+      _shared = VolunteerViewModel();
+      AppState.registerCacheReset(_shared!._resetCache);
+    }
+    return _shared!;
+  }
+
+  void _resetCache() {
+    _loaded = false;
+    _stats = VolunteerStats.empty;
+    _activities = [];
+    _assignments = [];
+    _submissions = [];
+    _logs = [];
+    _impactStories = [];
+    _certificates = [];
+    _donations = [];
+    _stipends = [];
+    _paymentDetails = null;
+    notifyListeners();
+  }
+
+  bool _loaded = false;
   VolunteerLoadState _state = VolunteerLoadState.idle;
   String? _error;
 
@@ -47,7 +73,8 @@ class VolunteerViewModel extends ChangeNotifier {
 
   // ── Load everything for the volunteer dashboard ───────────────────────────
 
-  Future<void> load() async {
+  Future<void> load({bool force = false}) async {
+    if (_loaded && !force) return;
     _state = VolunteerLoadState.loading;
     _error = null;
     notifyListeners();
@@ -83,6 +110,7 @@ class VolunteerViewModel extends ChangeNotifier {
           .catchError((_) {}),
     ]);
 
+    _loaded = true;
     _state = VolunteerLoadState.idle;
     notifyListeners();
   }

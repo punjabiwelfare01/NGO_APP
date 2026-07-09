@@ -49,7 +49,7 @@ def _owned(db: Session, request_id: int, user: User):
 def accept(request_id: int, db: Session = Depends(get_db), user: User = Depends(_counsellor)):
     item = _owned(db, request_id, user); item.status = "accepted"; item.accepted_at = datetime.utcnow()
     for delta, kind in ((timedelta(hours=24), "24_hours"), (timedelta(hours=2), "2_hours"), (timedelta(minutes=15), "15_minutes")):
-        db.add(ReminderJob(user_id=item.counsellor_id, notification_type="counselling_reminder", entity_type="counselling_request", entity_id=item.id, scheduled_at=item.preferred_at - delta))
+        db.add(ReminderJob(user_id=item.counsellor_id, notification_type=f"counselling_reminder_{kind}", entity_type="counselling_request", entity_id=item.id, scheduled_at=item.preferred_at - delta))
     notification_service.notify(db, item.requested_by, "counsellor_decision", "Counsellor accepted", f"Your request for {item.topic} was accepted.", entity_type="counselling_request", entity_id=item.id, commit=False); db.commit(); return _request_json(item, db, True)
 
 

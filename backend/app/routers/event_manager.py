@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..dependencies import require_role
@@ -60,7 +60,9 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
 
     # ── Activities linked to events ───────────────────────────────────────────
     event_activities = (
-        db.query(VolunteerActivity).filter(VolunteerActivity.event_id.in_(event_ids)).all()
+        db.query(VolunteerActivity)
+        .options(selectinload(VolunteerActivity.assignments))
+        .filter(VolunteerActivity.event_id.in_(event_ids)).all()
         if event_ids else []
     )
     by_event: dict = {eid: [] for eid in event_ids}
@@ -69,15 +71,17 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
     event_payload = {e.id: _event_json(e, by_event.get(e.id, [])) for e in events}
 
     # ── Standalone activities created by this EM (no event) ──────────────────
+    standalone_query = db.query(VolunteerActivity).options(
+        selectinload(VolunteerActivity.assignments)
+    )
     standalone_activities = (
-        db.query(VolunteerActivity)
-        .filter(
+        standalone_query.filter(
             VolunteerActivity.event_id.is_(None),
             VolunteerActivity.created_by == user.id,
         )
         .all()
         if user.active_role == UserRole.event_manager
-        else db.query(VolunteerActivity).filter(VolunteerActivity.event_id.is_(None)).all()
+        else standalone_query.filter(VolunteerActivity.event_id.is_(None)).all()
     )
 
     all_activities = event_activities + standalone_activities
@@ -86,6 +90,10 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
     # ── Assignments ───────────────────────────────────────────────────────────
     assignments = (
         db.query(ActivityAssignment)
+        .options(
+            selectinload(ActivityAssignment.activity),
+            selectinload(ActivityAssignment.student),
+        )
         .filter(ActivityAssignment.activity_id.in_(activity_ids))
         .all()
         if activity_ids else []
@@ -189,8 +197,9 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
         })
 
     # ── Impact posts ──────────────────────────────────────────────────────────
+    impact_query = db.query(ImpactPost).options(selectinload(ImpactPost.media))
     if user.active_role in (UserRole.admin, UserRole.super_admin):
-        impacts = db.query(ImpactPost).order_by(ImpactPost.created_at.desc()).all()
+        impacts = impact_query.order_by(ImpactPost.created_at.desc()).all()
     else:
         # Include:
         #  1. Posts this EM created (all statuses — their drafts + submitted)
@@ -203,7 +212,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
         if event_ids:
             conditions.append(ImpactPost.event_id.in_(event_ids))
         impacts = (
-            db.query(ImpactPost)
+            impact_query
             .filter(or_(*conditions))
             .order_by(ImpactPost.created_at.desc())
             .all()

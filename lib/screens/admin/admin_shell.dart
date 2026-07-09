@@ -21,26 +21,21 @@ class _AdminShellState extends State<AdminShell> {
   int _index = 0;
   late final AdminViewModel _adminVm;
   late final EventManagerViewModel _eventVm;
+  final _homeKey = GlobalKey<AdminHomeViewState>();
 
   @override
   void initState() {
     super.initState();
-    _adminVm = AdminViewModel()..load();
-    _eventVm = EventManagerViewModel()..load();
+    _adminVm = AdminViewModel.shared..load();
+    _eventVm = EventManagerViewModel.shared..load();
     CounsellorViewModel.shared.load();
-  }
-
-  @override
-  void dispose() {
-    _adminVm.dispose();
-    _eventVm.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
       AdminHomeView(
+        key: _homeKey,
         adminVm: _adminVm,
         eventVm: _eventVm,
         onOpenTab: (index) => setState(() => _index = index),
@@ -72,7 +67,12 @@ class _AdminShellState extends State<AdminShell> {
         child: NavigationBar(
           height: 80,
           selectedIndex: _index,
-          onDestinationSelected: (value) => setState(() => _index = value),
+          onDestinationSelected: (value) {
+            setState(() => _index = value);
+            _adminVm.load(force: true);
+            _eventVm.load(force: true);
+            if (value == 0) _homeKey.currentState?.refresh();
+          },
           indicatorColor: AppColors.primary.withValues(alpha: .16),
           backgroundColor: Colors.white,
           destinations: [

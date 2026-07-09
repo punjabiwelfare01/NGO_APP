@@ -338,6 +338,8 @@ class CounsellingRequest {
     required this.gradeLevel,
     required this.status,
     required this.requestedAt,
+    this.principalPhone = '',
+    this.schoolAddress = '',
     this.specialRequirements = '',
     this.assignedVolunteers = const [],
     this.eventManagerNotes = '',
@@ -350,7 +352,9 @@ class CounsellingRequest {
   final CounsellorCategory counsellorCategory;
   final String schoolName;
   final String principalName;
+  final String principalPhone;
   final String schoolEmail;
+  final String schoolAddress;
   final String topic;
   final DateTime preferredDate;
   final SessionMode sessionMode;
@@ -379,7 +383,9 @@ class CounsellingRequest {
     counsellorCategory: counsellorCategory ?? this.counsellorCategory,
     schoolName: schoolName,
     principalName: principalName,
+    principalPhone: principalPhone,
     schoolEmail: schoolEmail,
+    schoolAddress: schoolAddress,
     topic: topic,
     preferredDate: preferredDate ?? this.preferredDate,
     sessionMode: sessionMode,

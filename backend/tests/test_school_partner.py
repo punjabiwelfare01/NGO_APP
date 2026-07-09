@@ -52,6 +52,32 @@ class TestSubmitRequest:
         assert resp.status_code == 201
 
 
+class TestAcceptanceNotifiesSchool:
+    def test_school_partner_is_notified_when_counsellor_accepts(
+        self, client, school_partner_headers, mentor_headers, mentor_user,
+    ):
+        created = client.post(
+            "/school/counsellor-requests",
+            json=_request_payload(mentor_user.id),
+            headers=school_partner_headers,
+        ).json()
+
+        resp = client.post(
+            f"/counsellor/requests/{created['id']}/accept", headers=mentor_headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == "accepted"
+
+        notifications = client.get("/notifications", headers=school_partner_headers).json()
+        assert any(
+            n["type"] == "counsellor_decision" and "accepted" in n["title"].lower()
+            for n in notifications
+        )
+
+        listing = client.get("/school/my-requests", headers=school_partner_headers).json()
+        assert listing[0]["status"] == "accepted"
+
+
 class TestMyRequests:
     def test_list_and_detail(self, client, school_partner_headers, mentor_user):
         created = client.post(

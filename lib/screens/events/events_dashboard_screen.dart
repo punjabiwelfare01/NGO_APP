@@ -77,7 +77,7 @@ class _EventsDashboardScreenState extends State<EventsDashboardScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            onPressed: widget.vm.load,
+            onPressed: () => widget.vm.load(force: true),
           ),
         ],
       ),
@@ -95,7 +95,7 @@ class _EventsDashboardScreenState extends State<EventsDashboardScreen> {
           if (widget.vm.errorMessage != null && widget.vm.all.isEmpty) {
             return Center(
               child: TextButton(
-                onPressed: widget.vm.load,
+                onPressed: () => widget.vm.load(force: true),
                 child: Text('Retry\n${widget.vm.errorMessage}',
                     textAlign: TextAlign.center),
               ),

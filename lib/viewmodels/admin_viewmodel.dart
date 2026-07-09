@@ -1,11 +1,33 @@
 import 'package:flutter/foundation.dart';
 
+import '../app_state.dart';
 import '../models/api_models.dart';
 import '../repositories/admin_repository.dart';
 import '../repositories/api_client.dart';
 import 'view_state.dart';
 
 class AdminViewModel extends ChangeNotifier {
+  static AdminViewModel? _shared;
+  static AdminViewModel get shared {
+    if (_shared == null) {
+      _shared = AdminViewModel();
+      AppState.registerCacheReset(_shared!._resetCache);
+    }
+    return _shared!;
+  }
+
+  void _resetCache() {
+    _loaded = false;
+    _pendingLoaded = false;
+    _pendingUsers = [];
+    _notifications = [];
+    _allUsers = [];
+    _stats = AdminStats.empty();
+    if (!_disposed) notifyListeners();
+  }
+
+  bool _loaded = false;
+  bool _pendingLoaded = false;
   ViewState _state = ViewState.idle;
   String? _errorMessage;
   bool _disposed = false;
@@ -31,7 +53,8 @@ class AdminViewModel extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<void> load() async {
+  Future<void> load({bool force = false}) async {
+    if (_loaded && !force) return;
     _state = ViewState.loading;
     _errorMessage = null;
     if (!_disposed) notifyListeners();
@@ -49,6 +72,8 @@ class AdminViewModel extends ChangeNotifier {
       _stats = results[2] as AdminStats;
       _allUsers = results[3] as List<AdminUserItem>;
       _state = ViewState.idle;
+      _loaded = true;
+      _pendingLoaded = true;
     } on ApiException catch (e) {
       _state = ViewState.error;
       _errorMessage = 'Failed to load data (${e.statusCode}).';
@@ -59,13 +84,15 @@ class AdminViewModel extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> loadPendingUsers() async {
+  Future<void> loadPendingUsers({bool force = false}) async {
+    if (_pendingLoaded && !force) return;
     _state = ViewState.loading;
     _errorMessage = null;
     if (!_disposed) notifyListeners();
     try {
       _pendingUsers = await AdminRepository.getPendingUsers();
       _state = ViewState.idle;
+      _pendingLoaded = true;
     } on ApiException catch (error) {
       _state = ViewState.error;
       _errorMessage = 'Unable to load pending approvals (${error.statusCode}).';

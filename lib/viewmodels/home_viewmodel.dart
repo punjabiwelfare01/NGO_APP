@@ -15,6 +15,30 @@ import '../repositories/wellness_repository.dart';
 import 'view_state.dart';
 
 class HomeViewModel extends ChangeNotifier {
+  static HomeViewModel? _shared;
+  static HomeViewModel get shared {
+    if (_shared == null) {
+      _shared = HomeViewModel();
+      AppState.registerCacheReset(_shared!._resetCache);
+    }
+    return _shared!;
+  }
+
+  void _resetCache() {
+    _loaded = false;
+    _categories = [];
+    _upcomingSession = null;
+    _allUpcomingSessions = [];
+    _availableSlots = [];
+    _upcomingCounsellingEvent = null;
+    _upcomingEvents = [];
+    _dailyChallenge = null;
+    _studentProfile = null;
+    _continueLearningCourse = null;
+    if (!_disposed) notifyListeners();
+  }
+
+  bool _loaded = false;
   ViewState _state = ViewState.idle;
   String? _errorMessage;
   List<SkillCategory> _categories = [];
@@ -46,7 +70,8 @@ class HomeViewModel extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<void> load() async {
+  Future<void> load({bool force = false}) async {
+    if (_loaded && !force) return;
     if (!AppState.isAuthenticated) {
       _state = ViewState.error;
       _errorMessage = 'Please sign in again to load your home dashboard.';
@@ -87,6 +112,7 @@ class HomeViewModel extends ChangeNotifier {
       _upcomingEvents = _publicUpcomingEvents(events);
       _continueLearningCourse = _pickContinueLearningCourse(userCourses);
       _state = ViewState.idle;
+      _loaded = true;
     } on ApiException catch (e) {
       _state = ViewState.error;
       _errorMessage = e.statusCode == 401

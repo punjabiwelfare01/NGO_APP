@@ -17,7 +17,9 @@ class EventsView extends StatelessWidget {
         role.isMentor ||
         role.isContentCreator) {
       return EventsDashboardScreen(
-        vm: EventsViewModel(isAdmin: role.isAdmin || role == UserRole.superAdmin)..load(),
+        vm: EventsViewModel.shared(
+          isAdmin: role.isAdmin || role == UserRole.superAdmin,
+        )..load(),
       );
     }
     return const StudentCalendarView();

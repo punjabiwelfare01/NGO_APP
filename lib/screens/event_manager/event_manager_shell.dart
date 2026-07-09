@@ -28,16 +28,14 @@ class _EventManagerShellState extends State<EventManagerShell> {
   @override
   void initState() {
     super.initState();
-    _vm = EventManagerViewModel()..load();
-    _eventsVm = EventsViewModel(isAdmin: false)..load();
+    _vm = EventManagerViewModel.shared..load();
+    _eventsVm = EventsViewModel.shared(isAdmin: false)..load();
     CounsellorViewModel.shared.load();
   }
 
   @override
   void dispose() {
     _studentsTabNotifier.dispose();
-    _vm.dispose();
-    _eventsVm.dispose();
     super.dispose();
   }
 
@@ -76,7 +74,11 @@ class _EventManagerShellState extends State<EventManagerShell> {
             backgroundColor: Colors.white,
             elevation: 8,
             shadowColor: AppColors.ink.withValues(alpha: 0.10),
-            onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+            onDestinationSelected: (i) {
+              setState(() => _selectedIndex = i);
+              _vm.load(force: true);
+              _eventsVm.load(force: true);
+            },
             destinations: [
               NavigationDestination(
                 icon: Badge(

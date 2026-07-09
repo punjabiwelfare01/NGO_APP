@@ -1,12 +1,43 @@
 import 'package:flutter/foundation.dart';
 
+import '../app_state.dart';
 import '../models/event_manager_models.dart';
 import '../repositories/event_manager_repository.dart';
 import '../repositories/impact_repository.dart';
+import 'events_viewmodel.dart';
 
 enum EMLoadState { idle, loading, error }
 
 class EventManagerViewModel extends ChangeNotifier {
+  static EventManagerViewModel? _shared;
+  static EventManagerViewModel get shared {
+    if (_shared == null) {
+      _shared = EventManagerViewModel();
+      AppState.registerCacheReset(_shared!._resetCache);
+    }
+    return _shared!;
+  }
+
+  /// Marks the cached dashboard data stale without an immediate refetch —
+  /// called by [EventsViewModel] when it mutates event/activity data via a
+  /// different cached instance, so this view model's next `load()` (e.g. on
+  /// next tab open) doesn't serve a now-outdated events list.
+  static void invalidateCache() {
+    _shared?._loaded = false;
+  }
+
+  void _resetCache() {
+    _loaded = false;
+    _impactOnlyMode = false;
+    _stats = EventManagerStats.empty;
+    _events = [];
+    _assignments = [];
+    _impactPosts = [];
+    _activities = [];
+    notifyListeners();
+  }
+
+  bool _loaded = false;
   EMLoadState _state = EMLoadState.idle;
   String? _error;
   EventManagerStats _stats = EventManagerStats.empty;
@@ -70,7 +101,8 @@ class EventManagerViewModel extends ChangeNotifier {
       .where((item) => item.adminApproved && item.isPublished)
       .toList();
 
-  Future<void> load() async {
+  Future<void> load({bool force = false}) async {
+    if (_loaded && !force) return;
     _state = EMLoadState.loading;
     _error = null;
     notifyListeners();
@@ -81,6 +113,7 @@ class EventManagerViewModel extends ChangeNotifier {
       _assignments = result.assignments;
       _impactPosts = result.impacts;
       _state = EMLoadState.idle;
+      _loaded = true;
     } catch (error) {
       _error = error.toString();
       _state = EMLoadState.error;
@@ -109,7 +142,8 @@ class EventManagerViewModel extends ChangeNotifier {
 
   /// Refreshes impact posts after a mutation, using whichever load path this
   /// view model was initialized with.
-  Future<void> _refreshImpact() => _impactOnlyMode ? loadImpactOnly() : load();
+  Future<void> _refreshImpact() =>
+      _impactOnlyMode ? loadImpactOnly() : load(force: true);
 
   Future<void> updateAssignmentStatus(
     int id,
@@ -123,14 +157,14 @@ class EventManagerViewModel extends ChangeNotifier {
       notes: notes,
       instructions: instructions,
     );
-    await load();
+    await load(force: true);
   }
 
   Future<EMImpactPost> convertToImpactPost(
     EMStudentAssignment assignment,
   ) async {
     final id = await EventManagerRepository.createImpact(assignment);
-    await load();
+    await load(force: true);
     return _impactPosts.firstWhere((post) => post.id == id);
   }
 
@@ -252,7 +286,8 @@ class EventManagerViewModel extends ChangeNotifier {
 
   Future<void> addNewEvent(NGOEvent event) async {
     await EventManagerRepository.createEvent(event);
-    await load();
+    await load(force: true);
+    EventsViewModel.invalidateCaches();
   }
 
   Future<int> addImpactPost(

@@ -25,6 +25,15 @@ class AppState {
 
   static bool get isAuthenticated => token != null;
 
+  static final List<void Function()> _cacheResetCallbacks = [];
+
+  /// Lets a singleton ViewModel register a callback that clears its cached
+  /// data on logout, so switching accounts on the same device never leaves
+  /// stale data from the previous session visible to the next one.
+  static void registerCacheReset(void Function() callback) {
+    _cacheResetCallbacks.add(callback);
+  }
+
   /// True when the user's account is fully approved and can access dashboards.
   static bool get canAccessDashboard =>
       accessStatus == AccessStatus.approved || role.isAdmin;
@@ -74,6 +83,9 @@ class AppState {
     SessionStorage.remove(_availableRolesKey);
     SessionStorage.remove(_nameKey);
     SessionStorage.remove(_accessStatusKey);
+    for (final callback in _cacheResetCallbacks) {
+      callback();
+    }
   }
 
   static void updateStudentName(String name) {

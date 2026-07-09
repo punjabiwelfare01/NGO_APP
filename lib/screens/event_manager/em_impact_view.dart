@@ -477,11 +477,6 @@ class _DraftPostCardState extends State<_DraftPostCard> {
               ],
             ),
           ),
-          // ── 4-metric grid ─────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-            child: _ImpactMetricsGrid(post: post),
-          ),
           // ── Appreciation message ───────────────────────────────────────
           if (post.appreciationMessage.isNotEmpty)
             Padding(
@@ -968,11 +963,6 @@ class _PublishedPostCardState extends State<_PublishedPostCard> {
               ],
             ),
           ),
-          // ── 4-metric grid ─────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-            child: _ImpactMetricsGrid(post: post),
-          ),
           // ── Appreciation message ───────────────────────────────────────
           if (post.appreciationMessage.isNotEmpty)
             Padding(
@@ -1198,99 +1188,6 @@ class _FullWidthCoverImage extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-// ─── 4-tile impact metrics grid ───────────────────────────────────────────────
-
-class _ImpactMetricsGrid extends StatelessWidget {
-  const _ImpactMetricsGrid({required this.post});
-  final EMImpactPost post;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _MetricTile(
-          icon: Icons.group_rounded,
-          value: '0',
-          label: 'Volunteers',
-          color: _kPurple,
-        ),
-        const SizedBox(width: 7),
-        _MetricTile(
-          icon: Icons.people_rounded,
-          value: '${post.studentsHelped ?? 0}',
-          label: 'Children\nHelped',
-          color: const Color(0xFF1565C0),
-        ),
-        const SizedBox(width: 7),
-        _MetricTile(
-          icon: Icons.access_time_rounded,
-          value: post.hoursServed != null
-              ? post.hoursServed!.toStringAsFixed(0)
-              : '0',
-          label: 'Hours',
-          color: const Color(0xFFE65100),
-        ),
-        const SizedBox(width: 7),
-        _MetricTile(
-          icon: Icons.workspace_premium_rounded,
-          value: '0',
-          label: 'Certificates',
-          color: const Color(0xFF2E7D32),
-        ),
-      ],
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 3),
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

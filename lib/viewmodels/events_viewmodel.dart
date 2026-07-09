@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import '../models/event_manager_models.dart';
 import '../models/unified_event.dart';
 import '../repositories/api_client.dart';
 import '../repositories/event_manager_repository.dart';
 import '../repositories/event_repository.dart';
+import 'event_manager_viewmodel.dart';
 import 'view_state.dart';
 
 /// Single view model behind the unified "Events" module, replacing
@@ -17,6 +19,43 @@ class EventsViewModel extends ChangeNotifier {
 
   final bool isAdmin;
 
+  // Two singletons (not one) since Admin and Event Manager need independent
+  // `isAdmin` gating — they otherwise both wrap the same dashboard() data.
+  static EventsViewModel? _sharedAdmin;
+  static EventsViewModel? _sharedEventManager;
+
+  static EventsViewModel shared({required bool isAdmin}) {
+    if (isAdmin) {
+      if (_sharedAdmin == null) {
+        _sharedAdmin = EventsViewModel(isAdmin: true);
+        AppState.registerCacheReset(_sharedAdmin!._resetCache);
+      }
+      return _sharedAdmin!;
+    }
+    if (_sharedEventManager == null) {
+      _sharedEventManager = EventsViewModel(isAdmin: false);
+      AppState.registerCacheReset(_sharedEventManager!._resetCache);
+    }
+    return _sharedEventManager!;
+  }
+
+  void _resetCache() {
+    _loaded = false;
+    _events = [];
+    _search = '';
+    notifyListeners();
+  }
+
+  /// Marks both cached dashboard instances stale without an immediate
+  /// refetch — called by [EventManagerViewModel] when it mutates event data
+  /// via its own cached instance, so an already-open Events tab doesn't keep
+  /// serving a now-outdated events list.
+  static void invalidateCaches() {
+    _sharedAdmin?._loaded = false;
+    _sharedEventManager?._loaded = false;
+  }
+
+  bool _loaded = false;
   ViewState _state = ViewState.idle;
   String? _errorMessage;
   List<UnifiedEvent> _events = [];
@@ -68,7 +107,8 @@ class EventsViewModel extends ChangeNotifier {
     }).toList();
   }
 
-  Future<void> load() async {
+  Future<void> load({bool force = false}) async {
+    if (_loaded && !force) return;
     _state = ViewState.loading;
     _errorMessage = null;
     notifyListeners();
@@ -90,6 +130,7 @@ class EventsViewModel extends ChangeNotifier {
               ))
           .toList();
       _state = ViewState.idle;
+      _loaded = true;
     } catch (e) {
       _errorMessage = e.toString();
       _state = ViewState.error;
@@ -109,7 +150,7 @@ class EventsViewModel extends ChangeNotifier {
       status,
       notes: notes,
     );
-    await load();
+    await load(force: true);
   }
 
   /// Creates one event-level impact post aggregating all of this event's
@@ -149,27 +190,28 @@ class EventsViewModel extends ChangeNotifier {
       'hours_served': totalHours,
       'media': photoUrls.map((url) => {'media_type': 'image', 'url': url}).toList(),
     });
-    await load();
+    await load(force: true);
   }
 
   Future<void> submitImpactForApproval(int postId) async {
     await EventManagerRepository.submitImpact(postId);
-    await load();
+    await load(force: true);
   }
 
   Future<void> approveAndPublishImpact(int postId) async {
     await EventManagerRepository.publishImpact(postId);
-    await load();
+    await load(force: true);
   }
 
   Future<void> generateReport(int eventId) async {
     await EventManagerRepository.ensureReport(eventId);
-    await load();
+    await load(force: true);
   }
 
   Future<void> publish(UnifiedEvent event) async {
     await EventRepository.publishEvent(event.event.id);
-    await load();
+    await load(force: true);
+    EventManagerViewModel.invalidateCache();
   }
 
   /// Admin/super_admin only on the backend (`/events/{id}/status`) — callers
@@ -177,17 +219,20 @@ class EventsViewModel extends ChangeNotifier {
   /// `UnifiedEvent.nextAction`'s "Mark Completed" gating).
   Future<void> advanceStatus(UnifiedEvent event, String newStatus) async {
     await EventRepository.advanceStatus(event.event.id, newStatus);
-    await load();
+    await load(force: true);
+    EventManagerViewModel.invalidateCache();
   }
 
   /// Admin/super_admin only on the backend (`DELETE /events/{id}`).
   Future<void> deleteEvent(UnifiedEvent event) async {
     await EventRepository.deleteEvent(event.event.id);
-    await load();
+    await load(force: true);
+    EventManagerViewModel.invalidateCache();
   }
 
   Future<void> createEvent(NGOEvent event) async {
     await EventManagerRepository.createEvent(event);
-    await load();
+    await load(force: true);
+    EventManagerViewModel.invalidateCache();
   }
 }

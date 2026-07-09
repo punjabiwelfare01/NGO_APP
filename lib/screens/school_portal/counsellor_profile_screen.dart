@@ -1015,7 +1015,9 @@ class _BookingFormState extends State<_BookingForm> {
   final _formKey = GlobalKey<FormState>();
   final _schoolCtrl = TextEditingController();
   final _principalCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
   final _topicCtrl = TextEditingController();
   final _countCtrl = TextEditingController();
   final _requirementsCtrl = TextEditingController();
@@ -1046,7 +1048,9 @@ class _BookingFormState extends State<_BookingForm> {
   void dispose() {
     _schoolCtrl.dispose();
     _principalCtrl.dispose();
+    _phoneCtrl.dispose();
     _emailCtrl.dispose();
+    _addressCtrl.dispose();
     _topicCtrl.dispose();
     _countCtrl.dispose();
     _requirementsCtrl.dispose();
@@ -1082,7 +1086,9 @@ class _BookingFormState extends State<_BookingForm> {
       counsellorCategory: widget.counsellor.category,
       schoolName: _schoolCtrl.text.trim(),
       principalName: _principalCtrl.text.trim(),
+      principalPhone: _phoneCtrl.text.trim(),
       schoolEmail: _emailCtrl.text.trim(),
+      schoolAddress: _addressCtrl.text.trim(),
       topic: _topicCtrl.text.trim().isNotEmpty
           ? _topicCtrl.text.trim()
           : (widget.isAwarenessCamp ? 'Awareness Camp' : 'Counselling Session'),
@@ -1271,12 +1277,28 @@ class _BookingFormState extends State<_BookingForm> {
                     _fLabel('Principal / Contact Name *'),
                     _field(_principalCtrl, 'Full name', required: true),
                     const SizedBox(height: 12),
+                    _fLabel('Contact Phone Number *'),
+                    _field(
+                      _phoneCtrl,
+                      'e.g. 9876543210',
+                      required: true,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 12),
                     _fLabel('School Email *'),
                     _field(
                       _emailCtrl,
                       'principal@school.edu',
                       required: true,
                       keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 12),
+                    _fLabel('School Address *'),
+                    _field(
+                      _addressCtrl,
+                      'Full address of the school',
+                      required: true,
+                      maxLines: 2,
                     ),
                     const SizedBox(height: 12),
                     _fLabel('Session Topic *'),

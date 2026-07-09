@@ -50,7 +50,7 @@ class _ProfileViewState extends State<ProfileView> {
     _vm = ProfileViewModel()..load();
     _authVm = AuthViewModel();
     if (AppState.role.isStudent) {
-      _volunteerVm = VolunteerViewModel()..load();
+      _volunteerVm = VolunteerViewModel.shared..load();
       _volunteerVm!.addListener(_onVolunteerChanged);
     }
   }
@@ -62,7 +62,6 @@ class _ProfileViewState extends State<ProfileView> {
     _vm.dispose();
     _authVm.dispose();
     _volunteerVm?.removeListener(_onVolunteerChanged);
-    _volunteerVm?.dispose();
     super.dispose();
   }
 
@@ -244,8 +243,9 @@ class _ProfileViewState extends State<ProfileView> {
                     color: const Color(0xFF20BF6B),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) =>
-                            DailyLogScreen(vm: VolunteerViewModel()..load()),
+                        builder: (_) => DailyLogScreen(
+                          vm: VolunteerViewModel.shared..load(),
+                        ),
                       ),
                     ),
                   ),
@@ -256,7 +256,7 @@ class _ProfileViewState extends State<ProfileView> {
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => MyCertificatesScreen(
-                          vm: VolunteerViewModel()..load(),
+                          vm: VolunteerViewModel.shared..load(),
                         ),
                       ),
                     ),
@@ -267,8 +267,9 @@ class _ProfileViewState extends State<ProfileView> {
                     color: const Color(0xFF8B5CF6),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) =>
-                            DonationScreen(vm: VolunteerViewModel()..load()),
+                        builder: (_) => DonationScreen(
+                          vm: VolunteerViewModel.shared..load(),
+                        ),
                       ),
                     ),
                   ),

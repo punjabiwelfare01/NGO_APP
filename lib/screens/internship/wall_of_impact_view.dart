@@ -369,13 +369,6 @@ class _MetricsBar extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           _MetricTile(
-            icon: Icons.currency_rupee_rounded,
-            value: _compact(metrics.donationCollected.round()),
-            label: 'Donated',
-            color: const Color(0xFF2E7D32),
-          ),
-          const SizedBox(width: 10),
-          _MetricTile(
             icon: Icons.auto_stories_rounded,
             value: '${metrics.posts}',
             label: 'Stories',
@@ -665,47 +658,6 @@ class _PostCardState extends State<_PostCard> {
             ),
           ],
 
-          // ── Impact metrics ────────────────────────────────────────────────
-          if (post.peopleReached > 0 ||
-              post.hoursServed > 0 ||
-              post.donationCollected > 0 ||
-              post.location != null) ...[
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  if (post.peopleReached > 0)
-                    _MetricChip(
-                      icon: Icons.people_rounded,
-                      label: '${_fmtNum(post.peopleReached)} beneficiaries',
-                      color: _kPurple,
-                    ),
-                  if (post.hoursServed > 0)
-                    _MetricChip(
-                      icon: Icons.schedule_rounded,
-                      label: '${post.hoursServed.toStringAsFixed(0)} hours',
-                      color: AppColors.primary,
-                    ),
-                  if (post.donationCollected > 0)
-                    _MetricChip(
-                      icon: Icons.currency_rupee_rounded,
-                      label: '₹${_fmtNum(post.donationCollected.round())} raised',
-                      color: const Color(0xFF2E7D32),
-                    ),
-                  if (post.location != null)
-                    _MetricChip(
-                      icon: Icons.location_on_rounded,
-                      label: post.location!,
-                      color: AppColors.muted,
-                    ),
-                ],
-              ),
-            ),
-          ],
-
           // ── Appreciation message ──────────────────────────────────────────
           if (post.partnerName != null) ...[
             const SizedBox(height: 12),
@@ -771,11 +723,6 @@ class _PostCardState extends State<_PostCard> {
         ],
       ),
     );
-  }
-
-  String _fmtNum(int n) {
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
-    return '$n';
   }
 }
 
@@ -886,45 +833,6 @@ class _ImageCarousel extends StatelessWidget {
   }
 }
 
-// ── Metric chip ──────────────────────────────────────────────────────────────
-
-class _MetricChip extends StatelessWidget {
-  const _MetricChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ── Action button ─────────────────────────────────────────────────────────────
 

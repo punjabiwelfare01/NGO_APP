@@ -78,7 +78,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _vm = HomeViewModel();
+    _vm = HomeViewModel.shared;
     _skillSearchCtrl = TextEditingController();
     _vm.addListener(_onVmChanged);
     _vm.load();
@@ -89,12 +89,12 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     );
     // Admins get a live notification + pending-approval count
     if (AppState.role.isAdmin) {
-      _adminVm = AdminViewModel();
+      _adminVm = AdminViewModel.shared;
       _adminVm!.load();
     }
     // Students (NGO volunteers) get live impact stats + assignment data
     if (AppState.role.isStudent) {
-      _volunteerVm = VolunteerViewModel()..load();
+      _volunteerVm = VolunteerViewModel.shared..load();
       _volunteerVm!.addListener(_onVolunteerVmChanged);
       _pipelineVm = EventPipelineViewModel.shared..load();
       _pipelineVm!.addListener(_onVolunteerVmChanged);
@@ -112,9 +112,9 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _vm.load();
-      _adminVm?.load();
-      _volunteerVm?.load();
+      _vm.load(force: true);
+      _adminVm?.load(force: true);
+      _volunteerVm?.load(force: true);
       _pipelineVm?.load();
     }
   }
@@ -127,10 +127,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
     _eventNotificationEntry = null;
     _skillSearchCtrl.dispose();
     _vm.removeListener(_onVmChanged);
-    _vm.dispose();
-    _adminVm?.dispose();
     _volunteerVm?.removeListener(_onVolunteerVmChanged);
-    _volunteerVm?.dispose();
     _pipelineVm?.removeListener(_onVolunteerVmChanged);
     super.dispose();
   }
@@ -220,7 +217,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
           label: label,
           onRegister: () {
             dismiss();
-            openEvent(context, event, onRefresh: () => _vm.load());
+            openEvent(context, event, onRefresh: () => _vm.load(force: true));
           },
           onDismiss: dismiss,
         ),
@@ -299,7 +296,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
                   onOpenEvents: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) =>
-                          EventsDashboardScreen(vm: EventsViewModel(isAdmin: true)..load()),
+                          EventsDashboardScreen(vm: EventsViewModel.shared(isAdmin: true)..load()),
                     ),
                   ),
                   onOpenCounselling: () => Navigator.of(context).push(
@@ -333,7 +330,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
               UpcomingEventsPanel(
                 events: _vm.upcomingEvents,
                 onEventTap: (event) =>
-                    openEvent(context, event, onRefresh: () => _vm.load()),
+                    openEvent(context, event, onRefresh: () => _vm.load(force: true)),
               ),
 
             // ── Next counselling session (non-student roles only) ──────────────────
@@ -541,7 +538,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   void _openCounsellingBooking(BuildContext context) {
     final event = _vm.upcomingCounsellingEvent;
     if (event != null) {
-      openEvent(context, event, onRefresh: () => _vm.load());
+      openEvent(context, event, onRefresh: () => _vm.load(force: true));
       return;
     }
     Navigator.of(
@@ -552,7 +549,7 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
   void _openCounsellingSession(BuildContext context) {
     final event = _vm.upcomingCounsellingEvent;
     if (event != null) {
-      openEvent(context, event, onRefresh: () => _vm.load());
+      openEvent(context, event, onRefresh: () => _vm.load(force: true));
       return;
     }
     final session = _vm.upcomingSession;
@@ -1008,7 +1005,7 @@ class _ActiveNGOActivityCard extends StatelessWidget {
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => WorkSubmissionScreen(
-                      vm: vm ?? (VolunteerViewModel()..load()),
+                      vm: vm ?? (VolunteerViewModel.shared..load()),
                       assignment: assignment,
                     ),
                   ),
@@ -1376,7 +1373,7 @@ class _NGOQuickActionsGrid extends StatelessWidget {
   const _NGOQuickActionsGrid();
 
   void _open(BuildContext context, int index) {
-    final vm = VolunteerViewModel()..load();
+    final vm = VolunteerViewModel.shared..load();
     final screen = switch (index) {
       0 => WorkSubmissionScreen(vm: vm),
       1 => DailyLogScreen(vm: vm),
