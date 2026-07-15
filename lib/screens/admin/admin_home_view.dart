@@ -89,6 +89,27 @@ class AdminHomeViewState extends State<AdminHomeView> {
     builder: (_, _) {
       final admin = widget.adminVm;
       final events = widget.eventVm;
+      if (admin.state == ViewState.error && !admin.loaded) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(
+                admin.errorMessage ?? 'Failed to load admin data.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: admin.load, child: const Text('Retry')),
+            ],
+          ),
+        );
+      }
+      if (admin.state == ViewState.loading && !admin.loaded) {
+        return const Center(child: CircularProgressIndicator());
+      }
       return RefreshIndicator(
         onRefresh: () async {
           await Future.wait([

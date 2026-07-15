@@ -39,6 +39,7 @@ class AdminViewModel extends ChangeNotifier {
 
   ViewState get state => _state;
   String? get errorMessage => _errorMessage;
+  bool get loaded => _loaded;
   List<PendingUserItem> get pendingUsers => _pendingUsers;
   List<AdminNotification> get notifications => _notifications;
   List<AdminUserItem> get allUsers => _allUsers;
@@ -53,6 +54,17 @@ class AdminViewModel extends ChangeNotifier {
     super.dispose();
   }
 
+  /// Wraps a future so that on error:
+  /// - first load → returns [empty] (fallback)
+  /// - refresh   → returns the current field value (preserves existing data)
+  Future<T> _guard<T>(Future<T> call, T empty, T current) async {
+    try {
+      return await call;
+    } catch (_) {
+      return _loaded ? current : empty;
+    }
+  }
+
   Future<void> load({bool force = false}) async {
     if (_loaded && !force) return;
     _state = ViewState.loading;
@@ -60,16 +72,10 @@ class AdminViewModel extends ChangeNotifier {
     if (!_disposed) notifyListeners();
     try {
       final results = await Future.wait([
-        AdminRepository.getPendingUsers().catchError(
-          (_) => <PendingUserItem>[],
-        ),
-        AdminRepository.getNotifications().catchError(
-          (_) => <AdminNotification>[],
-        ),
-        AdminRepository.getStats().catchError(
-          (_) => AdminStats.empty(),
-        ),
-        AdminRepository.getAllUsers().catchError((_) => <AdminUserItem>[]),
+        _guard(AdminRepository.getPendingUsers(), <PendingUserItem>[], _pendingUsers),
+        _guard(AdminRepository.getNotifications(), <AdminNotification>[], _notifications),
+        _guard(AdminRepository.getStats(), AdminStats.empty(), _stats),
+        _guard(AdminRepository.getAllUsers(), <AdminUserItem>[], _allUsers),
       ]);
       _pendingUsers = results[0] as List<PendingUserItem>;
       _notifications = results[1] as List<AdminNotification>;

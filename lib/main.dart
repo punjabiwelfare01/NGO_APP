@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'app_state.dart';
@@ -32,6 +34,41 @@ import 'screens/school_portal/school_partner_portal_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    stderr.writeln('FlutterError: ${details.exception}\n${details.stack}');
+  };
+
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    debugPrint('Build error: ${details.exception}');
+    return Material(
+      color: const Color(0xFFFEF2F2),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 48, color: Color(0xFFDC2626)),
+              const SizedBox(height: 12),
+              Text(
+                'Something went wrong.',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF991B1B)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                details.exception.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
   AppState.restore();
   // Reconcile the cached role with the backend before choosing a dashboard.
   // Admin approval may have changed a provisional student into a counsellor.
