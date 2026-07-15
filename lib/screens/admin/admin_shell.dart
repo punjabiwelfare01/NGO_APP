@@ -68,10 +68,18 @@ class _AdminShellState extends State<AdminShell> {
           height: 80,
           selectedIndex: _index,
           onDestinationSelected: (value) {
+            if (value == _index) return;
             setState(() => _index = value);
-            _adminVm.load(force: true);
-            _eventVm.load(force: true);
-            if (value == 0) _homeKey.currentState?.refresh();
+            switch (value) {
+              case 0:
+                _adminVm.load(force: true);
+                _eventVm.load(force: true);
+                _homeKey.currentState?.refresh();
+              case 1:
+                _adminVm.loadAllUsers();
+              case 3:
+                _eventVm.load(force: true);
+            }
           },
           indicatorColor: AppColors.primary.withValues(alpha: .16),
           backgroundColor: Colors.white,

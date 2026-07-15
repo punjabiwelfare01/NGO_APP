@@ -60,11 +60,15 @@ class AdminViewModel extends ChangeNotifier {
     if (!_disposed) notifyListeners();
     try {
       final results = await Future.wait([
-        AdminRepository.getPendingUsers(),
+        AdminRepository.getPendingUsers().catchError(
+          (_) => <PendingUserItem>[],
+        ),
         AdminRepository.getNotifications().catchError(
           (_) => <AdminNotification>[],
         ),
-        AdminRepository.getStats(),
+        AdminRepository.getStats().catchError(
+          (_) => AdminStats.empty(),
+        ),
         AdminRepository.getAllUsers().catchError((_) => <AdminUserItem>[]),
       ]);
       _pendingUsers = results[0] as List<PendingUserItem>;

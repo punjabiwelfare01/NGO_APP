@@ -250,6 +250,9 @@ class ApiClient {
         tag: 'HTTP',
         error: res.body,
       );
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        AppState.clear();
+      }
       throw ApiException(res.statusCode, res.body);
     }
   }

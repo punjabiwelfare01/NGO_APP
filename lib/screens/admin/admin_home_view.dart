@@ -15,6 +15,7 @@ import '../../viewmodels/admin_viewmodel.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../viewmodels/events_viewmodel.dart';
+import '../../viewmodels/view_state.dart';
 import '../../widgets/achievement_certificates_section.dart';
 import '../../widgets/donation_impact_card.dart';
 import '../event_manager/counsellor_requests_screen.dart';
@@ -100,6 +101,10 @@ class AdminHomeViewState extends State<AdminHomeView> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
+            if (admin.state == ViewState.error)
+              _errorBanner(admin.errorMessage, admin.load),
+            if (events.state == EMLoadState.error)
+              _errorBanner('Events data failed to load.', () => events.load(force: true)),
             _header(admin),
             const SizedBox(height: AdminSpacing.xl),
             _criticalAlerts(admin, events),
@@ -827,6 +832,41 @@ class AdminHomeViewState extends State<AdminHomeView> {
       CounsellorViewModel.shared.allAdminRequests
           .where((r) => r.status == SchoolRequestStatus.newRequest)
           .length;
+
+  Widget _errorBanner(String? message, VoidCallback onRetry) => Container(
+    margin: const EdgeInsets.only(bottom: AdminSpacing.md),
+    padding: const EdgeInsets.all(AdminSpacing.md),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFEF2F2),
+      borderRadius: BorderRadius.circular(AdminSpacing.cardRadius),
+      border: Border.all(color: const Color(0xFFFECACA)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 24),
+        const SizedBox(width: AdminSpacing.sm),
+        Expanded(
+          child: Text(
+            message ?? 'Failed to load data.',
+            style: const TextStyle(
+              color: Color(0xFF991B1B),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: AdminSpacing.sm),
+        TextButton(
+          onPressed: onRetry,
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFFDC2626),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+          ),
+          child: const Text('Retry'),
+        ),
+      ],
+    ),
+  );
 
   Widget _alert(String text) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
