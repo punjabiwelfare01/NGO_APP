@@ -8,6 +8,8 @@ import '../../repositories/auth_repository.dart';
 import '../../repositories/ngo_repository.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 import '../../widgets/achievement_certificates_section.dart';
+import '../../widgets/donation_impact_card.dart';
+import '../../widgets/profile_section.dart';
 import '../internship/wall_of_impact_view.dart';
 import '../profile/profile_notifications_screen.dart';
 import 'counsellor_directory_screen.dart';
@@ -415,6 +417,8 @@ class _HomeTab extends StatelessWidget {
                   _RequestCard(request: r, vm: vm),
                   const SizedBox(height: 10),
                 ],
+              const SizedBox(height: 22),
+              const DonationImpactCard(),
               const SizedBox(height: 12),
               _AssignmentNotice(),
             ]),
@@ -1577,127 +1581,99 @@ class _ProfileTab extends StatelessWidget {
           const SizedBox(height: 20),
 
           // ── School Details ──────────────────────────────────────────────
-          _ProfileSection(
+          ProfileSection(
             title: 'School Details',
             rows: [
               if (p?.schoolName != null)
-                _ProfileRow(
+                ProfileRow(
                     Icons.school_rounded, 'School Name', p!.schoolName!),
               if (p?.schoolType != null)
-                _ProfileRow(
+                ProfileRow(
                     Icons.category_rounded, 'School Type', p!.schoolType!),
               if (p?.schoolBoard != null)
-                _ProfileRow(
+                ProfileRow(
                     Icons.menu_book_rounded, 'Board', p!.schoolBoard!),
               if (p?.registrationNumber != null)
-                _ProfileRow(Icons.badge_rounded, 'Reg. Number',
+                ProfileRow(Icons.badge_rounded, 'Reg. Number',
                     p!.registrationNumber!),
               if (p?.address != null)
-                _ProfileRow(Icons.home_rounded, 'Address', p!.address!),
+                ProfileRow(Icons.home_rounded, 'Address', p!.address!),
               if (p?.city != null && p?.state != null)
-                _ProfileRow(Icons.location_city_rounded, 'City / State',
+                ProfileRow(Icons.location_city_rounded, 'City / State',
                     '${p!.city!}, ${p.state!}')
               else ...[
                 if (p?.city != null)
-                  _ProfileRow(
+                  ProfileRow(
                       Icons.location_city_rounded, 'City', p!.city!),
                 if (p?.state != null)
-                  _ProfileRow(Icons.map_rounded, 'State', p!.state!),
+                  ProfileRow(Icons.map_rounded, 'State', p!.state!),
               ],
               if (p?.pinCode != null)
-                _ProfileRow(
+                ProfileRow(
                     Icons.pin_drop_rounded, 'Pin Code', p!.pinCode!),
             ],
           ),
           const SizedBox(height: 14),
 
           // ── Contact Person ──────────────────────────────────────────────
-          _ProfileSection(
+          ProfileSection(
             title: 'Contact Person',
             rows: [
               if (p?.coordinatorName != null)
-                _ProfileRow(Icons.person_rounded, 'Coordinator',
+                ProfileRow(Icons.person_rounded, 'Coordinator',
                     p!.coordinatorName!),
               if (p?.coordinatorDesignation != null)
-                _ProfileRow(Icons.work_rounded, 'Designation',
+                ProfileRow(Icons.work_rounded, 'Designation',
                     p!.coordinatorDesignation!),
               if (p?.phone != null)
-                _ProfileRow(Icons.phone_rounded, 'Phone', p!.phone!),
+                ProfileRow(Icons.phone_rounded, 'Phone', p!.phone!),
               if (p?.alternatePhone != null)
-                _ProfileRow(Icons.phone_in_talk_rounded, 'Alt. Phone',
+                ProfileRow(Icons.phone_in_talk_rounded, 'Alt. Phone',
                     p!.alternatePhone!),
               if (p?.email != null)
-                _ProfileRow(Icons.email_rounded, 'Email', p!.email!),
+                ProfileRow(Icons.email_rounded, 'Email', p!.email!),
             ],
           ),
           const SizedBox(height: 14),
 
           // ── Partnership Info ────────────────────────────────────────────
-          _ProfileSection(
+          ProfileSection(
             title: 'Partnership Info',
             rows: [
               if (p?.partnerId != null)
-                _ProfileRow(Icons.fingerprint_rounded, 'Partner ID',
+                ProfileRow(Icons.fingerprint_rounded, 'Partner ID',
                     p!.partnerId!),
-              _ProfileRow(
+              ProfileRow(
                   Icons.verified_rounded, 'Status', statusLabel),
               if (p?.joinedDate != null)
-                _ProfileRow(Icons.calendar_today_rounded, 'Joined Date',
+                ProfileRow(Icons.calendar_today_rounded, 'Joined Date',
                     _fmtDate(p!.joinedDate!)),
               if (p?.verificationNote != null &&
                   p!.verificationNote!.isNotEmpty)
-                _ProfileRow(Icons.info_outline_rounded,
+                ProfileRow(Icons.info_outline_rounded,
                     'Verification Note', p.verificationNote!),
             ],
           ),
           const SizedBox(height: 14),
 
           // ── Account Actions ─────────────────────────────────────────────
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Account Actions',
-                style: TextStyle(
-                  color: _kMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: .6,
-                ),
+          ProfileActionsCard(
+            actions: [
+              ProfileActionTile(
+                icon: Icons.edit_rounded,
+                label: 'Edit Profile',
+                color: _kBlue,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const SchoolPartnerProfileScreen()),
+                ).then((_) => vm.loadSchoolProfile(force: true)),
               ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: _kCard,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withValues(alpha: .04),
-                        blurRadius: 8),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _ActionTile(
-                      icon: Icons.edit_rounded,
-                      label: 'Edit Profile',
-                      color: _kBlue,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) =>
-                                const SchoolPartnerProfileScreen()),
-                      ).then((_) => vm.loadSchoolProfile(force: true)),
-                    ),
-                    const Divider(height: 1, indent: 52),
-                    _ActionTile(
-                      icon: Icons.logout_rounded,
-                      label: 'Logout',
-                      color: Colors.red,
-                      onTap: () => _logout(context),
-                    ),
-                  ],
-                ),
+              ProfileActionTile(
+                icon: Icons.logout_rounded,
+                label: 'Logout',
+                color: Colors.red,
+                onTap: () => _logout(context),
               ),
             ],
           ),
@@ -1708,127 +1684,3 @@ class _ProfileTab extends StatelessWidget {
   }
 }
 
-// ── Action Tile ───────────────────────────────────────────────────────────────
-
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 14),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const Spacer(),
-            Icon(Icons.chevron_right_rounded,
-                color: color.withValues(alpha: .5), size: 18),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Profile Section ───────────────────────────────────────────────────────────
-
-class _ProfileSection extends StatelessWidget {
-  const _ProfileSection({required this.title, required this.rows});
-  final String title;
-  final List<Widget> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    if (rows.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title,
-            style: const TextStyle(
-              color: _kMuted,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: .6,
-            )),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: _kCard,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: .04),
-                  blurRadius: 8),
-            ],
-          ),
-          child: Column(
-            children: [
-              for (int i = 0; i < rows.length; i++) ...[
-                rows[i],
-                if (i < rows.length - 1)
-                  const Divider(height: 1, indent: 52),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Profile Row ───────────────────────────────────────────────────────────────
-
-class _ProfileRow extends StatelessWidget {
-  const _ProfileRow(this.icon, this.label, this.value);
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Icon(icon, color: _kBlue, size: 18),
-          const SizedBox(width: 14),
-          Text(label,
-              style: const TextStyle(color: _kMuted, fontSize: 12)),
-          const Spacer(),
-          Flexible(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: _kInk,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-              textAlign: TextAlign.right,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

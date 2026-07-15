@@ -97,7 +97,7 @@ class EventManagerRepository {
       ApiClient.post('/impact/posts/$postId/publish', const {});
   static Future<void> deleteImpact(int postId) async =>
       ApiClient.delete('/impact/posts/$postId');
-  static Future<void> createEvent(NGOEvent event) async {
+  static Future<int> createEvent(NGOEvent event) async {
     final eventType = switch (event.category) {
       EventCategory.talentHunt => 'talent_hunt',
       EventCategory.awarenessCampaign => 'awareness_campaign',
@@ -118,18 +118,35 @@ class EventManagerRepository {
             })
             as Map<String, dynamic>;
     final eventId = created['id'] as int;
-    for (final activity in event.activities) {
+    if (event.activities.isNotEmpty) {
+      for (final activity in event.activities) {
+        await ApiClient.post('/volunteer/activities', {
+          'event_id': eventId,
+          'title': activity.title,
+          'category': 'event_organization',
+          'description': activity.description,
+          'location': event.location,
+          'max_students': activity.maxStudents,
+          'certificate_eligible': event.certificateEligible,
+          'stipend_amount': event.stipendAmount,
+        });
+      }
+    } else if (event.location.trim().isNotEmpty) {
+      // No explicit activities were supplied by the caller — still create a
+      // default one so the venue is actually persisted somewhere. Event has
+      // no location column of its own; it's always derived from the first
+      // linked activity's location (see backend's `_event_json`).
       await ApiClient.post('/volunteer/activities', {
         'event_id': eventId,
-        'title': activity.title,
+        'title': event.title,
         'category': 'event_organization',
-        'description': activity.description,
         'location': event.location,
-        'max_students': activity.maxStudents,
+        'max_students': event.maxVolunteers,
         'certificate_eligible': event.certificateEligible,
         'stipend_amount': event.stipendAmount,
       });
     }
+    return eventId;
   }
 
   static Future<void> createStandaloneActivity({

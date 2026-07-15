@@ -5,9 +5,9 @@ import '../../core/colors.dart';
 import '../../viewmodels/event_manager_viewmodel.dart';
 import '../../viewmodels/events_viewmodel.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
-import '../events/events_dashboard_screen.dart';
 import '../profile/profile_view.dart';
 import 'em_activities_view.dart';
+import 'em_events_workflow_screen.dart';
 import 'em_home_view.dart';
 import 'em_students_view.dart';
 import 'em_impact_view.dart';
@@ -50,7 +50,7 @@ class _EventManagerShellState extends State<EventManagerShell> {
 
     final pages = [
       EMHomeView(vm: _vm, managerName: name, onNavigateToStudents: _navigateToStudents),
-      EventsDashboardScreen(vm: _eventsVm),
+      EMEventsWorkflowScreen(vm: _eventsVm),
       EMActivitiesView(vm: _vm),
       EMStudentsView(vm: _vm, tabNotifier: _studentsTabNotifier),
       EMImpactView(vm: _vm),

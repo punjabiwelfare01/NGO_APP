@@ -5,7 +5,7 @@ from ..database import get_db
 from ..dependencies import get_current_user
 from ..models.certificate import Certificate
 from ..models.donation import Donation
-from ..models.event import EventParticipant
+from ..models.event import Event, EventParticipant
 from ..models.platform import NotificationPreference, UserSetting
 from ..models.user import User
 from ..models.volunteer import WorkSubmission
@@ -54,8 +54,12 @@ def _reports(db: Session, user_id: int) -> list[dict]:
         reports.append({"id": f"donation-{item.id}", "type": "donation", "title": "Donation report", "status": item.status.value if hasattr(item.status, "value") else item.status, "summary": f"₹{item.amount:g}", "created_at": item.created_at, "details": {"transaction_id": item.transaction_id, "purpose": item.purpose}})
     for item in db.query(Certificate).filter(Certificate.student_id == user_id).all():
         reports.append({"id": f"certificate-{item.id}", "type": "certificate", "title": item.activity_name, "status": item.status.value if hasattr(item.status, "value") else item.status, "summary": item.certificate_id, "created_at": item.created_at, "details": {"certificate_id": item.certificate_id, "issue_date": str(item.issue_date) if item.issue_date else None}})
-    for item in db.query(EventParticipant).filter(EventParticipant.user_id == user_id).all():
-        reports.append({"id": f"event-{item.id}", "type": "event", "title": item.event.title, "status": item.status, "summary": "Event participation", "created_at": item.registered_at, "details": {"event_id": item.event_id, "score": item.score}})
+    participants = db.query(EventParticipant).filter(EventParticipant.user_id == user_id).all()
+    event_ids = {item.event_id for item in participants}
+    events_by_id = {e.id: e for e in (db.query(Event).filter(Event.id.in_(event_ids)).all() if event_ids else [])}
+    for item in participants:
+        event = events_by_id.get(item.event_id)
+        reports.append({"id": f"event-{item.id}", "type": "event", "title": event.title if event else "Event", "status": item.status, "summary": "Event participation", "created_at": item.registered_at, "details": {"event_id": item.event_id, "score": item.score}})
     return sorted(reports, key=lambda item: item["created_at"] or "", reverse=True)
 
 

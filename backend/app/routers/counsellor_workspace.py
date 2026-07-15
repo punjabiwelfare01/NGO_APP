@@ -31,12 +31,35 @@ def _request_json(item: SchoolCounsellorRequest, db: Session, reveal: bool) -> d
     return {"id": item.id, "counsellor_user_id": item.counsellor_id, "school_name": item.school_name, "coordinator_name": item.coordinator_name, "coordinator_phone": item.coordinator_phone if reveal else "", "coordinator_email": item.coordinator_email if reveal else "", "school_address": item.school_address or "", "program": item.program or "School counselling", "topic": item.topic, "class_group": item.class_group or "", "expected_students": item.expected_students, "language": item.language or "", "special_requirements": item.special_requirements or "", "preferred_date": preferred.date().isoformat(), "preferred_hour": preferred.hour, "preferred_minute": preferred.minute, "mode": item.mode, "offline_location": item.offline_location or "", "meeting_link": item.meeting_link if reveal else None, "counsellor_name": counsellor.name if counsellor else "TBD", "assigned_event_manager": manager.name if manager else None, "assigned_event_manager_phone": manager.phone if manager and reveal else None, "preparation_notes": item.preparation_notes or "", "suggested_date": suggested.date().isoformat() if suggested else None, "suggested_hour": suggested.hour if suggested else None, "suggested_minute": suggested.minute if suggested else None, "status": item.status, "decline_reason": item.decline_reason, "decline_note": item.decline_note or "", "requested_at": item.created_at.isoformat() if item.created_at else None, "accepted_at": item.accepted_at.isoformat() if item.accepted_at else None, "confirmed_at": item.confirmed_at.isoformat() if item.confirmed_at else None, "completed_at": item.completed_at.isoformat() if item.completed_at else None}
 
 
+def _request_json_list(items: list[SchoolCounsellorRequest], db: Session, reveal_fn) -> list[dict]:
+    """Batched equivalent of calling `_request_json()` per item — collapses
+    the manager/counsellor lookups into 2 queries total instead of up to 2
+    per row. `reveal_fn(item)` computes the same per-item `reveal` flag the
+    single-item version took as a plain bool."""
+    if not items:
+        return []
+    user_ids = {item.assigned_event_manager_id for item in items if item.assigned_event_manager_id}
+    user_ids.update(item.counsellor_id for item in items if item.counsellor_id)
+    users_by_id = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+
+    results = []
+    for item in items:
+        reveal = reveal_fn(item)
+        manager = users_by_id.get(item.assigned_event_manager_id) if item.assigned_event_manager_id else None
+        counsellor = users_by_id.get(item.counsellor_id)
+        preferred = item.preferred_at
+        suggested = item.suggested_at
+        results.append({"id": item.id, "counsellor_user_id": item.counsellor_id, "school_name": item.school_name, "coordinator_name": item.coordinator_name, "coordinator_phone": item.coordinator_phone if reveal else "", "coordinator_email": item.coordinator_email if reveal else "", "school_address": item.school_address or "", "program": item.program or "School counselling", "topic": item.topic, "class_group": item.class_group or "", "expected_students": item.expected_students, "language": item.language or "", "special_requirements": item.special_requirements or "", "preferred_date": preferred.date().isoformat(), "preferred_hour": preferred.hour, "preferred_minute": preferred.minute, "mode": item.mode, "offline_location": item.offline_location or "", "meeting_link": item.meeting_link if reveal else None, "counsellor_name": counsellor.name if counsellor else "TBD", "assigned_event_manager": manager.name if manager else None, "assigned_event_manager_phone": manager.phone if manager and reveal else None, "preparation_notes": item.preparation_notes or "", "suggested_date": suggested.date().isoformat() if suggested else None, "suggested_hour": suggested.hour if suggested else None, "suggested_minute": suggested.minute if suggested else None, "status": item.status, "decline_reason": item.decline_reason, "decline_note": item.decline_note or "", "requested_at": item.created_at.isoformat() if item.created_at else None, "accepted_at": item.accepted_at.isoformat() if item.accepted_at else None, "confirmed_at": item.confirmed_at.isoformat() if item.confirmed_at else None, "completed_at": item.completed_at.isoformat() if item.completed_at else None})
+    return results
+
+
 
 @router.get("/counsellor/requests")
 def requests(db: Session = Depends(get_db), user: User = Depends(_counsellor)):
     query = db.query(SchoolCounsellorRequest)
     if user.active_role == UserRole.mentor: query = query.filter(SchoolCounsellorRequest.counsellor_id == user.id)
-    return [_request_json(item, db, item.status not in ("new_request", "declined")) for item in query.order_by(SchoolCounsellorRequest.created_at.desc()).all()]
+    items = query.order_by(SchoolCounsellorRequest.created_at.desc()).all()
+    return _request_json_list(items, db, lambda item: item.status not in ("new_request", "declined"))
 
 
 def _owned(db: Session, request_id: int, user: User):
@@ -67,7 +90,8 @@ def reschedule(request_id: int, payload: dict, db: Session = Depends(get_db), us
 def sessions(db: Session = Depends(get_db), user: User = Depends(_counsellor)):
     query = db.query(SchoolCounsellorRequest).filter(SchoolCounsellorRequest.status.in_(["accepted", "confirmed", "scheduled", "completed"]))
     if user.active_role == UserRole.mentor: query = query.filter(SchoolCounsellorRequest.counsellor_id == user.id)
-    return [_request_json(item, db, True) for item in query.order_by(SchoolCounsellorRequest.preferred_at).all()]
+    items = query.order_by(SchoolCounsellorRequest.preferred_at).all()
+    return _request_json_list(items, db, lambda item: True)
 
 
 @router.get("/counsellor/sessions/{session_id}")

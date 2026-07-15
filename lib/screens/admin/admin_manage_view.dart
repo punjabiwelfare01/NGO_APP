@@ -416,7 +416,7 @@ class _DonationAdminList extends StatelessWidget {
               leading: const Icon(Icons.payments_rounded),
               title: Text(d.donorName ?? 'Anonymous Donor'),
               subtitle: Text(
-                '${d.status.displayName} • ${d.purpose ?? d.category ?? 'NGO Support'}',
+                'Logged by ${d.referredByName ?? 'Unknown'} • ${d.status.displayName} • ${d.purpose ?? d.category ?? 'NGO Support'}',
               ),
               trailing: Text(
                 '₹${d.amount.toStringAsFixed(0)}',
@@ -448,7 +448,9 @@ class _CertificateAdminList extends StatelessWidget {
                 color: c.isVerified ? AppColors.secondary : AppColors.accent,
               ),
               title: Text(c.activityName),
-              subtitle: Text('${c.certificateId} • ${c.status.displayName}'),
+              subtitle: Text(
+                '${c.studentName ?? 'Unknown Student'} • ${c.certificateId} • ${c.status.displayName}',
+              ),
               trailing: Text(c.isVerified ? 'Verified' : 'Review'),
             ),
           ),

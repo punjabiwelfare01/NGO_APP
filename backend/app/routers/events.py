@@ -146,15 +146,24 @@ def update_event(
 # ── delete event ───────────────────────────────────────────────────────────────
 
 @router.delete("/{event_id}", status_code=204,
-               summary="Delete event [admin, super_admin]")
+               summary="Delete event [admin, super_admin, event_manager (own drafts only)]")
 def delete_event(
     event_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role(UserRole.admin, UserRole.super_admin)),
+    current_user: User = Depends(
+        require_role(UserRole.event_manager, UserRole.admin, UserRole.super_admin)
+    ),
 ):
-    deleted = event_crud.delete_event(db, event_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Event not found")
+    event = _event_or_404(db, event_id)
+    if current_user.active_role == UserRole.event_manager:
+        if event.created_by != current_user.id:
+            raise HTTPException(status_code=403, detail="You can only delete events you created")
+        if event.status not in (EventStatus.draft, EventStatus.pending_review):
+            raise HTTPException(
+                status_code=403,
+                detail="Only draft events can be deleted — published events must stay on record",
+            )
+    event_crud.delete_event(db, event_id)
 
 
 # ── publish event ──────────────────────────────────────────────────────────────

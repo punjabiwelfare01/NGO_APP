@@ -25,7 +25,11 @@ class AppConfig {
   static const String _envBackendEnvironment = String.fromEnvironment(
     'BACKEND_ENV',
   );
-  static const Duration apiTimeout = Duration(seconds: 10);
+  // Plain JSON requests against the production backend have been measured
+  // at 7-8s on their own (remote DB round-trip latency) — 10s left almost no
+  // margin and caused spurious client-side TimeoutExceptions on ordinary
+  // requests, not just uploads.
+  static const Duration apiTimeout = Duration(seconds: 20);
 
   // File uploads (images/documents) go through an SFTP hop to Hostinger on
   // the backend — the connect+auth handshake alone regularly takes several

@@ -223,7 +223,8 @@ class EventsViewModel extends ChangeNotifier {
     EventManagerViewModel.invalidateCache();
   }
 
-  /// Admin/super_admin only on the backend (`DELETE /events/{id}`).
+  /// Admin/super_admin can delete any event; an Event Manager can only
+  /// delete their own event while it's still a draft (enforced server-side).
   Future<void> deleteEvent(UnifiedEvent event) async {
     await EventRepository.deleteEvent(event.event.id);
     await load(force: true);
@@ -232,6 +233,50 @@ class EventsViewModel extends ChangeNotifier {
 
   Future<void> createEvent(NGOEvent event) async {
     await EventManagerRepository.createEvent(event);
+    await load(force: true);
+    EventManagerViewModel.invalidateCache();
+  }
+
+  /// Updates an existing event's core details (title/description/date/
+  /// capacity/certificate) plus its venue. Works for both draft and
+  /// already-published events. Venue has no column of its own on the
+  /// backend `Event` row — it's always derived from the first linked
+  /// activity's location — so this patches that activity's location (or
+  /// creates one if the event doesn't have any activities yet).
+  Future<void> updateEventDetails(
+    UnifiedEvent unified, {
+    required String title,
+    required String description,
+    required DateTime date,
+    required String location,
+    required int maxVolunteers,
+    required bool certificateEligible,
+  }) async {
+    final event = unified.event;
+    await EventRepository.updateEvent(event.id, {
+      'title': title,
+      'description': description,
+      'event_start': date.toIso8601String(),
+      'max_participants': maxVolunteers,
+      'certificate_enabled': certificateEligible,
+    });
+    if (location.trim().isNotEmpty) {
+      if (event.activities.isNotEmpty) {
+        await EventManagerRepository.editActivity(
+          event.activities.first.id,
+          {'location': location.trim()},
+        );
+      } else {
+        await EventManagerRepository.createActivity(
+          title: title,
+          category: 'event_organization',
+          eventId: event.id,
+          location: location.trim(),
+          maxStudents: maxVolunteers,
+          certificateEligible: certificateEligible,
+        );
+      }
+    }
     await load(force: true);
     EventManagerViewModel.invalidateCache();
   }

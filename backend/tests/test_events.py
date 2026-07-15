@@ -142,6 +142,26 @@ class TestDeleteEvent:
         resp = client.delete(f"/events/{event_id}", headers=student_headers)
         assert resp.status_code == 403
 
+    def test_event_manager_can_delete_own_draft_event(self, client, event_manager_headers):
+        create = client.post("/events/create", json=EVENT_PAYLOAD, headers=event_manager_headers)
+        event_id = create.json()["id"]
+        assert create.json()["status"] == "draft"
+        resp = client.delete(f"/events/{event_id}", headers=event_manager_headers)
+        assert resp.status_code == 204
+
+    def test_event_manager_cannot_delete_own_published_event(self, client, event_manager_headers):
+        create = client.post("/events/create", json=EVENT_PAYLOAD, headers=event_manager_headers)
+        event_id = create.json()["id"]
+        client.post(f"/events/{event_id}/publish", headers=event_manager_headers)
+        resp = client.delete(f"/events/{event_id}", headers=event_manager_headers)
+        assert resp.status_code == 403
+
+    def test_event_manager_cannot_delete_others_event(self, client, admin_headers, event_manager_headers):
+        create = client.post("/events/create", json=EVENT_PAYLOAD, headers=admin_headers)
+        event_id = create.json()["id"]
+        resp = client.delete(f"/events/{event_id}", headers=event_manager_headers)
+        assert resp.status_code == 403
+
 
 # ── publish event ──────────────────────────────────────────────────────────────
 

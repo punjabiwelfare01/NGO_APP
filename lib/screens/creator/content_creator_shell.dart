@@ -7,6 +7,7 @@ import '../../repositories/api_client.dart';
 import '../../repositories/creator_repository.dart';
 import '../../widgets/achievement_certificates_section.dart';
 import '../../widgets/app_card.dart';
+import '../../widgets/donation_impact_card.dart';
 import '../events/admin/create_event/create_event_view.dart';
 import '../events/admin/create_event/quiz/create_quiz_screen.dart';
 import '../learn/admin/create_free_course_screen.dart';
@@ -156,6 +157,8 @@ class _CreatorHomeViewState extends State<_CreatorHomeView> {
           _TopPerformingSection(items: _stats!.topPerforming),
           const SizedBox(height: 20),
           const AchievementCertificatesSection(),
+          const SizedBox(height: 20),
+          const DonationImpactCard(),
         ],
       ],
     );

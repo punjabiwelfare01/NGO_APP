@@ -39,6 +39,7 @@ class DonationOut(BaseModel):
     transaction_id: Optional[str]
     proof_file: Optional[str]
     referred_by: Optional[int]
+    referred_by_name: Optional[str] = None
     status: DonationStatus
     receipt_number: Optional[str]
     verified_by: Optional[int]

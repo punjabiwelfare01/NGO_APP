@@ -9,6 +9,7 @@ import '../../models/counsellor_models.dart';
 import '../../repositories/api_client.dart';
 import '../../repositories/auth_repository.dart';
 import '../../viewmodels/counsellor_home_viewmodel.dart';
+import '../../widgets/profile_section.dart';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -69,9 +70,6 @@ class CounsellorProfileView extends StatelessWidget {
                     // 5 — Availability
                     const SizedBox(height: 16),
                     _AvailabilityManagementSection(vm: vm),
-                    // 7 — Privacy notice
-                    const SizedBox(height: 16),
-                    _PrivacyCard(vm: vm),
                     // 8 — Public preview
                     const SizedBox(height: 16),
                     _PublicPreviewCard(profile: p),
@@ -488,79 +486,19 @@ class _ProfessionalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = profile;
-    final rows = [
-      (Icons.badge_rounded, 'Designation', p.designation),
-      (Icons.category_rounded, 'Category', p.category.label),
-      (Icons.history_rounded, 'Experience', '${p.yearsOfExperience} years'),
-      (Icons.translate_rounded, 'Languages', p.languages.join(' • ')),
-      (Icons.swap_horiz_rounded, 'Mode', p.sessionMode.label),
-      if (p.serviceBackground.isNotEmpty)
-        (Icons.work_rounded, 'Background', p.serviceBackground),
-      if (p.showRetiredStatus && p.publicStatusLabel.isNotEmpty)
-        (Icons.info_rounded, 'Status', p.publicStatusLabel),
-    ];
-    return _ProfileCard(
-      icon: Icons.person_pin_rounded,
+    return ProfileSection(
       title: 'Professional Information',
-      color: _kBlue,
-      child: Column(
-        children: rows.map((r) {
-          final isLast = r == rows.last;
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: _kBlue.withValues(alpha: .08),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(r.$1, color: _kBlue, size: 15),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            r.$2,
-                            style: const TextStyle(
-                              color: _kMuted,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: .3,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            r.$3,
-                            style: const TextStyle(
-                              color: _kInk,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!isLast)
-                Divider(
-                  height: 1,
-                  color: _kMuted.withValues(alpha: .1),
-                  indent: 44,
-                ),
-            ],
-          );
-        }).toList(),
-      ),
+      rows: [
+        ProfileRow(Icons.badge_rounded, 'Designation', p.designation),
+        ProfileRow(Icons.category_rounded, 'Category', p.category.label),
+        ProfileRow(Icons.history_rounded, 'Experience', '${p.yearsOfExperience} years'),
+        ProfileRow(Icons.translate_rounded, 'Languages', p.languages.join(' • ')),
+        ProfileRow(Icons.swap_horiz_rounded, 'Mode', p.sessionMode.label),
+        if (p.serviceBackground.isNotEmpty)
+          ProfileRow(Icons.work_rounded, 'Background', p.serviceBackground),
+        if (p.showRetiredStatus && p.publicStatusLabel.isNotEmpty)
+          ProfileRow(Icons.info_rounded, 'Status', p.publicStatusLabel),
+      ],
     );
   }
 }
@@ -754,164 +692,6 @@ class _RecognitionCard extends StatelessWidget {
           );
         }).toList(),
       ),
-    );
-  }
-}
-
-// ─── Privacy Card ─────────────────────────────────────────────────────────────
-
-class _PrivacyCard extends StatelessWidget {
-  const _PrivacyCard({required this.vm});
-  final CounsellorHomeViewModel vm;
-
-  @override
-  Widget build(BuildContext context) {
-    final phone = vm.user?.phone?.trim();
-    final location = vm.user?.location?.trim();
-    final privateItems = [
-      'Government / Army Service ID',
-      'Aadhaar & PAN card numbers',
-      'Personal phone number',
-      'Home address / personal location',
-      'Verification documents (admin only)',
-    ];
-    final publicItems = [
-      'Name, photo, designation',
-      'NGO verification ID & category',
-      'Qualifications & certifications',
-      'Approved recognition / awards',
-      'Public bio & areas of expertise',
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Private details
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF8F0),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-                color: _kAmber.withValues(alpha: .25)),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: _kAmber.withValues(alpha: .15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.lock_outline_rounded,
-                        color: _kAmber, size: 17),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Your Privacy is Protected',
-                          style: TextStyle(
-                            color: _kInk,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 1),
-                        if (phone?.isNotEmpty == true ||
-                            location?.isNotEmpty == true)
-                          Text(
-                            [
-                              if (phone?.isNotEmpty == true) phone!,
-                              if (location?.isNotEmpty == true) location!,
-                            ].join(' • '),
-                            style: const TextStyle(
-                                color: _kMuted, fontSize: 11),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'PRIVATE — never shown publicly:',
-                style: TextStyle(
-                  color: Color(0xFFE65100),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: .5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...privateItems.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 5),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.remove_circle_outline_rounded,
-                          size: 13, color: Color(0xFFC62828)),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: Text(
-                          item,
-                          style: const TextStyle(
-                            color: Color(0xFF795548),
-                            fontSize: 11.5,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Divider(color: Color(0xFFFFCC80), height: 1),
-              const SizedBox(height: 12),
-              const Text(
-                'PUBLIC — visible to schools & students:',
-                style: TextStyle(
-                  color: _kGreen,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: .5,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...publicItems.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 5),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.check_circle_rounded,
-                          size: 13, color: _kGreen),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: Text(
-                          item,
-                          style: const TextStyle(
-                            color: Color(0xFF2D6A4F),
-                            fontSize: 11.5,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1189,72 +969,27 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _kCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _kMuted.withValues(alpha: .12)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
+    return ProfileActionsCard(
+      title: 'Account Actions',
+      actions: [
+        ProfileActionTile(
+          icon: Icons.lock_outline_rounded,
+          color: _kBlue,
+          label: 'Change Password',
+          onTap: () => showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => const _ChangePasswordSheet(),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: _kMuted.withValues(alpha: .1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.settings_rounded,
-                      size: 16, color: _kMuted),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Account Settings',
-                  style: TextStyle(
-                    color: _kInk,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          _SettingsTile(
-            icon: Icons.lock_outline_rounded,
-            color: _kBlue,
-            label: 'Change Password',
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => const _ChangePasswordSheet(),
-            ),
-          ),
-          const Divider(height: 1, indent: 58),
-          _SettingsTile(
-            icon: Icons.logout_rounded,
-            color: const Color(0xFFC62828),
-            label: 'Logout',
-            isDestructive: true,
-            onTap: () => _logout(context),
-          ),
-          const SizedBox(height: 4),
-        ],
-      ),
+        ),
+        ProfileActionTile(
+          icon: Icons.logout_rounded,
+          color: const Color(0xFFC62828),
+          label: 'Logout',
+          onTap: () => _logout(context),
+        ),
+      ],
     );
   }
 
@@ -1291,49 +1026,6 @@ class _SettingsCard extends StatelessWidget {
       AppState.clear();
       nav.pushNamedAndRemoveUntil('/login', (route) => false);
     }
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.onTap,
-    this.isDestructive = false,
-  });
-  final IconData icon;
-  final Color color;
-  final String label;
-  final VoidCallback onTap;
-  final bool isDestructive;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: .1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, size: 17, color: color),
-      ),
-      title: Text(
-        label,
-        style: TextStyle(
-          color: isDestructive ? color : _kInk,
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
-        ),
-      ),
-      trailing: Icon(Icons.chevron_right_rounded,
-          color: _kMuted.withValues(alpha: .5)),
-      onTap: onTap,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-    );
   }
 }
 

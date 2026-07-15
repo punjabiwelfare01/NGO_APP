@@ -21,6 +21,7 @@ import '../../utils/navigation_helper.dart';
 import '../../widgets/achievement_certificates_section.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_scroll_view.dart';
+import '../../widgets/donation_impact_card.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/top_header.dart';
 import '../volunteer/work_submission_screen.dart';
@@ -494,6 +495,10 @@ class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
               const _WallOfImpactPreviewCard(),
               const AchievementCertificatesSection(),
             ],
+
+            // ── Donation call-to-action ─────────────────────────────
+            const SectionHeader(title: 'Support Our Cause'),
+            const DonationImpactCard(),
 
             // ── Emergency Help shortcut ────────────────────────────
             const SectionHeader(title: 'Emergency Help'),

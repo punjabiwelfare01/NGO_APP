@@ -1,7 +1,7 @@
 import json
 from datetime import date, timedelta
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
 from ..models.course import UserCourseProgress, UserLessonProgress
@@ -14,7 +14,13 @@ def get_user(db: Session, user_id: int) -> User | None:
 
 
 def get_users(db: Session, skip: int = 0, limit: int = 100) -> list[User]:
-    return db.query(User).offset(skip).limit(limit).all()
+    return (
+        db.query(User)
+        .options(selectinload(User.role_grants))
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 
 def create_user(db: Session, user: UserCreate) -> User:

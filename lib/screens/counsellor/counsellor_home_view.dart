@@ -7,6 +7,7 @@ import '../../repositories/api_client.dart';
 import '../../repositories/ngo_repository.dart';
 import '../../viewmodels/counsellor_home_viewmodel.dart';
 import '../../widgets/achievement_certificates_section.dart';
+import '../../widgets/donation_impact_card.dart';
 import 'counsellor_meeting_detail_screen.dart';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -104,6 +105,8 @@ class _CounsellorHomeViewState extends State<CounsellorHomeView> {
                     ],
                     const SizedBox(height: 22),
                     const AchievementCertificatesSection(),
+                    const SizedBox(height: 22),
+                    const DonationImpactCard(),
                     const SizedBox(height: 22),
                     _NgoFooter(),
                   ]),
@@ -886,13 +889,6 @@ class _MyImpactSection extends StatelessWidget {
         label: 'Schools\nSupported',
         color: _kAmber,
         month: _schoolsSupported,
-      ),
-      (
-        icon: Icons.star_rounded,
-        value: '${vm.completedSessions.length}',
-        label: 'Success\nStories',
-        color: _kPurple,
-        month: vm.stats.completedThisMonth,
       ),
     ];
 

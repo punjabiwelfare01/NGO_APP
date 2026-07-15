@@ -525,11 +525,11 @@ class EventPipelineViewModel extends ChangeNotifier {
     );
   }
 
-  static PipelineActivity _buildActivity(
-      EventActivity act, List<EMStudentAssignment> actAssignments) {
+  static PipelineActivity _buildActivity(EventActivity act,
+      List<EMStudentAssignment> actAssignments, int fallbackEventId) {
     return PipelineActivity(
       id: act.id,
-      eventId: act.eventId,
+      eventId: act.eventId ?? fallbackEventId,
       title: act.title,
       role: act.role,
       description: act.description,
@@ -565,7 +565,7 @@ class EventPipelineViewModel extends ChangeNotifier {
       proofRequired: e.proofRequired,
       activities: e.activities
           .map((act) =>
-              _buildActivity(act, byActivity[act.id] ?? []))
+              _buildActivity(act, byActivity[act.id] ?? [], e.id))
           .toList(),
       createdAt: e.createdAt,
     );

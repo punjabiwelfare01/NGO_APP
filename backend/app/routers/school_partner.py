@@ -68,6 +68,60 @@ def _school_json(item: SchoolCounsellorRequest, db: Session) -> dict:
     }
 
 
+def _school_json_list(items: list[SchoolCounsellorRequest], db: Session) -> list[dict]:
+    """Batched equivalent of calling `_school_json()` per item — the manager
+    and counsellor lookups it does per row are collapsed into 2 queries
+    total instead of up to 2 per row."""
+    if not items:
+        return []
+    user_ids = {item.assigned_event_manager_id for item in items if item.assigned_event_manager_id}
+    user_ids.update(item.counsellor_id for item in items if item.counsellor_id)
+    users_by_id = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+
+    results = []
+    for item in items:
+        reveal = item.status not in ("new_request", "declined", "cancelled")
+        manager = users_by_id.get(item.assigned_event_manager_id) if item.assigned_event_manager_id else None
+        counsellor = users_by_id.get(item.counsellor_id)
+        preferred = item.preferred_at
+        suggested = item.suggested_at
+        results.append({
+            "id": item.id,
+            "counsellor_name": counsellor.name if counsellor else "TBD",
+            "school_name": item.school_name,
+            "coordinator_name": item.coordinator_name,
+            "coordinator_phone": item.coordinator_phone if reveal else "",
+            "coordinator_email": item.coordinator_email if reveal else "",
+            "school_address": item.school_address or "",
+            "program": item.program or "School counselling",
+            "topic": item.topic,
+            "class_group": item.class_group or "",
+            "expected_students": item.expected_students,
+            "language": item.language or "",
+            "special_requirements": item.special_requirements or "",
+            "preferred_date": preferred.date().isoformat(),
+            "preferred_hour": preferred.hour,
+            "preferred_minute": preferred.minute,
+            "mode": item.mode,
+            "offline_location": item.offline_location or "",
+            "meeting_link": item.meeting_link if reveal else None,
+            "assigned_event_manager": manager.name if manager else None,
+            "assigned_event_manager_phone": manager.phone if manager and reveal else None,
+            "preparation_notes": item.preparation_notes or "",
+            "suggested_date": suggested.date().isoformat() if suggested else None,
+            "suggested_hour": suggested.hour if suggested else None,
+            "suggested_minute": suggested.minute if suggested else None,
+            "status": item.status,
+            "decline_reason": item.decline_reason,
+            "decline_note": item.decline_note or "",
+            "requested_at": item.created_at.isoformat(),
+            "accepted_at": item.accepted_at.isoformat() if item.accepted_at else None,
+            "confirmed_at": item.confirmed_at.isoformat() if item.confirmed_at else None,
+            "completed_at": item.completed_at.isoformat() if item.completed_at else None,
+        })
+    return results
+
+
 def _owned_request(db: Session, request_id: int, user: User) -> SchoolCounsellorRequest:
     item = (
         db.query(SchoolCounsellorRequest)
@@ -147,7 +201,7 @@ def my_requests(
         .order_by(SchoolCounsellorRequest.created_at.desc())
         .all()
     )
-    return [_school_json(item, db) for item in items]
+    return _school_json_list(items, db)
 
 
 @router.get("/my-requests/{request_id}",
@@ -337,9 +391,14 @@ def ngo_events(db: Session = Depends(get_db), user: User = Depends(get_current_u
         .limit(20)
         .all()
     )
+    event_ids = [e.id for e in events]
+    activities_by_event: dict[int, list[VolunteerActivity]] = {eid: [] for eid in event_ids}
+    if event_ids:
+        for act in db.query(VolunteerActivity).filter(VolunteerActivity.event_id.in_(event_ids)).all():
+            activities_by_event[act.event_id].append(act)
     result = []
     for e in events:
-        acts = db.query(VolunteerActivity).filter(VolunteerActivity.event_id == e.id).all()
+        acts = activities_by_event[e.id]
         location = next((a.location for a in acts if a.location), None)
         result.append({
             "id": e.id,

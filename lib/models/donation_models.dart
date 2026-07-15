@@ -49,6 +49,7 @@ class Donation {
   final String? transactionId;
   final String? proofFile;
   final int? referredBy;
+  final String? referredByName;
   final DonationStatus status;
   final String? receiptNumber;
   final DateTime? createdAt;
@@ -66,6 +67,7 @@ class Donation {
     this.transactionId,
     this.proofFile,
     this.referredBy,
+    this.referredByName,
     required this.status,
     this.receiptNumber,
     this.createdAt,
@@ -84,6 +86,7 @@ class Donation {
         transactionId: j['transaction_id'] as String?,
         proofFile: j['proof_file'] as String?,
         referredBy: j['referred_by'] as int?,
+        referredByName: j['referred_by_name'] as String?,
         status: DonationStatus.fromString(j['status'] as String),
         receiptNumber: j['receipt_number'] as String?,
         createdAt: j['created_at'] == null

@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..dependencies import admin_only
@@ -128,7 +128,7 @@ def list_users(
     db: Session = Depends(get_db),
     _: User = Depends(admin_only),
 ):
-    q = db.query(User)
+    q = db.query(User).options(selectinload(User.role_grants))
     if search:
         like = f"%{search}%"
         q = q.filter(
@@ -156,6 +156,7 @@ def list_pending_users(
 ):
     return (
         db.query(User)
+        .options(selectinload(User.role_grants))
         .filter(User.access_status.in_(PENDING_STATUSES))
         .order_by(User.created_at.desc())
         .all()

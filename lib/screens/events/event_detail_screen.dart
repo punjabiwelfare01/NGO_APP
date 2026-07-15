@@ -52,6 +52,48 @@ class _EventDetailScreenState extends State<EventDetailScreen>
     }
   }
 
+  /// Admin can delete any event; an Event Manager can only delete their own
+  /// draft/pending-review events (enforced server-side — this just decides
+  /// whether to surface the menu item at all).
+  bool get _canDelete =>
+      widget.vm.isAdmin || _event.event.status == EventStatus.draft;
+
+  Future<void> _confirmDelete() async {
+    final u = _event;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete event?'),
+        content: Text(
+          'This permanently deletes "${u.event.title}" and cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: AppColors.softRed)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await widget.vm.deleteEvent(u);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed: $e'), backgroundColor: AppColors.softRed),
+        );
+        setState(() => _busy = false);
+      }
+    }
+  }
+
   void _handleAction(ActionKind kind) {
     final u = _event;
     switch (kind) {
@@ -90,6 +132,18 @@ class _EventDetailScreenState extends State<EventDetailScreen>
         backgroundColor: Colors.white,
         foregroundColor: AppColors.ink,
         elevation: 0,
+        actions: [
+          if (_canDelete)
+            PopupMenuButton<String>(
+              onSelected: (_) => _confirmDelete(),
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete Event', style: TextStyle(color: AppColors.softRed)),
+                ),
+              ],
+            ),
+        ],
         bottom: TabBar(
           controller: _tabs,
           isScrollable: true,

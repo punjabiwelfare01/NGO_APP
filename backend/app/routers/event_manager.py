@@ -131,6 +131,38 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
             "created_at": date.today().isoformat(),
         }
 
+    # Batch both per-assignment lookups that used to run once per row (2N
+    # extra round trips against a remote DB) into 2 queries total.
+    student_ids = {a.student_id for a in assignments}
+
+    all_student_submissions = (
+        db.query(WorkSubmission).filter(WorkSubmission.student_id.in_(student_ids)).all()
+        if student_ids else []
+    )
+    approved_by_student: dict[int, list[WorkSubmission]] = {}
+    for sub in all_student_submissions:
+        if str(sub.status).endswith("approved"):
+            approved_by_student.setdefault(sub.student_id, []).append(sub)
+
+    em_submissions = (
+        db.query(WorkSubmission)
+        .filter(
+            WorkSubmission.student_id.in_(student_ids),
+            WorkSubmission.review_target == ReviewTarget.event_manager,
+        )
+        .order_by(WorkSubmission.created_at.desc())
+        .all()
+        if student_ids else []
+    )
+    submission_by_assignment_id: dict[int, WorkSubmission] = {}
+    submission_by_student_activity: dict[tuple[int, int], WorkSubmission] = {}
+    for sub in em_submissions:
+        if sub.assignment_id is not None:
+            submission_by_assignment_id.setdefault(sub.assignment_id, sub)
+        else:
+            key = (sub.student_id, sub.activity_id)
+            submission_by_student_activity.setdefault(key, sub)
+
     assignment_payload = []
     for assignment in assignments:
         activity = assignment.activity
@@ -143,27 +175,9 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(_manager)):
             (item for item in event["activities"] if item["id"] == activity.id),
             _activity_stub(activity),
         )
-        submission = (
-            db.query(WorkSubmission)
-            .filter(
-                WorkSubmission.review_target == ReviewTarget.event_manager,
-                or_(
-                    WorkSubmission.assignment_id == assignment.id,
-                    and_(
-                        WorkSubmission.assignment_id.is_(None),
-                        WorkSubmission.student_id == assignment.student_id,
-                        WorkSubmission.activity_id == assignment.activity_id,
-                    ),
-                )
-            )
-            .order_by(WorkSubmission.created_at.desc())
-            .first()
-        )
-        stats = [
-            item for item in
-            db.query(WorkSubmission).filter(WorkSubmission.student_id == assignment.student_id).all()
-            if str(item.status).endswith("approved")
-        ]
+        submission = submission_by_assignment_id.get(assignment.id) or \
+            submission_by_student_activity.get((assignment.student_id, assignment.activity_id))
+        stats = approved_by_student.get(assignment.student_id, [])
         assignment_payload.append({
             "id": assignment.id,
             "student": {
@@ -480,6 +494,78 @@ def _activity_list_item(activity: VolunteerActivity, db: Session) -> dict:
     }
 
 
+def _activity_list_items(activities: list[VolunteerActivity], db: Session) -> list[dict]:
+    """Batched equivalent of calling `_activity_list_item()` once per activity
+    — same 5 lookups (assignments/certs/impact/creator/event), but each run
+    once total (keyed by id) instead of once per activity, so a list of N
+    activities costs 5 queries instead of 5N."""
+    if not activities:
+        return []
+    activity_ids = [a.id for a in activities]
+    creator_ids = {a.created_by for a in activities if a.created_by}
+    event_ids = {a.event_id for a in activities if a.event_id}
+
+    assignments_by_activity: dict[int, list[ActivityAssignment]] = {aid: [] for aid in activity_ids}
+    for assignment in db.query(ActivityAssignment).filter(ActivityAssignment.activity_id.in_(activity_ids)).all():
+        assignments_by_activity[assignment.activity_id].append(assignment)
+
+    certs_by_activity: dict[int, list[Certificate]] = {aid: [] for aid in activity_ids}
+    if hasattr(Certificate, "activity_id"):
+        for cert in db.query(Certificate).filter(Certificate.activity_id.in_(activity_ids)).all():
+            certs_by_activity[cert.activity_id].append(cert)
+
+    impact_by_activity: dict[int, ImpactPost] = {
+        post.activity_id: post
+        for post in db.query(ImpactPost).filter(ImpactPost.activity_id.in_(activity_ids)).all()
+    }
+    creators_by_id = {
+        u.id: u for u in (db.query(User).filter(User.id.in_(creator_ids)).all() if creator_ids else [])
+    }
+    events_by_id = {
+        e.id: e for e in (db.query(Event).filter(Event.id.in_(event_ids)).all() if event_ids else [])
+    }
+
+    items = []
+    for activity in activities:
+        assignments = assignments_by_activity[activity.id]
+        completed_logs = [a for a in assignments if a.status in ("admin_approved", "certificate_generated", "completed")]
+        pending_logs = [a for a in assignments if a.status in ("submitted", "event_manager_verified")]
+        certs = certs_by_activity[activity.id]
+        impact = impact_by_activity.get(activity.id)
+        creator = creators_by_id.get(activity.created_by) if activity.created_by else None
+        event = events_by_id.get(activity.event_id) if activity.event_id else None
+        items.append({
+            "id": activity.id,
+            "title": activity.title,
+            "category": activity.category.value,
+            "event_id": activity.event_id,
+            "event_name": event.title if event else None,
+            "location": activity.location,
+            "start_date": activity.start_date.isoformat() if activity.start_date else None,
+            "end_date": activity.end_date.isoformat() if activity.end_date else None,
+            "reward_hours": activity.reward_hours,
+            "max_students": activity.max_students,
+            "description": activity.description,
+            "expected_work": activity.expected_work,
+            "work_instructions": activity.work_instructions,
+            "proof_required": activity.proof_required,
+            "certificate_eligible": activity.certificate_eligible,
+            "stipend_amount": activity.stipend_amount,
+            "is_active": activity.is_active,
+            "status": activity.status,
+            "created_by": activity.created_by,
+            "created_by_name": creator.name if creator else None,
+            "created_at": activity.created_at.isoformat() if activity.created_at else None,
+            "updated_at": activity.updated_at.isoformat() if activity.updated_at else None,
+            "assigned_students": len(assignments),
+            "completed_work_logs": len(completed_logs),
+            "pending_approvals": len(pending_logs),
+            "certificates_generated": len(certs),
+            "impact_story_status": impact.status if impact else None,
+        })
+    return items
+
+
 @router.get("/students")
 def list_ngo_students(
     search: Optional[str] = Query(None),
@@ -587,7 +673,7 @@ def list_my_activities(
     if status:
         q = q.filter(VolunteerActivity.status == status)
     activities = q.order_by(VolunteerActivity.created_at.desc()).all()
-    return [_activity_list_item(a, db) for a in activities]
+    return _activity_list_items(activities, db)
 
 
 @router.put("/activities/{activity_id}")
@@ -765,7 +851,7 @@ def admin_all_activities(
     if category:
         q = q.filter(VolunteerActivity.category == category)
     activities = q.order_by(VolunteerActivity.created_at.desc()).all()
-    return [_activity_list_item(a, db) for a in activities]
+    return _activity_list_items(activities, db)
 
 
 @router.get("/admin/activities-summary")

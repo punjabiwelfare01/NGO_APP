@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..crud import donation_crud
 from ..database import get_db
 from ..dependencies import get_current_user, require_role
-from ..models.donation import DonationStatus
+from ..models.donation import Donation, DonationStatus
 from ..models.user import User, UserRole
 from ..schemas.donation import (
     DonationCreate, DonationOut, DonationReview,
@@ -16,6 +16,23 @@ from ..schemas.donation import (
 )
 
 router = APIRouter(prefix="/donations", tags=["Donations"])
+
+
+def _with_collector_names(db: Session, donations: List[Donation]) -> List[dict]:
+    """Attach `referred_by_name` — the name of the student/volunteer who
+    filled in the donation log form — resolved in one batched query instead
+    of one lookup per row."""
+    referrer_ids = {d.referred_by for d in donations if d.referred_by}
+    names_by_id = {
+        u.id: u.name
+        for u in (db.query(User).filter(User.id.in_(referrer_ids)).all() if referrer_ids else [])
+    }
+    result = []
+    for d in donations:
+        out = DonationOut.model_validate(d).model_dump()
+        out["referred_by_name"] = names_by_id.get(d.referred_by)
+        result.append(out)
+    return result
 
 
 # ── NGO Payment Details (public read, admin write) ────────────────────────────
@@ -69,7 +86,7 @@ def my_donations(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return donation_crud.get_donations_by_student(db, current_user.id)
+    return _with_collector_names(db, donation_crud.get_donations_by_student(db, current_user.id))
 
 
 @router.get("", response_model=List[DonationOut])
@@ -78,7 +95,7 @@ def all_donations(
     db: Session = Depends(get_db),
     _: User = Depends(require_role(UserRole.admin, UserRole.super_admin)),
 ):
-    return donation_crud.get_donations(db, status=status)
+    return _with_collector_names(db, donation_crud.get_donations(db, status=status))
 
 
 @router.patch("/{donation_id}/review", response_model=DonationOut)

@@ -1325,6 +1325,13 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
   final List<_ImpactMedia> _mediaItems = [];
   bool _isUploading = false;
 
+  // ── Step 4: Save/Submit ───────────────────────────────────────────────────
+  // The production backend can take several seconds per request (documented
+  // latency on the remote DB) — this flag drives a visible spinner so a slow
+  // response doesn't look like a dead button, and guards against a second
+  // tap firing a duplicate request while the first is still in flight.
+  bool _saving = false;
+
   int get _imageCount => _mediaItems.where((m) => m.isImage).length;
   int get _videoCount => _mediaItems.where((m) => m.isVideo).length;
 
@@ -1615,7 +1622,20 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
 
   // ── Save / Submit ─────────────────────────────────────────────────────────
 
+  void _showError(BuildContext ctx, Object error) {
+    final msg = error.toString().contains('TimeoutException')
+        ? 'The server is taking too long to respond. Please check your connection and try again.'
+        : 'Something went wrong — please try again.';
+    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: const Color(0xFFC62828),
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 4),
+    ));
+  }
+
   Future<void> _saveDraft(BuildContext ctx) async {
+    if (_saving) return;
     if (_titleCtrl.text.trim().isEmpty || _descCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(ctx).showSnackBar(
         const SnackBar(
@@ -1635,51 +1655,59 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
       return;
     }
 
-    final media = _uploadedMediaList;
-    if (widget.existingPost != null) {
-      await widget.vm.updateImpactPost(
-        widget.existingPost!.id,
-        _buildPost(widget.existingPost!.id),
-        mediaList: media,
-      );
-    } else {
-      await widget.vm.addImpactPost(_buildPost(0), mediaList: media);
-    }
+    setState(() => _saving = true);
+    try {
+      final media = _uploadedMediaList;
+      if (widget.existingPost != null) {
+        await widget.vm.updateImpactPost(
+          widget.existingPost!.id,
+          _buildPost(widget.existingPost!.id),
+          mediaList: media,
+        );
+      } else {
+        await widget.vm.addImpactPost(_buildPost(0), mediaList: media);
+      }
 
-    if (!ctx.mounted) return;
-    final failed = _mediaItems.where((m) => m.status == _UploadStatus.failed).length;
-    if (failed > 0) {
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-        content: Text(
-          'Draft saved — $failed file${failed == 1 ? '' : 's'} still failed. Tap Retry then save again.',
-        ),
-        backgroundColor: const Color(0xFFC62828),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-      ));
-      return;
-    }
-
-    final messenger = ScaffoldMessenger.of(ctx);
-    Navigator.pop(ctx);
-    messenger.showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            widget.existingPost != null ? 'Impact post updated' : 'Impact post saved as Draft',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+      if (!ctx.mounted) return;
+      final failed = _mediaItems.where((m) => m.status == _UploadStatus.failed).length;
+      if (failed > 0) {
+        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+          content: Text(
+            'Draft saved — $failed file${failed == 1 ? '' : 's'} still failed. Tap Retry then save again.',
           ),
-        ),
-      ]),
-      backgroundColor: _kPurple,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 3),
-    ));
+          backgroundColor: const Color(0xFFC62828),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ));
+        return;
+      }
+
+      final messenger = ScaffoldMessenger.of(ctx);
+      Navigator.pop(ctx);
+      messenger.showSnackBar(SnackBar(
+        content: Row(children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              widget.existingPost != null ? 'Impact post updated' : 'Impact post saved as Draft',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ]),
+        backgroundColor: _kPurple,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ));
+    } catch (e) {
+      if (ctx.mounted) _showError(ctx, e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _submitForApproval(BuildContext ctx) async {
+    if (_saving) return;
     if (_titleCtrl.text.trim().isEmpty || _descCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
         content: Text('Please fill in title and description'),
@@ -1709,24 +1737,33 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
       return;
     }
 
-    final media = _uploadedMediaList;
-    int postId;
-    if (widget.existingPost != null) {
-      postId = widget.existingPost!.id;
-      await widget.vm.updateImpactPost(postId, _buildPost(postId), mediaList: media);
-    } else {
-      postId = await widget.vm.addImpactPost(_buildPost(0), mediaList: media);
-    }
-    if (!ctx.mounted) return;
+    setState(() => _saving = true);
+    try {
+      final media = _uploadedMediaList;
+      int postId;
+      if (widget.existingPost != null) {
+        postId = widget.existingPost!.id;
+        await widget.vm.updateImpactPost(postId, _buildPost(postId), mediaList: media);
+      } else {
+        postId = await widget.vm.addImpactPost(_buildPost(0), mediaList: media);
+      }
+      if (!ctx.mounted) return;
 
-    widget.vm.submitImpactPostForApproval(postId);
-    final messenger = ScaffoldMessenger.of(ctx);
-    Navigator.pop(ctx);
-    messenger.showSnackBar(const SnackBar(
-      content: Text('Sent to Admin for approval. It will be published once approved.'),
-      backgroundColor: _kPurple,
-      behavior: SnackBarBehavior.floating,
-    ));
+      await widget.vm.submitImpactPostForApproval(postId);
+      if (!ctx.mounted) return;
+
+      final messenger = ScaffoldMessenger.of(ctx);
+      Navigator.pop(ctx);
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Sent to Admin for approval. It will be published once approved.'),
+        backgroundColor: _kPurple,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      if (ctx.mounted) _showError(ctx, e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -1912,7 +1949,7 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
                   else ...[
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => _saveDraft(context),
+                        onPressed: _saving ? null : () => _saveDraft(context),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: _kPurple,
                           side: const BorderSide(color: _kPurple),
@@ -1921,14 +1958,22 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Save Draft',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        child: _saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: _kPurple),
+                              )
+                            : const Text('Save Draft',
+                                style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: FilledButton(
-                        onPressed: () => _submitForApproval(context),
+                        onPressed:
+                            _saving ? null : () => _submitForApproval(context),
                         style: FilledButton.styleFrom(
                           backgroundColor: _kPurple,
                           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1936,8 +1981,15 @@ class _CreateImpactPostSheetState extends State<_CreateImpactPostSheet> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text('Submit',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        child: _saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Submit',
+                                style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],

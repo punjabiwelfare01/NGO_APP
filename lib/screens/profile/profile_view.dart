@@ -15,6 +15,7 @@ import '../../viewmodels/view_state.dart';
 import '../../models/volunteer_models.dart';
 import '../../viewmodels/volunteer_viewmodel.dart';
 import '../../widgets/app_scroll_view.dart';
+import '../../widgets/profile_section.dart';
 import '../volunteer/daily_log_screen.dart';
 import '../volunteer/donation_screen.dart';
 import '../volunteer/my_certificates_screen.dart';
@@ -289,65 +290,25 @@ class _ProfileViewState extends State<ProfileView> {
             // ── Profile Information ─────────────────────────────────────────
             const _SectionTitle('Profile Information'),
             if (isStudent) ...[
-              // Personal details subsection label
-              const _SubSectionLabel('Personal Details'),
-              _InfoCard(
+              ProfileSection(
+                title: 'Personal Details',
                 rows: [
-                  _InfoRowData(
-                    icon: Icons.person_outline_rounded,
-                    tint: const Color(0xFF126BFF),
-                    label: 'Full Name',
-                    value: _value(user?.name),
-                    onTap: _openEditProfile,
-                  ),
-                  _InfoRowData(
-                    icon: Icons.email_outlined,
-                    tint: const Color(0xFF9C27B0),
-                    label: 'Email Address',
-                    value: _value(user?.email),
-                  ),
-                  _InfoRowData(
-                    icon: Icons.phone_outlined,
-                    tint: const Color(0xFF20BF6B),
-                    label: 'Phone Number',
-                    value: _value(user?.phone),
-                    onTap: _openEditProfile,
-                  ),
+                  ProfileRow(Icons.person_outline_rounded, 'Full Name', _value(user?.name)),
+                  ProfileRow(Icons.email_outlined, 'Email Address', _value(user?.email)),
+                  ProfileRow(Icons.phone_outlined, 'Phone Number', _value(user?.phone)),
                 ],
               ),
-              const _SubSectionLabel('Education Details'),
-              _InfoCard(
+              const SizedBox(height: 14),
+              ProfileSection(
+                title: 'Education Details',
                 rows: [
-                  _InfoRowData(
-                    icon: Icons.cake_outlined,
-                    tint: const Color(0xFF11B8C9),
-                    label: 'Date of Birth / Age',
-                    value: _dateOrAge(user),
-                    onTap: _openEditProfile,
-                  ),
-                  _InfoRowData(
-                    icon: Icons.school_rounded,
-                    tint: const Color(0xFF17B86A),
-                    label: 'Class / College / Year',
-                    value: _value(user?.className),
-                    onTap: _openEditProfile,
-                  ),
-                  _InfoRowData(
-                    icon: Icons.account_balance_rounded,
-                    tint: const Color(0xFF8B5CF6),
-                    label: 'School / College / Institution',
-                    value: _value(user?.schoolName),
-                    onTap: _openEditProfile,
-                  ),
-                  _InfoRowData(
-                    icon: Icons.location_on_outlined,
-                    tint: const Color(0xFFFF8800),
-                    label: 'City / Location',
-                    value: _value(user?.location),
-                    onTap: _openEditProfile,
-                  ),
+                  ProfileRow(Icons.cake_outlined, 'Date of Birth / Age', _dateOrAge(user)),
+                  ProfileRow(Icons.school_rounded, 'Class / College / Year', _value(user?.className)),
+                  ProfileRow(Icons.account_balance_rounded, 'School / College / Institution', _value(user?.schoolName)),
+                  ProfileRow(Icons.location_on_outlined, 'City / Location', _value(user?.location)),
                 ],
               ),
+              const SizedBox(height: 14),
               const _SubSectionLabel('Volunteer Details'),
               _InterestsCard(
                 interests: user?.interests ?? const [],
@@ -356,82 +317,54 @@ class _ProfileViewState extends State<ProfileView> {
             ] else ...[
               // Non-student (Event Manager / Content Creator / Counsellor)
               // Fields map to the NGO Staff registration form
-              _InfoCard(
+              ProfileSection(
+                title: 'Profile Details',
                 rows: [
-                  _InfoRowData(
-                    icon: Icons.person_outline_rounded,
-                    tint: const Color(0xFF126BFF),
-                    label: 'Full Name',
-                    value: _value(user?.name),
-                  ),
-                  _InfoRowData(
-                    icon: Icons.email_outlined,
-                    tint: const Color(0xFF9C27B0),
-                    label: 'Email Address',
-                    value: _value(user?.email),
-                  ),
-                  _InfoRowData(
-                    icon: Icons.phone_outlined,
-                    tint: const Color(0xFF20BF6B),
-                    label: 'Phone Number',
-                    value: _value(user?.phone),
-                  ),
-                  _InfoRowData(
-                    icon: Icons.business_outlined,
-                    tint: const Color(0xFFFF8800),
-                    label: 'Organization / Department',
-                    value: _value(user?.schoolName),
-                  ),
+                  ProfileRow(Icons.person_outline_rounded, 'Full Name', _value(user?.name)),
+                  ProfileRow(Icons.email_outlined, 'Email Address', _value(user?.email)),
+                  ProfileRow(Icons.phone_outlined, 'Phone Number', _value(user?.phone)),
+                  ProfileRow(Icons.business_outlined, 'Organization / Department', _value(user?.schoolName)),
                 ],
               ),
-              const _SubSectionLabel('Role Information'),
-              _InfoCard(
+              const SizedBox(height: 14),
+              ProfileSection(
+                title: 'Role Information',
                 rows: [
-                  _InfoRowData(
-                    icon: Icons.work_outline_rounded,
-                    tint: const Color(0xFF1565C0),
-                    label: 'Role',
-                    value: _roleLabel(user?.role),
-                  ),
+                  ProfileRow(Icons.work_outline_rounded, 'Role', _roleLabel(user?.role)),
                   if (user?.requestedRole != null)
-                    _InfoRowData(
-                      icon: Icons.how_to_reg_rounded,
-                      tint: const Color(0xFF17B86A),
-                      label: 'Requested Role',
-                      value: _roleLabel(user?.requestedRole),
-                    ),
-                  _InfoRowData(
-                    icon: Icons.verified_outlined,
-                    tint: const Color(0xFF11B8C9),
-                    label: 'Account Status',
-                    value: _accessStatusLabel(user?.accessStatus),
-                  ),
+                    ProfileRow(Icons.how_to_reg_rounded, 'Requested Role', _roleLabel(user?.requestedRole)),
+                  ProfileRow(Icons.verified_outlined, 'Account Status', _accessStatusLabel(user?.accessStatus)),
                 ],
               ),
             ],
+            const SizedBox(height: 20),
 
             const _SectionTitle('Preferences & Security'),
-            _InfoCard(
-              rows: [
+            ProfileActionsCard(
+              actions: [
                 if (AppState.hasMultipleRoles)
-                  _InfoRowData(
+                  ProfileActionTile(
                     icon: Icons.swap_horiz_rounded,
-                    tint: const Color(0xFF7C4DFF),
-                    label: 'Switch Role',
-                    value: 'Currently: ${_switcherLabel(AppState.role)}',
+                    color: const Color(0xFF7C4DFF),
+                    label: 'Switch Role (${_switcherLabel(AppState.role)})',
                     onTap: _switchRole,
                   ),
-                _InfoRowData(
+                ProfileActionTile(
+                  icon: Icons.edit_rounded,
+                  color: const Color(0xFF126BFF),
+                  label: 'Edit Profile',
+                  onTap: _openEditProfile,
+                ),
+                ProfileActionTile(
                   icon: Icons.lock_outline_rounded,
-                  tint: const Color(0xFF126BFF),
+                  color: const Color(0xFF126BFF),
                   label: 'Change Password',
                   onTap: _openChangePassword,
                 ),
-                _InfoRowData(
+                ProfileActionTile(
                   icon: Icons.logout_rounded,
-                  tint: Colors.redAccent,
+                  color: Colors.red,
                   label: 'Logout',
-                  labelColor: Colors.red,
                   onTap: _logout,
                 ),
               ],
@@ -1222,124 +1155,6 @@ class _SubSectionLabel extends StatelessWidget {
       ),
     );
   }
-}
-
-// ── Info card (rows of icon + label + value) ──────────────────────────────────
-
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({required this.rows});
-
-  final List<_InfoRowData> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE8ECF4)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF08164A).withValues(alpha: 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          for (var i = 0; i < rows.length; i++)
-            _InfoRow(data: rows[i], showDivider: i != rows.length - 1),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.data, required this.showDivider});
-
-  final _InfoRowData data;
-  final bool showDivider;
-
-  @override
-  Widget build(BuildContext context) {
-    final labelColor = data.labelColor ?? const Color(0xFF08164A);
-    return InkWell(
-      onTap: data.onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 18),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          border: showDivider
-              ? const Border(bottom: BorderSide(color: Color(0xFFE8ECF4)))
-              : null,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: data.tint.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: data.tint.withValues(alpha: 0.18)),
-              ),
-              child: Icon(data.icon, color: data.tint, size: 22),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                data.label,
-                style: TextStyle(
-                  color: labelColor,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            if (data.value != null) ...[
-              Flexible(
-                child: Text(
-                  data.value!,
-                  textAlign: TextAlign.right,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF3F4D70),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-            if (data.onTap != null)
-              const Icon(Icons.chevron_right_rounded,
-                  color: Color(0xFF4A587C)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoRowData {
-  const _InfoRowData({
-    required this.icon,
-    required this.tint,
-    required this.label,
-    this.value,
-    this.labelColor,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final Color tint;
-  final String label;
-  final String? value;
-  final Color? labelColor;
-  final VoidCallback? onTap;
 }
 
 // ── Interests card (chips display) ────────────────────────────────────────────

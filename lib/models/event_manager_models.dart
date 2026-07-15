@@ -201,7 +201,8 @@ enum EMImpactPostType {
   schoolPartnerProgram,
   volunteerOfMonth,
   guestOfficerAppreciation,
-  eventSuccessReport;
+  eventSuccessReport,
+  educationSupport;
 
   String get label => switch (this) {
         certificateAwarded       => 'Certificate Awarded',
@@ -213,6 +214,7 @@ enum EMImpactPostType {
         volunteerOfMonth         => 'Volunteer of the Month',
         guestOfficerAppreciation => 'Guest / Officer Appreciation',
         eventSuccessReport       => 'Event Success Report',
+        educationSupport         => 'Education Support',
       };
 
   IconData get icon => switch (this) {
@@ -225,6 +227,7 @@ enum EMImpactPostType {
         volunteerOfMonth         => Icons.star_rounded,
         guestOfficerAppreciation => Icons.military_tech_rounded,
         eventSuccessReport       => Icons.emoji_events_rounded,
+        educationSupport         => Icons.menu_book_rounded,
       };
 
   Color get color => switch (this) {
@@ -237,6 +240,7 @@ enum EMImpactPostType {
         volunteerOfMonth         => const Color(0xFFFF6F00),
         guestOfficerAppreciation => const Color(0xFF283593),
         eventSuccessReport       => const Color(0xFF1B5E20),
+        educationSupport         => const Color(0xFF00838F),
       };
 
   static EMImpactPostType fromString(String v) =>
@@ -346,7 +350,7 @@ class NGOEvent {
 
 class EventActivity {
   final int id;
-  final int eventId;
+  final int? eventId;
   final String title;
   final ActivityRole role;
   final String? description;
@@ -368,7 +372,7 @@ class EventActivity {
 
   factory EventActivity.fromJson(Map<String, dynamic> j) => EventActivity(
         id: j['id'] as int,
-        eventId: j['event_id'] as int,
+        eventId: j['event_id'] as int?,
         title: j['title'] as String,
         role: ActivityRole.fromString(j['role'] as String),
         description: j['description'] as String?,
