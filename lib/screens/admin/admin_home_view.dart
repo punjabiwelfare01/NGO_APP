@@ -125,7 +125,10 @@ class AdminHomeViewState extends State<AdminHomeView> {
             if (admin.state == ViewState.error)
               _errorBanner(admin.errorMessage, admin.load),
             if (events.state == EMLoadState.error)
-              _errorBanner('Events data failed to load.', () => events.load(force: true)),
+              _errorBanner(
+                'Events data failed to load.',
+                () => events.load(force: true),
+              ),
             _header(admin),
             const SizedBox(height: AdminSpacing.xl),
             _criticalAlerts(admin, events),
@@ -222,7 +225,10 @@ class AdminHomeViewState extends State<AdminHomeView> {
           children: [
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(AdminSpacing.chipRadius),
@@ -230,7 +236,11 @@ class AdminHomeViewState extends State<AdminHomeView> {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.verified_rounded, color: Color(0xFF2E7D32), size: 18),
+                    Icon(
+                      Icons.verified_rounded,
+                      color: Color(0xFF2E7D32),
+                      size: 18,
+                    ),
                     SizedBox(width: 6),
                     Flexible(
                       child: Text(
@@ -306,7 +316,11 @@ class AdminHomeViewState extends State<AdminHomeView> {
         children: [
           const Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Color(0xFFFFD54F), size: 24),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFFFD54F),
+                size: 24,
+              ),
               SizedBox(width: AdminSpacing.xs),
               Expanded(
                 child: Text(
@@ -428,7 +442,11 @@ class AdminHomeViewState extends State<AdminHomeView> {
         Icons.event_rounded,
         'Create Event',
         const Color(0xFF1565C0),
-        () => _push(EventsDashboardScreen(vm: EventsViewModel.shared(isAdmin: true)..load())),
+        () => _push(
+          EventsDashboardScreen(
+            vm: EventsViewModel.shared(isAdmin: true)..load(),
+          ),
+        ),
       ),
       _Action(
         Icons.rate_review_rounded,
@@ -513,7 +531,10 @@ class AdminHomeViewState extends State<AdminHomeView> {
               radius: 22,
               child: Text(
                 user.name.isEmpty ? '?' : user.name[0].toUpperCase(),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(width: AdminSpacing.sm),
@@ -585,7 +606,10 @@ class AdminHomeViewState extends State<AdminHomeView> {
   );
 
   Widget _volunteerReview(EventManagerViewModel vm) {
-    final work = vm.pendingSubmissions.take(2).toList();
+    final work = vm.pendingSubmissions
+        .where((a) => a.submission != null)
+        .take(2)
+        .toList();
     return _previewSection(
       'Volunteer Work Review',
       Icons.fact_check_rounded,
@@ -626,7 +650,11 @@ class AdminHomeViewState extends State<AdminHomeView> {
           'Events & Activities Overview',
           Icons.event_note_rounded,
           action: 'Manage',
-          onAction: () => _push(EventsDashboardScreen(vm: EventsViewModel.shared(isAdmin: true)..load())),
+          onAction: () => _push(
+            EventsDashboardScreen(
+              vm: EventsViewModel.shared(isAdmin: true)..load(),
+            ),
+          ),
         ),
         const SizedBox(height: AdminSpacing.sm),
         Row(
@@ -649,7 +677,9 @@ class AdminHomeViewState extends State<AdminHomeView> {
   }
 
   Widget _schoolRequests() {
-    final requests = CounsellorViewModel.shared.allAdminRequests.take(2).toList();
+    final requests = CounsellorViewModel.shared.allAdminRequests
+        .take(2)
+        .toList();
     return _previewSection(
       'School Counselling Requests',
       Icons.school_rounded,
@@ -752,7 +782,10 @@ class AdminHomeViewState extends State<AdminHomeView> {
       _sectionTitle('Reports & Analytics', Icons.analytics_rounded),
       const SizedBox(height: AdminSpacing.sm),
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: AdminSpacing.md, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AdminSpacing.md,
+          vertical: 4,
+        ),
         decoration: _cardDecoration(),
         child: Column(
           children: [
@@ -825,17 +858,13 @@ class AdminHomeViewState extends State<AdminHomeView> {
                         size: 22,
                       ),
                       const SizedBox(width: AdminSpacing.xs),
-                      Expanded(
-                        child: Text(
-                          items[i],
-                          style: AdminText.body,
-                        ),
-                      ),
+                      Expanded(child: Text(items[i], style: AdminText.body)),
                       const SizedBox(width: AdminSpacing.xs),
                       const Text('Now', style: AdminText.secondary),
                     ],
                   ),
-                  if (i != items.length - 1) const Divider(height: AdminSpacing.lg),
+                  if (i != items.length - 1)
+                    const Divider(height: AdminSpacing.lg),
                 ],
             ],
           ),
@@ -864,7 +893,11 @@ class AdminHomeViewState extends State<AdminHomeView> {
     ),
     child: Row(
       children: [
-        const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 24),
+        const Icon(
+          Icons.error_outline_rounded,
+          color: Color(0xFFDC2626),
+          size: 24,
+        ),
         const SizedBox(width: AdminSpacing.sm),
         Expanded(
           child: Text(
@@ -926,7 +959,11 @@ class AdminHomeViewState extends State<AdminHomeView> {
             ),
             const SizedBox(width: AdminSpacing.sm),
             Expanded(
-              child: AdminStatBlock(label: label, value: value, valueColor: color),
+              child: AdminStatBlock(
+                label: label,
+                value: value,
+                valueColor: color,
+              ),
             ),
           ],
         ),
@@ -1001,7 +1038,13 @@ class AdminHomeViewState extends State<AdminHomeView> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(action, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              Text(
+                action,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(width: 2),
               const Icon(Icons.arrow_forward_rounded, size: 16),
             ],
@@ -1086,7 +1129,11 @@ class AdminHomeViewState extends State<AdminHomeView> {
                 padding: const EdgeInsets.only(top: AdminSpacing.sm),
                 child: Row(
                   children: [
-                    const Icon(Icons.shield_rounded, color: Color(0xFF2E7D32), size: 16),
+                    const Icon(
+                      Icons.shield_rounded,
+                      color: Color(0xFF2E7D32),
+                      size: 16,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -1109,6 +1156,7 @@ class AdminHomeViewState extends State<AdminHomeView> {
       ),
     ],
   );
+
   /// Compact centered stat used inside a 3-across row (e.g. center-summary
   /// cards). The value auto-shrinks via FittedBox so it can never overflow
   /// its column regardless of digit count, and the label wraps to 2 lines
@@ -1162,50 +1210,58 @@ class AdminHomeViewState extends State<AdminHomeView> {
     ),
     child: AdminStatBlock(label: label, value: value),
   );
-  Widget _reportRow(String title, String subtitle, {VoidCallback? onTap}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: AdminSpacing.sm),
-    child: Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: .1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.description_outlined, color: AppColors.primary, size: 22),
-        ),
-        const SizedBox(width: AdminSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AdminText.bodyStrong.copyWith(fontSize: 15),
+  Widget _reportRow(String title, String subtitle, {VoidCallback? onTap}) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: AdminSpacing.sm),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: .1),
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AdminText.secondary,
+              child: const Icon(
+                Icons.description_outlined,
+                color: AppColors.primary,
+                size: 22,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: AdminSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AdminText.bodyStrong.copyWith(fontSize: 15),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AdminText.secondary,
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: onTap,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, AdminSpacing.minTouch),
+              ),
+              child: const Text(
+                'Generate',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
         ),
-        TextButton(
-          onPressed: onTap,
-          style: TextButton.styleFrom(
-            minimumSize: const Size(0, AdminSpacing.minTouch),
-          ),
-          child: const Text('Generate', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        ),
-      ],
-    ),
-  );
+      );
   Widget _empty(String text, IconData icon) => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(AdminSpacing.md),
@@ -1283,7 +1339,10 @@ class AdminHomeViewState extends State<AdminHomeView> {
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     color: Colors.red.shade400,
-                    child: const Icon(Icons.delete_outline, color: Colors.white),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.white,
+                    ),
                   ),
                   child: ListTile(
                     leading: Icon(
