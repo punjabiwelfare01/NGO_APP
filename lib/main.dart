@@ -27,7 +27,6 @@ import 'screens/home/home_view.dart';
 import 'screens/learn/learn_view.dart';
 import 'screens/profile/profile_view.dart';
 import 'screens/quiz/quiz_play_screen.dart';
-import 'screens/helping_support/helping_support_view.dart';
 import 'screens/internship/internship_view.dart';
 import 'screens/internship/wall_of_impact_view.dart';
 import 'screens/school_portal/school_partner_portal_screen.dart';
@@ -231,7 +230,6 @@ class _AppShellState extends State<AppShell> {
               initialCategory: _selectedLearnCategory,
             ),
             const EventsView(),
-            const HelpingSupportView(),
             const ProfileView(),
           ];
 
@@ -258,11 +256,6 @@ class _AppShellState extends State<AppShell> {
         Icons.calendar_month_outlined,
         Icons.calendar_month_rounded,
         'Calendar',
-      ),
-      _NavItem(
-        Icons.support_agent_outlined,
-        Icons.support_agent_rounded,
-        'Support',
       ),
       _NavItem(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
     ];

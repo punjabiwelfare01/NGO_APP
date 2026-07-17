@@ -677,15 +677,28 @@ class AdminHomeViewState extends State<AdminHomeView> {
   }
 
   Widget _schoolRequests() {
-    final requests = CounsellorViewModel.shared.allAdminRequests
-        .take(2)
-        .toList();
+    // Pending/awaiting-action requests surface first regardless of when they
+    // were created, so an old unresolved request isn't buried under recent
+    // ones that have already moved along; ties broken by most recent first.
+    int priority(SchoolRequestStatus status) => switch (status) {
+      SchoolRequestStatus.newRequest => 0,
+      SchoolRequestStatus.pendingConfirmation => 1,
+      _ => 2,
+    };
+    final requests = [...CounsellorViewModel.shared.allAdminRequests]
+      ..sort((a, b) {
+        final byPriority = priority(a.status).compareTo(priority(b.status));
+        return byPriority != 0
+            ? byPriority
+            : b.requestedAt.compareTo(a.requestedAt);
+      });
+    final preview = requests.take(2).toList();
     return _previewSection(
       'School Counselling Requests',
       Icons.school_rounded,
-      requests.isEmpty
+      preview.isEmpty
           ? [_empty('No school requests found.', Icons.school_outlined)]
-          : requests
+          : preview
                 .map(
                   (r) => _previewCard(
                     r.schoolName,

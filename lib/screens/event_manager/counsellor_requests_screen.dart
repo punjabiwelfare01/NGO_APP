@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../core/colors.dart';
-import '../../models/counsellor_models.dart';
+import '../../models/counsellor_session_models.dart';
 import '../../viewmodels/counsellor_viewmodel.dart';
 
+/// Admin oversight of every school counselling request across all
+/// counsellors — backed by the real `GET /counsellor/requests` data
+/// (`CounsellorViewModel.allAdminRequests`). Read-only: accepting,
+/// declining and rescheduling a request is the assigned counsellor's own
+/// action (in their portal), not something the backend lets an admin do on
+/// their behalf, so this screen surfaces status and detail rather than
+/// fake action buttons.
 class CounsellorRequestsScreen extends StatefulWidget {
   const CounsellorRequestsScreen({super.key});
 
@@ -14,12 +21,23 @@ class CounsellorRequestsScreen extends StatefulWidget {
 
 class _CounsellorRequestsScreenState extends State<CounsellorRequestsScreen> {
   final _vm = CounsellorViewModel.shared;
-  RequestStatus? _filter;
+  SchoolRequestStatus? _filter;
+
+  static const _pendingStatuses = {
+    SchoolRequestStatus.newRequest,
+    SchoolRequestStatus.pendingConfirmation,
+  };
+  static const _activeStatuses = {
+    SchoolRequestStatus.accepted,
+    SchoolRequestStatus.rescheduled,
+    SchoolRequestStatus.confirmed,
+    SchoolRequestStatus.scheduled,
+  };
 
   @override
   void initState() {
     super.initState();
-    _vm.load();
+    _vm.loadAllAdminRequests();
   }
 
   @override
@@ -29,76 +47,86 @@ class _CounsellorRequestsScreenState extends State<CounsellorRequestsScreen> {
       title: const Text('School Counsellor Requests'),
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded),
+          onPressed: () => _vm.loadAllAdminRequests(),
+        ),
+      ],
     ),
-    body: ListenableBuilder(
-      listenable: _vm,
-      builder: (context, _) {
-        final requests = _filter == null
-            ? _vm.requests
-            : _vm.requests.where((r) => r.status == _filter).toList();
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
-          children: [
-          const Text(
-            'School Counsellor Requests',
-            style: TextStyle(
-              color: AppColors.ink,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Review, recommend, assign and confirm verified counsellors.',
-            style: TextStyle(color: AppColors.muted),
-          ),
-          const SizedBox(height: 16),
-          Row(
+    body: RefreshIndicator(
+      onRefresh: () => _vm.loadAllAdminRequests(),
+      child: ListenableBuilder(
+        listenable: _vm,
+        builder: (context, _) {
+          final all = _vm.allAdminRequests;
+          final requests = _filter == null
+              ? all
+              : all.where((r) => r.status == _filter).toList();
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
             children: [
-              _summary(
-                'Pending',
-                _vm.pendingRequests.length,
-                const Color(0xFFF57F17),
+              const Text(
+                'School Counsellor Requests',
+                style: TextStyle(
+                  color: AppColors.ink,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              const SizedBox(width: 9),
-              _summary(
-                'Active',
-                _vm.activeRequests.length,
-                const Color(0xFF1565C0),
+              const SizedBox(height: 4),
+              const Text(
+                'Every school counselling request across all counsellors.',
+                style: TextStyle(color: AppColors.muted),
               ),
-              const SizedBox(width: 9),
-              _summary(
-                'Complete',
-                _vm.requests
-                    .where((r) => r.status == RequestStatus.completed)
-                    .length,
-                const Color(0xFF2E7D32),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _summary(
+                    'Pending',
+                    all.where((r) => _pendingStatuses.contains(r.status)).length,
+                    const Color(0xFFF57F17),
+                  ),
+                  const SizedBox(width: 9),
+                  _summary(
+                    'Active',
+                    all.where((r) => _activeStatuses.contains(r.status)).length,
+                    const Color(0xFF1565C0),
+                  ),
+                  const SizedBox(width: 9),
+                  _summary(
+                    'Complete',
+                    all
+                        .where((r) => r.status == SchoolRequestStatus.completed)
+                        .length,
+                    const Color(0xFF2E7D32),
+                  ),
+                ],
               ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 38,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _filterChip('All', null),
+                    for (final status in SchoolRequestStatus.values)
+                      _filterChip(status.label, status),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (requests.isEmpty)
+                _empty()
+              else
+                for (final request in requests) ...[
+                  _requestCard(context, request),
+                  const SizedBox(height: 12),
+                ],
             ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 38,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _filterChip('All', null),
-                for (final status in RequestStatus.values)
-                  _filterChip(status.label, status),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (requests.isEmpty)
-            _empty()
-          else
-            for (final request in requests) ...[
-              _requestCard(context, request),
-              const SizedBox(height: 12),
-            ],
-          ],
-        );
-      },
+          );
+        },
+      ),
     ),
   );
 
@@ -133,7 +161,7 @@ class _CounsellorRequestsScreenState extends State<CounsellorRequestsScreen> {
     ),
   );
 
-  Widget _filterChip(String label, RequestStatus? status) {
+  Widget _filterChip(String label, SchoolRequestStatus? status) {
     final active = _filter == status;
     return Padding(
       padding: const EdgeInsets.only(right: 7),
@@ -145,7 +173,7 @@ class _CounsellorRequestsScreenState extends State<CounsellorRequestsScreen> {
     );
   }
 
-  Widget _requestCard(BuildContext context, CounsellingRequest r) => Container(
+  Widget _requestCard(BuildContext context, SchoolBookingRequest r) => Container(
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
       color: Colors.white,
@@ -181,7 +209,7 @@ class _CounsellorRequestsScreenState extends State<CounsellorRequestsScreen> {
                     ),
                   ),
                   Text(
-                    '${r.gradeLevel} • ${r.studentCount} students',
+                    '${r.classGroup.isEmpty ? r.program : r.classGroup} • ${r.expectedStudents} students',
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 11,
@@ -194,76 +222,24 @@ class _CounsellorRequestsScreenState extends State<CounsellorRequestsScreen> {
           ],
         ),
         const SizedBox(height: 13),
-        _line(Icons.person_rounded, 'Requested counsellor', r.counsellorName),
+        _line(Icons.person_rounded, 'Counsellor', r.counsellorName),
         _line(Icons.topic_rounded, 'Topic', r.topic),
-        _line(r.sessionMode.icon, 'Mode', r.sessionMode.label),
+        _line(r.mode.icon, 'Mode', r.mode.label),
         _line(
           Icons.calendar_month_rounded,
           'Preferred date',
           _date(r.preferredDate),
         ),
-        if (r.assignedVolunteers.isNotEmpty)
-          _line(
-            Icons.volunteer_activism_rounded,
-            'Student support',
-            r.assignedVolunteers.join(', '),
-          ),
-        if (r.eventManagerNotes.isNotEmpty)
-          _line(Icons.notes_rounded, 'Manager note', r.eventManagerNotes),
+        if (r.status == SchoolRequestStatus.declined && r.declineReason != null)
+          _line(Icons.info_outline_rounded, 'Decline reason', r.declineReason!.label),
         const Divider(height: 22),
-        Wrap(
-          spacing: 7,
-          runSpacing: 7,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () => _recommend(context, r),
-              icon: const Icon(Icons.recommend_rounded, size: 17),
-              label: const Text('Recommend'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _assignVolunteers(context, r),
-              icon: const Icon(Icons.group_add_rounded, size: 17),
-              label: const Text('Volunteers'),
-            ),
-            if (r.status == RequestStatus.pending)
-              FilledButton(
-                onPressed: () => _vm.updateRequestStatus(
-                  r.id,
-                  RequestStatus.reviewed,
-                  notes: 'Request reviewed by Event Manager.',
-                ),
-                child: const Text('Start Review'),
-              ),
-            if (r.status == RequestStatus.reviewed ||
-                r.status == RequestStatus.assigned)
-              FilledButton.icon(
-                onPressed: () => _vm.updateRequestStatus(
-                  r.id,
-                  RequestStatus.confirmed,
-                  notes: 'Counsellor and school schedule confirmed.',
-                ),
-                icon: const Icon(Icons.check_circle_rounded, size: 17),
-                label: const Text('Confirm'),
-              ),
-            if (r.status == RequestStatus.confirmed)
-              FilledButton.icon(
-                onPressed: () => _complete(context, r),
-                icon: const Icon(Icons.task_alt_rounded, size: 17),
-                label: const Text('Complete'),
-              ),
-            if (r.status == RequestStatus.completed) ...[
-              OutlinedButton.icon(
-                onPressed: () => _report(context, r),
-                icon: const Icon(Icons.description_rounded, size: 17),
-                label: const Text('Session Report'),
-              ),
-              FilledButton.icon(
-                onPressed: () => _impact(context, r),
-                icon: const Icon(Icons.auto_awesome_rounded, size: 17),
-                label: const Text('Wall of Impact'),
-              ),
-            ],
-          ],
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            onPressed: () => _viewDetails(context, r),
+            icon: const Icon(Icons.visibility_rounded, size: 17),
+            label: const Text('View Details'),
+          ),
         ),
       ],
     ),
@@ -301,7 +277,7 @@ class _CounsellorRequestsScreenState extends State<CounsellorRequestsScreen> {
     ),
   );
 
-  Widget _status(RequestStatus status) => Container(
+  Widget _status(SchoolRequestStatus status) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
     decoration: BoxDecoration(
       color: status.color.withValues(alpha: .1),
@@ -331,121 +307,49 @@ class _CounsellorRequestsScreenState extends State<CounsellorRequestsScreen> {
     ),
   );
 
-  Future<void> _recommend(
-    BuildContext context,
-    CounsellingRequest request,
-  ) async {
-    final selected = await showDialog<CounsellorProfile>(
-      context: context,
-      builder: (_) => SimpleDialog(
-        title: const Text('Recommend verified counsellor'),
-        children: _vm.allCounsellors
-            .map(
-              (c) => SimpleDialogOption(
-                onPressed: () => Navigator.pop(context, c),
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(c.category.icon, color: c.category.color),
-                  title: Text(c.name),
-                  subtitle: Text('${c.category.label}\n${c.sessionMode.label}'),
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-    if (selected != null) _vm.assignCounsellor(request.id, selected);
-  }
-
-  Future<void> _assignVolunteers(
-    BuildContext context,
-    CounsellingRequest request,
-  ) async {
-    final controller = TextEditingController(
-      text: request.assignedVolunteers.join(', '),
-    );
-    final result = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Assign student volunteers'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Names, comma separated',
-            helperText: 'For registration, logistics and session support',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Assign'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (result != null) {
-      _vm.updateRequestStatus(
-        request.id,
-        request.status == RequestStatus.pending
-            ? RequestStatus.reviewed
-            : request.status,
-        volunteers: result
-            .split(',')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList(),
-        notes: request.eventManagerNotes,
-      );
-    }
-  }
-
-  void _complete(BuildContext context, CounsellingRequest r) {
-    _vm.updateRequestStatus(
-      r.id,
-      RequestStatus.completed,
-      notes: 'Session completed. Report and impact-post workflow unlocked.',
-      volunteers: r.assignedVolunteers,
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Session completed. You can now generate its school report and Wall of Impact post.',
-        ),
-      ),
-    );
-  }
-
-  void _report(BuildContext context, CounsellingRequest r) => showDialog<void>(
+  void _viewDetails(BuildContext context, SchoolBookingRequest r) => showDialog<void>(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text('School Session Report'),
-      content: Text(
-        '${r.schoolName}\nTopic: ${r.topic}\nCounsellor: ${r.counsellorName}\nStudents guided: ${r.studentCount}\nMode: ${r.sessionMode.label}\nStatus: Completed',
+      title: Text(r.schoolName),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _line(Icons.flag_rounded, 'Status', r.status.label),
+            _line(Icons.person_rounded, 'Coordinator', r.coordinatorName),
+            if (r.coordinatorPhone.isNotEmpty)
+              _line(Icons.phone_rounded, 'Phone', r.coordinatorPhone),
+            if (r.coordinatorEmail.isNotEmpty)
+              _line(Icons.email_rounded, 'Email', r.coordinatorEmail),
+            if (r.schoolAddress.isNotEmpty)
+              _line(Icons.location_on_rounded, 'Address', r.schoolAddress),
+            _line(Icons.person_pin_rounded, 'Counsellor', r.counsellorName),
+            _line(Icons.topic_rounded, 'Topic', r.topic),
+            _line(Icons.groups_rounded, 'Students', '${r.expectedStudents}'),
+            if (r.language.isNotEmpty)
+              _line(Icons.translate_rounded, 'Language', r.language),
+            _line(r.mode.icon, 'Mode', r.mode.label),
+            _line(Icons.calendar_month_rounded, 'Preferred date', _date(r.preferredDate)),
+            if (r.suggestedDate != null)
+              _line(Icons.event_repeat_rounded, 'Suggested date', _date(r.suggestedDate!)),
+            if (r.specialRequirements.isNotEmpty)
+              _line(Icons.notes_rounded, 'Requirements', r.specialRequirements),
+            if (r.assignedEventManager != null)
+              _line(Icons.badge_rounded, 'Event Manager', r.assignedEventManager!),
+            if (r.status == SchoolRequestStatus.declined && r.declineReason != null)
+              _line(Icons.cancel_rounded, 'Decline reason', r.declineReason!.label),
+            if (r.declineNote.isNotEmpty)
+              _line(Icons.comment_rounded, 'Decline note', r.declineNote),
+          ],
+        ),
       ),
       actions: [
         FilledButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Done'),
+          child: const Text('Close'),
         ),
       ],
-    ),
-  );
-
-  void _impact(
-    BuildContext context,
-    CounsellingRequest r,
-  ) => ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        'Draft Wall of Impact post created for ${r.schoolName}; ready for admin approval.',
-      ),
-      backgroundColor: const Color(0xFF6A1B9A),
     ),
   );
 

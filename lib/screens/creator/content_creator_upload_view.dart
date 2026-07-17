@@ -3,19 +3,13 @@ import 'package:flutter/material.dart';
 import '../../core/colors.dart';
 import '../../models/course.dart';
 import '../../models/creator_content.dart';
-import '../../models/event_models.dart';
 import '../../models/quiz_models.dart';
 import '../../models/skill_category.dart';
 import '../../repositories/course_repository.dart';
 import '../../repositories/creator_repository.dart';
-import '../../repositories/event_repository.dart';
-import '../../repositories/quiz_repository.dart';
-import 'create_post_screen.dart';
 import '../learn/admin/create_lesson_screen.dart';
-import '../events/admin/create_event/create_event_view.dart';
 import '../events/admin/create_event/quiz/create_quiz_screen.dart';
 import '../learn/admin/create_free_course_screen.dart';
-import '../learn/admin/manage_skill_categories_screen.dart';
 
 class ContentCreatorUploadView extends StatefulWidget {
   const ContentCreatorUploadView({super.key});
@@ -28,8 +22,6 @@ class ContentCreatorUploadView extends StatefulWidget {
 class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
   List<SkillCategory> _categories = [];
   List<Course> _courses = [];
-  List<EventModel> _events = [];
-  List<QuizSummary> _quizzes = [];
   List<CreatorContentItem> _content = [];
   int? _selectedCategoryId;
   String? _selectedStaticFilter;
@@ -51,17 +43,13 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
       final results = await Future.wait([
         CourseRepository.getCategories(),
         CourseRepository.getCourses(),
-        EventRepository.getEvents(),
-        QuizRepository.getQuizzes(includeInactive: true),
         CreatorRepository.getContent(),
       ]);
       if (!mounted) return;
       setState(() {
         _categories = results[0] as List<SkillCategory>;
         _courses = results[1] as List<Course>;
-        _events = results[2] as List<EventModel>;
-        _quizzes = results[3] as List<QuizSummary>;
-        _content = results[4] as List<CreatorContentItem>;
+        _content = results[2] as List<CreatorContentItem>;
         _loading = false;
       });
     } catch (_) {
@@ -84,11 +72,9 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
           const _UploadHeader(),
           const SizedBox(height: 18),
           _CreateActionGrid(
-            onCreateEvent: _openCreateEvent,
             onCreateFreeCourse: _openCreateCourse,
             onAddLesson: () => _openCreateLesson(),
             onCreateQuiz: _openCreateQuiz,
-            onCreatePost: _openCreatePost,
             onUploadPdfNotes: () => _openCreateLesson(notesFirst: true),
             onReviewPending: () => _showDrafts(recentUploads),
           ),
@@ -122,9 +108,7 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
             _RecentUploadsCard(items: recentUploads, onViewAll: _load),
           const SizedBox(height: 18),
           _QuickActionsCard(
-            onManageSkills: _openManageSkills,
             onAddCourse: _openCreateCourse,
-            onCreatePost: _openCreatePost,
             onViewDrafts: () => _showDrafts(recentUploads),
           ),
         ],
@@ -179,13 +163,6 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
     return items
         .where((item) => (item.category ?? '').toLowerCase() == selectedTitle)
         .toList();
-  }
-
-  Future<void> _openCreateEvent() async {
-    final created = await Navigator.of(context).push<EventModel>(
-      MaterialPageRoute(builder: (_) => const CreateEventView()),
-    );
-    if (created != null) await _load();
   }
 
   Future<void> _openCreateCourse() async {
@@ -246,26 +223,6 @@ class _ContentCreatorUploadViewState extends State<ContentCreatorUploadView> {
       MaterialPageRoute(builder: (_) => const CreateQuizScreen()),
     );
     if (created != null) await _load();
-  }
-
-  Future<void> _openCreatePost() async {
-    final created = await Navigator.of(context).push<CreatorContentItem>(
-      MaterialPageRoute(
-        builder: (_) => CreatePostScreen(
-          courses: _courses,
-          events: _events,
-          quizzes: _quizzes,
-        ),
-      ),
-    );
-    if (created != null) await _load();
-  }
-
-  Future<void> _openManageSkills() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ManageSkillCategoriesScreen()),
-    );
-    await _load();
   }
 
   void _showDrafts(List<_RecentUpload> uploads) {
@@ -329,20 +286,16 @@ class _UploadHeader extends StatelessWidget {
 
 class _CreateActionGrid extends StatelessWidget {
   const _CreateActionGrid({
-    required this.onCreateEvent,
     required this.onCreateFreeCourse,
     required this.onAddLesson,
     required this.onCreateQuiz,
-    required this.onCreatePost,
     required this.onUploadPdfNotes,
     required this.onReviewPending,
   });
 
-  final VoidCallback onCreateEvent;
   final VoidCallback onCreateFreeCourse;
   final VoidCallback onAddLesson;
   final VoidCallback onCreateQuiz;
-  final VoidCallback onCreatePost;
   final VoidCallback onUploadPdfNotes;
   final VoidCallback onReviewPending;
 
@@ -376,20 +329,6 @@ class _CreateActionGrid extends StatelessWidget {
         subtitle: 'Questions and rewards',
         color: AppColors.accent,
         onTap: onCreateQuiz,
-      ),
-      _CreateActionData(
-        icon: Icons.calendar_month_rounded,
-        title: 'Create Event',
-        subtitle: 'NGO event or workshop',
-        color: AppColors.primary,
-        onTap: onCreateEvent,
-      ),
-      _CreateActionData(
-        icon: Icons.campaign_rounded,
-        title: 'Create Post',
-        subtitle: 'Learning or NGO update',
-        color: const Color(0xFF2F8BFF),
-        onTap: onCreatePost,
       ),
       _CreateActionData(
         icon: Icons.pending_actions_rounded,
@@ -891,37 +830,21 @@ class _UploadStatusBadge extends StatelessWidget {
 
 class _QuickActionsCard extends StatelessWidget {
   const _QuickActionsCard({
-    required this.onManageSkills,
     required this.onAddCourse,
-    required this.onCreatePost,
     required this.onViewDrafts,
   });
 
-  final VoidCallback onManageSkills;
   final VoidCallback onAddCourse;
-  final VoidCallback onCreatePost;
   final VoidCallback onViewDrafts;
 
   @override
   Widget build(BuildContext context) {
     final actions = [
       _QuickActionData(
-        icon: Icons.tune_rounded,
-        label: 'Manage Skills',
-        color: AppColors.primary,
-        onTap: onManageSkills,
-      ),
-      _QuickActionData(
         icon: Icons.add_circle_outline_rounded,
         label: 'Add Course',
         color: AppColors.secondary,
         onTap: onAddCourse,
-      ),
-      _QuickActionData(
-        icon: Icons.campaign_rounded,
-        label: 'Create Post',
-        color: const Color(0xFF2F8BFF),
-        onTap: onCreatePost,
       ),
       _QuickActionData(
         icon: Icons.description_outlined,

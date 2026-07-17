@@ -116,11 +116,6 @@ class _ContentCreatorContentViewState extends State<ContentCreatorContentView> {
         case _ContentAction.preview:
           await _showDetails(item);
           return;
-        case _ContentAction.viewAnalytics:
-          _showSnack(
-            'Views: ${item.views}, completion: ${item.completionRate ?? 0}%',
-          );
-          return;
         case _ContentAction.edit:
           await _showEditTitle(item);
           break;
@@ -939,8 +934,7 @@ enum _ContentAction {
   submitReview,
   publish,
   unpublish,
-  delete,
-  viewAnalytics;
+  delete;
 
   String get label => switch (this) {
     _ContentAction.viewDetails => 'View Details',
@@ -950,7 +944,6 @@ enum _ContentAction {
     _ContentAction.publish => 'Publish',
     _ContentAction.unpublish => 'Unpublish',
     _ContentAction.delete => 'Delete',
-    _ContentAction.viewAnalytics => 'View Analytics',
   };
 }
 

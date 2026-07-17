@@ -8,15 +8,12 @@ import '../../repositories/creator_repository.dart';
 import '../../widgets/achievement_certificates_section.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/donation_impact_card.dart';
-import '../events/admin/create_event/create_event_view.dart';
 import '../events/admin/create_event/quiz/create_quiz_screen.dart';
 import '../learn/admin/create_free_course_screen.dart';
 import '../learn/learn_view.dart';
-import 'content_analytics_view.dart';
 import 'content_creator_content_view.dart';
 import 'content_creator_profile_view.dart';
 import 'content_creator_upload_view.dart';
-import 'create_post_screen.dart';
 
 class ContentCreatorShell extends StatefulWidget {
   const ContentCreatorShell({super.key});
@@ -32,7 +29,6 @@ class _ContentCreatorShellState extends State<ContentCreatorShell> {
   Widget build(BuildContext context) {
     final pages = [
       const _CreatorHomeView(),
-      const ContentAnalyticsView(),
       const ContentCreatorUploadView(),
       const ContentCreatorContentView(),
       const ContentCreatorProfileView(),
@@ -52,11 +48,6 @@ class _ContentCreatorShellState extends State<ContentCreatorShell> {
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home_rounded),
             label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.analytics_outlined),
-            selectedIcon: Icon(Icons.analytics_rounded),
-            label: 'Analytics',
           ),
           NavigationDestination(
             icon: Icon(Icons.add_circle_outline_rounded),
@@ -146,15 +137,11 @@ class _CreatorHomeViewState extends State<_CreatorHomeView> {
         else if (_error != null)
           _ErrorCard(message: _error!, onRetry: _retry)
         else ...[
-          _AnalyticsCard(stats: _stats!),
-          const SizedBox(height: 20),
           _CreationToolsSection(drafts: _stats!.drafts),
           const SizedBox(height: 20),
           const _PromoBanner(),
           const SizedBox(height: 20),
           _RecentContentSection(items: _stats!.recentContent),
-          const SizedBox(height: 20),
-          _TopPerformingSection(items: _stats!.topPerforming),
           const SizedBox(height: 20),
           const AchievementCertificatesSection(),
           const SizedBox(height: 20),
@@ -288,171 +275,6 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
-// ─── Analytics Card ──────────────────────────────────────────────────────────
-
-class _AnalyticsCard extends StatelessWidget {
-  const _AnalyticsCard({required this.stats});
-
-  final CreatorHomeStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.trending_up_rounded,
-                  color: AppColors.primary,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Creator Analytics',
-                    style: TextStyle(
-                      color: AppColors.ink,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    'Content overview & management',
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  icon: Icons.description_outlined,
-                  value: '${stats.totalContent}',
-                  label: 'Total Content',
-                  iconColor: AppColors.primary,
-                  bgColor: AppColors.primary.withValues(alpha: 0.10),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _StatTile(
-                  icon: Icons.check_circle_outline_rounded,
-                  value: '${stats.published}',
-                  label: 'Published',
-                  iconColor: AppColors.secondary,
-                  bgColor: AppColors.secondary.withValues(alpha: 0.15),
-                  valueColor: AppColors.secondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  icon: Icons.access_time_rounded,
-                  value: '${stats.pendingReview}',
-                  label: 'Pending Review',
-                  iconColor: AppColors.accent,
-                  bgColor: AppColors.accent.withValues(alpha: 0.12),
-                  valueColor: AppColors.accent,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _StatTile(
-                  icon: Icons.remove_red_eye_outlined,
-                  value: stats.totalViewsLabel,
-                  label: 'Total Views',
-                  iconColor: const Color(0xFF8B5CF6),
-                  bgColor: const Color(0xFF8B5CF6).withValues(alpha: 0.10),
-                  valueColor: const Color(0xFF8B5CF6),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.iconColor,
-    required this.bgColor,
-    this.valueColor = AppColors.ink,
-  });
-
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color iconColor;
-  final Color bgColor;
-  final Color valueColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: iconColor, size: 26),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: valueColor,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.muted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ─── Creation Tools ──────────────────────────────────────────────────────────
 
 class _CreationToolsSection extends StatelessWidget {
@@ -468,16 +290,6 @@ class _CreationToolsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tools = [
-      _ToolEntry(
-        icon: Icons.edit_outlined,
-        title: 'Create Post',
-        subtitle: 'Learning & NGO posts',
-        color: const Color(0xFF3B82F6),
-        onTap: () => _openScaffold(
-          context,
-          const CreatePostScreen(courses: [], events: [], quizzes: []),
-        ),
-      ),
       _ToolEntry(
         icon: Icons.school_outlined,
         title: 'Create Free Course',
@@ -498,13 +310,6 @@ class _CreationToolsSection extends StatelessWidget {
         subtitle: 'Questions & rewards',
         color: const Color(0xFFF59E0B),
         onTap: () => _openScaffold(context, const CreateQuizScreen()),
-      ),
-      _ToolEntry(
-        icon: Icons.calendar_today_outlined,
-        title: 'Create Event',
-        subtitle: 'Workshops & drives',
-        color: const Color(0xFFEF4444),
-        onTap: () => _openScaffold(context, const CreateEventView()),
       ),
       _ToolEntry(
         icon: Icons.folder_open_outlined,
@@ -883,195 +688,3 @@ class _ContentItem extends StatelessWidget {
   }
 }
 
-// ─── Top Performing ──────────────────────────────────────────────────────────
-
-class _TopPerformingSection extends StatelessWidget {
-  const _TopPerformingSection({required this.items});
-
-  final List<CreatorContentItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Top Performing Content',
-              style: TextStyle(
-                color: AppColors.ink,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            GestureDetector(
-              onTap: () {},
-              child: const Text(
-                'View all',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (items.isEmpty)
-          AppCard(
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: Text(
-                  'No published content yet',
-                  style: TextStyle(color: AppColors.muted, fontSize: 13),
-                ),
-              ),
-            ),
-          )
-        else
-          Column(
-            children: [
-              for (int i = 0; i < items.length; i++) ...[
-                _TopPerformingItem(item: items[i]),
-                if (i < items.length - 1) const SizedBox(height: 10),
-              ],
-            ],
-          ),
-      ],
-    );
-  }
-}
-
-class _TopPerformingItem extends StatelessWidget {
-  const _TopPerformingItem({required this.item});
-
-  final CreatorContentItem item;
-
-  static const _typeColors = {
-    'course': Color(0xFF10B981),
-    'lesson': Color(0xFF8B5CF6),
-    'quiz': Color(0xFFF59E0B),
-    'event': Color(0xFFEF4444),
-    'post': Color(0xFF3B82F6),
-  };
-
-  static const _typeIcons = {
-    'course': Icons.menu_book_outlined,
-    'lesson': Icons.play_circle_outline_rounded,
-    'quiz': Icons.help_outline_rounded,
-    'event': Icons.calendar_today_outlined,
-    'post': Icons.description_outlined,
-  };
-
-  String _shortNumber(int value) {
-    if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
-    return '$value';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _typeColors[item.type] ?? AppColors.secondary;
-    final icon = _typeIcons[item.type] ?? Icons.menu_book_outlined;
-
-    return AppCard(
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  item.subtitle ?? item.typeLabel,
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _MetricColumn(
-            icon: Icons.remove_red_eye_outlined,
-            value: _shortNumber(item.views),
-            label: 'Views',
-          ),
-          const SizedBox(width: 16),
-          _MetricColumn(
-            icon: Icons.check_circle_outline_rounded,
-            value: '${item.completionRate ?? 0}%',
-            label: 'Completion',
-          ),
-          const SizedBox(width: 8),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppColors.muted,
-            size: 20,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricColumn extends StatelessWidget {
-  const _MetricColumn({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(icon, color: AppColors.muted, size: 16),
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.ink,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.muted,
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
